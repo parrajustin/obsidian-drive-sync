@@ -5,6 +5,11 @@ import { LogError } from "../log";
 import type { StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
+import type { FileMapOfNodes } from "./file_node";
+import { GetFileMapOfNodes } from "./file_node";
+import { SearchString } from "../lib/search_string_parser";
+import type { Result } from "../lib/result";
+import { Ok } from "../lib/result";
 
 export enum RootSyncType {
     ROOT_SYNCER = "root",
@@ -29,9 +34,10 @@ export class FileSyncer {
     public error: Option<StatusError> = None;
     private _eventRefs: EventRef[] = [];
 
-    constructor(
+    private constructor(
         private _plugin: FirestoreSyncPlugin,
-        private _config: SyncerConfig
+        private _config: SyncerConfig,
+        private _mapOfFileNodes: FileMapOfNodes
     ) {
         void this._plugin.loggedIn.then(async () => {
             const watchRootResult = await WatchRootSettingsFolder(
@@ -45,6 +51,19 @@ export class FileSyncer {
             }
             void this.listenForFileChanges();
         });
+    }
+
+    /** Constructs the file syncer. */
+    public static async constructFileSyncer(
+        plugin: FirestoreSyncPlugin,
+        config: SyncerConfig
+    ): Promise<Result<FileSyncer, StatusError>> {
+        const searchString = SearchString.parse(config.syncQuery);
+        const buildMapOfNodesResult = GetFileMapOfNodes(plugin.app.vault, searchString);
+        if (buildMapOfNodesResult.err) {
+            return buildMapOfNodesResult;
+        }
+        return Ok(new FileSyncer(plugin, config, buildMapOfNodesResult.safeUnwrap()));
     }
 
     public async teardown() {
