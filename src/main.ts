@@ -34,7 +34,6 @@ export default class FirestoreSyncPlugin extends Plugin {
     private _syncers: FileSyncer[] = [];
 
     public override async onload(): Promise<void> {
-        console.log("Main");
         const { promise, resolve } = CreateExternallyResolvablePromise<UserCredential>();
         this.loggedIn = promise;
         this.loggedInResolve = resolve;
@@ -89,7 +88,11 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     public async loadSettings(): Promise<void> {
+        await this.onunload();
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        this.settings.syncers.forEach((config) => {
+            this._syncers.push(new FileSyncer(this, config));
+        });
     }
 
     /** Attempts to login from the settings tab. */
@@ -138,7 +141,7 @@ export default class FirestoreSyncPlugin extends Plugin {
 
     /** Attempts to login to the firebase infra. */
     private async tryLogin(): Promise<Result<Option<UserCredential>, StatusError>> {
-        if (this.settings.email === undefined && this.settings.password === undefined) {
+        if (this.settings.email === undefined || this.settings.password === undefined) {
             return Ok(None);
         }
 

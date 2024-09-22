@@ -6,6 +6,7 @@
     "type": "module",
     "scripts": {
         "dev": "node esbuild.config.mjs",
+        "deploy": "firebase deploy",
         "build": "node esbuild.config.mjs production",
         "version": "node version-bump.mjs",
         "githubaction": "node version-github-action.mjs",

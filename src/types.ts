@@ -1,5 +1,4 @@
 import type { FSWatcher } from "fs";
-import type { Events } from "obsidian";
 
 declare module "obsidian" {
     interface DataAdapterWathcer {
@@ -19,5 +18,9 @@ declare module "obsidian" {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         fn: (...args: any) => void;
         name: string;
+    }
+
+    interface Vault {
+        fileMap: Record<string, TAbstractFile>;
     }
 }

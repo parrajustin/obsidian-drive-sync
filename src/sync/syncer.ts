@@ -1,6 +1,6 @@
 import type { EventRef, TAbstractFile } from "obsidian";
 import type FirestoreSyncPlugin from "../main";
-import { WatchRootSettingsFolder } from "./fileUtil";
+import { WatchRootSettingsFolder } from "./file_util";
 import { LogError } from "../log";
 import type { StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
@@ -13,6 +13,14 @@ export enum RootSyncType {
 
 export interface SyncerConfig {
     type: RootSyncType;
+    /** Sync config identifier. */
+    syncerId: string;
+    /** If data storage encryption is enabled. Only encrypts the data. */
+    dataStorageEncrypted: boolean;
+    /** The password for encryption, all locations must have the same. */
+    encryptionPassword?: string;
+    /** Filter for files. */
+    syncQuery: string;
 }
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
@@ -46,27 +54,42 @@ export class FileSyncer {
     }
 
     private async listenForFileChanges() {
-        this._eventRefs.push(
-            this._plugin.app.vault.on("create", (file) => {
-                void this.createFileListener(file);
-            })
-        );
-        this._eventRefs.push(
-            this._plugin.app.vault.on("delete", (file) => {
-                void this.deleteFileListener(file);
-            })
-        );
-        this._eventRefs.push(
-            this._plugin.app.vault.on("rename", (file, oldPath: string) => {
-                void this.renameFileListener(file, oldPath);
-            })
-        );
+        this._plugin.app.workspace.onLayoutReady(() => {
+            const eventRefs: EventRef[] = [];
+            eventRefs.push(
+                this._plugin.app.vault.on("create", (file) => {
+                    void this.createFileListener(file);
+                })
+            );
+            eventRefs.push(
+                this._plugin.app.vault.on("delete", (file) => {
+                    void this.deleteFileListener(file);
+                })
+            );
+            eventRefs.push(
+                this._plugin.app.vault.on("rename", (file, oldPath: string) => {
+                    void this.renameFileListener(file, oldPath);
+                })
+            );
+            eventRefs.push(
+                this._plugin.app.vault.on("modify", (file) => {
+                    void this.modifyFileListener(file);
+                })
+            );
+            this._eventRefs.push(...eventRefs);
+            for (const ref of eventRefs) {
+                this._plugin.registerEvent(ref);
+            }
+        });
     }
 
     private async rootSettingsFileListener(event: string, fileName: string, path: string) {
         console.log("root folder", event, fileName, path);
     }
 
+    private async modifyFileListener(file: TAbstractFile) {
+        console.log("modify", file);
+    }
     private async createFileListener(file: TAbstractFile) {
         console.log("create", file);
     }

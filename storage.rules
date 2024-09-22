@@ -4,6 +4,10 @@ rules_version = '2';
 // allow write: if firestore.get(
 //    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
+  match /b/{uid} {
+    allow read, write: if request.auth.uid == uid
+  }
+
   match /b/{bucket}/o {
     match /{allPaths=**} {
       allow read, write: if false;
