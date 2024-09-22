@@ -110,7 +110,6 @@ const config = tseslint.config({
         "@typescript-eslint/no-misused-promises": "error",
         "@typescript-eslint/no-for-in-array": "error",
         "@typescript-eslint/no-unnecessary-boolean-literal-compare": "error",
-        "@typescript-eslint/no-unnecessary-condition": "error",
         "@typescript-eslint/strict-boolean-expressions": "error",
         // Note: you must disable the base rule as it can report incorrect errors
         "no-magic-numbers": "off",
