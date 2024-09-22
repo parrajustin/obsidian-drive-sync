@@ -1,7 +1,8 @@
 import type { App } from "obsidian";
 import { PluginSettingTab, Setting } from "obsidian";
 import type TemplaterPlugin from "main";
-import { RootSyncType } from "./sync/rootSyncer";
+import type { SyncerConfig } from "./sync/syncer";
+import { RootSyncType } from "./sync/syncer";
 
 export interface FolderTemplate {
     folder: string;
@@ -15,10 +16,6 @@ export const DEFAULT_SETTINGS: Settings = {
         }
     ]
 };
-
-export interface SyncerConfig {
-    type: RootSyncType;
-}
 
 export interface Settings {
     email?: string;

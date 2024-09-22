@@ -19,7 +19,8 @@ import type { Result, StatusResult } from "./lib/result";
 import { Err, Ok } from "./lib/result";
 import { WrapPromise } from "./lib/wrap_promise";
 import { LogError } from "./log";
-import { CreateExternallyResolvablePromise } from "./lib/externalPromise";
+import { CreateExternallyResolvablePromise } from "./lib/external_promise";
+import { FileSyncer } from "./sync/syncer";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -29,6 +30,8 @@ export default class FirestoreSyncPlugin extends Plugin {
     public settings: Settings;
     public loggedIn: Promise<UserCredential>;
     public loggedInResolve: (user: UserCredential) => void;
+    /** Root file syncers. */
+    private _syncers: FileSyncer[] = [];
 
     public override async onload(): Promise<void> {
         console.log("Main");
@@ -71,8 +74,18 @@ export default class FirestoreSyncPlugin extends Plugin {
         this.addSettingTab(new FirebaseSyncSettingTab(this.app, this));
     }
 
+    public override async onunload(): Promise<void> {
+        for (const syncer of this._syncers) {
+            await syncer.teardown();
+        }
+    }
+
     public async saveSettings(): Promise<void> {
         await this.saveData(this.settings);
+        await this.onunload();
+        this.settings.syncers.forEach((config) => {
+            this._syncers.push(new FileSyncer(this, config));
+        });
     }
 
     public async loadSettings(): Promise<void> {
