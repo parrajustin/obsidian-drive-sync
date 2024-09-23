@@ -7,7 +7,7 @@ service cloud.firestore {
 
     // Match any document in the 'file' collection
     match /file/{file} {
-        allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+        allow read, update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
         allow create: if request.auth != null;
     }
 
