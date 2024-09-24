@@ -8,20 +8,20 @@ import { InternalError, InvalidArgumentError } from "../lib/status_error";
 import { None, Some, type Option } from "../lib/option";
 import { TypeGuard } from "../lib/type_guard";
 
-interface FileNodeParams {
+interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
     fullPath: string;
     ctime: number;
     mtime: number;
     size: number;
     baseName: string;
     extension: string;
-    fileId: Option<string>;
-    userId: Option<string>;
+    fileId: TypeOfData;
+    userId: TypeOfData;
     deleted: boolean;
 }
 
 /** File node for book keeping. */
-export class FileNode {
+export class FileNode<TypeOfData extends Option<string> = Option<string>> {
     /** Full filepath. */
     public fullPath: string;
     /** The creation time. */
@@ -35,13 +35,13 @@ export class FileNode {
     /** File extension (example ".md"). */
     public extension: string;
     /** Uid of the file. */
-    public fileId: Option<string>;
+    public fileId: TypeOfData;
     /** The user id of the authenticated user who made this file. */
-    public userId: Option<string>;
+    public userId: TypeOfData;
     /** Only set by the firestore. */
     public deleted: boolean;
 
-    constructor(config: FileNodeParams) {
+    constructor(config: FileNodeParams<TypeOfData>) {
         this.fullPath = config.fullPath;
         this.ctime = config.ctime;
         this.mtime = config.mtime;
@@ -73,10 +73,15 @@ export class FileNode {
     }
 }
 
-export class FileNodeArray {
-    constructor(public nodes: FileNode[]) {}
+/** Flat array of all nodes to a single file path. */
+export class FileNodeArray<TypeOfData extends Option<string> = Option<string>> {
+    constructor(public nodes: FileNode<TypeOfData>[]) {}
 }
-export type FileMapOfNodes = Map<string, FileMapOfNodes | FileNodeArray>;
+/** A map representing a folder in the `FileNode` representation. */
+export type FileMapOfNodes<TypeOfData extends Option<string> = Option<string>> = Map<
+    string,
+    FileMapOfNodes<TypeOfData> | FileNodeArray<TypeOfData>
+>;
 
 /**
  * Checks if the `node` matches the `searchString`.
@@ -84,10 +89,9 @@ export type FileMapOfNodes = Map<string, FileMapOfNodes | FileNodeArray>;
  * @param searchString search node query.
  * @returns true if the node passes the query.
  */
-export function CheckFileNodeMatchesSearchString(
-    node: FileNode,
-    searchString: SearchString
-): boolean {
+export function CheckFileNodeMatchesSearchString<
+    TypeOfData extends Option<string> = Option<string>
+>(node: FileNode<TypeOfData>, searchString: SearchString): boolean {
     const query = searchString.getParsedQuery();
 
     // check if any of the exclude filters match.
@@ -156,9 +160,14 @@ export function GetAllFileNodes(app: App, searchString: SearchString): FileNode[
     return files;
 }
 
-/** Converts a flat array of FileNodes to a `FileMapOfNodes`. */
-export function ConvertArrayOfNodesToMap(arry: FileNode[]): Result<FileMapOfNodes, StatusError> {
-    const mapOfNodes: FileMapOfNodes = new Map();
+/**
+ * Converts a flat array of FileNodes to a `FileMapOfNodes`. Also checks only a single non deleted
+ * node at each path.
+ */
+export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Option<string>>(
+    arry: FileNode<TypeOfData>[]
+): Result<FileMapOfNodes<TypeOfData>, StatusError> {
+    const mapOfNodes: FileMapOfNodes<TypeOfData> = new Map();
 
     for (const node of arry) {
         const pathSplit = node.fullPath.split("/");
@@ -170,7 +179,10 @@ export function ConvertArrayOfNodesToMap(arry: FileNode[]): Result<FileMapOfNode
         let folderNode = mapOfNodes;
         for (const path of pathSplit) {
             if (!folderNode.has(path)) {
-                folderNode.set(path, new Map<string, FileMapOfNodes | FileNodeArray>());
+                folderNode.set(
+                    path,
+                    new Map<string, FileMapOfNodes<TypeOfData> | FileNodeArray<TypeOfData>>()
+                );
             }
             const selectedFolderNode = folderNode.get(path);
             if (selectedFolderNode === undefined) {
@@ -223,10 +235,12 @@ export function GetFileMapOfNodes(
 }
 
 /** Flattens the file map to get the array of file nodes. */
-export function FlattenFileNodes(fileMap: FileMapOfNodes): FileNode[] {
-    const fileNodes: FileNode[] = [];
+export function FlattenFileNodes<TypeOfData extends Option<string> = Option<string>>(
+    fileMap: FileMapOfNodes<TypeOfData>
+): FileNode<TypeOfData>[] {
+    const fileNodes: FileNode<TypeOfData>[] = [];
 
-    const recursiveCheck = (map: FileMapOfNodes) => {
+    const recursiveCheck = (map: FileMapOfNodes<TypeOfData>) => {
         for (const [_key, value] of map) {
             if (value instanceof FileNodeArray) {
                 fileNodes.push(...value.nodes);
@@ -240,8 +254,10 @@ export function FlattenFileNodes(fileMap: FileMapOfNodes): FileNode[] {
 }
 
 /** Gets a map of the nodes keyed by their file-id. */
-export function MapByFileId(arry: FileNode[]): Map<string, FileNode> {
-    const map = new Map<string, FileNode>();
+export function MapByFileId<TypeOfData extends Option<string> = Option<string>>(
+    arry: FileNode<TypeOfData>[]
+): Map<string, FileNode<TypeOfData>> {
+    const map = new Map<string, FileNode<TypeOfData>>();
     for (const node of arry) {
         if (node.fileId.none) {
             continue;
@@ -253,10 +269,10 @@ export function MapByFileId(arry: FileNode[]): Map<string, FileNode> {
 }
 
 /** Get the non deleted file at a file path. */
-export function GetNonDeletedByFilePath(
-    fileMap: FileMapOfNodes,
+export function GetNonDeletedByFilePath<TypeOfData extends Option<string> = Option<string>>(
+    fileMap: FileMapOfNodes<TypeOfData>,
     filePath: string
-): Result<Option<FileNode>, StatusError> {
+): Result<Option<FileNode<TypeOfData>>, StatusError> {
     const pathSegments = filePath.split("/");
     if (pathSegments.length === 0) {
         return Err(InvalidArgumentError("FilePath is required."));
@@ -266,14 +282,19 @@ export function GetNonDeletedByFilePath(
     for (const path of pathSegments) {
         const node = selectedFileNode.get(path);
         if (node === undefined) {
-            return Err(InvalidArgumentError(`path "${filePath}" somehow undefined!`));
+            // There is no folder to where we want to go.
+            return Ok(None);
         } else if (node instanceof FileNodeArray) {
             return Err(InvalidArgumentError(`path "${filePath}" leads to leaf node.`));
         }
         selectedFileNode = node;
     }
     const expectingNodeArry = selectedFileNode.get(fileName);
-    if (expectingNodeArry === undefined || !(expectingNodeArry instanceof FileNodeArray)) {
+    if (expectingNodeArry === undefined) {
+        // No file with that name found.
+        return Ok(None);
+    }
+    if (!(expectingNodeArry instanceof FileNodeArray)) {
         return Err(InvalidArgumentError(`path "${filePath}" does not lead to a leaf node.`));
     }
     // Ensure there is only a single not deleted node.
@@ -283,5 +304,5 @@ export function GetNonDeletedByFilePath(
     } else if (nonDeletedNodes.length === 0) {
         return Ok(None);
     }
-    return Ok(Some(nonDeletedNodes[0] as FileNode));
+    return Ok(Some(nonDeletedNodes[0] as FileNode<TypeOfData>));
 }

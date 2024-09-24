@@ -60,6 +60,7 @@ export class NoneImpl implements BaseOption<never> {
 }
 
 // Export None as a singleton, then freeze it so it can't be modified
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export const None = new NoneImpl();
 export type None = NoneImpl;
 Object.freeze(None);
