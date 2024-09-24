@@ -21,6 +21,7 @@ import { WrapPromise } from "./lib/wrap_promise";
 import { LogError } from "./log";
 import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
+import { GetOrCreateSyncProgressView, PROGRESS_VIEW_TYPE, SyncProgressView } from "./progressView";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -32,15 +33,15 @@ export default class FirestoreSyncPlugin extends Plugin {
     public loggedInResolve: (user: UserCredential) => void;
     /** Root file syncers. */
     private _syncers: FileSyncer[] = [];
+    /** If a microtask has been created to load syncers. */
+    private _loadingSyncers = false;
 
     public override async onload(): Promise<void> {
-        const { promise, resolve } = CreateExternallyResolvablePromise<UserCredential>();
-        this.loggedIn = promise;
-        this.loggedInResolve = resolve;
-        await this.loadSettings();
-        // TODO: Add SDKs for Firebase products that you want to use
-        // https://firebase.google.com/docs/web/setup#available-libraries
-
+        // Register the sync progress view.
+        this.registerView(PROGRESS_VIEW_TYPE, (leaf) => new SyncProgressView(leaf));
+        this.addRibbonIcon("dice", "Activate view", async () => {
+            await GetOrCreateSyncProgressView(this.app);
+        });
         // Your web app's Firebase configuration
         // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
@@ -56,6 +57,13 @@ export default class FirestoreSyncPlugin extends Plugin {
         // Initialize Firebase
         const firebaseApp = initializeApp(firebaseConfig);
         this.firebaseApp = Some(firebaseApp);
+
+        const { promise, resolve } = CreateExternallyResolvablePromise<UserCredential>();
+        this.loggedIn = promise;
+        this.loggedInResolve = resolve;
+        await this.loadSettings();
+        // TODO: Add SDKs for Firebase products that you want to use
+        // https://firebase.google.com/docs/web/setup#available-libraries
 
         // Try to login into firebase.
         const tryLoginResult = await this.tryLogin();
@@ -74,25 +82,17 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     public override async onunload(): Promise<void> {
-        for (const syncer of this._syncers) {
-            await syncer.teardown();
-        }
+        await this.teardownSyncers();
     }
 
     public async saveSettings(): Promise<void> {
         await this.saveData(this.settings);
-        await this.onunload();
-        this.settings.syncers.forEach((config) => {
-            this._syncers.push(new FileSyncer(this, config));
-        });
+        await this.startupSyncers();
     }
 
     public async loadSettings(): Promise<void> {
-        await this.onunload();
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-        this.settings.syncers.forEach((config) => {
-            this._syncers.push(new FileSyncer(this, config));
-        });
+        await this.startupSyncers();
     }
 
     /** Attempts to login from the settings tab. */
@@ -148,5 +148,60 @@ export default class FirestoreSyncPlugin extends Plugin {
         return (await this.login(this.settings.email, this.settings.password)).andThen((result) =>
             Ok(Some(result))
         );
+    }
+
+    private async teardownSyncers(): Promise<void> {
+        for (const syncer of this._syncers) {
+            await syncer.teardown();
+        }
+    }
+
+    /**
+     * Sets up all the syncers based on their configs. Will shutdown them all if any have an error.
+     */
+    private async startupSyncers() {
+        if (this._loadingSyncers) {
+            return;
+        }
+
+        this._loadingSyncers = true;
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        queueMicrotask(async () => {
+            // Make sure there are no syncers already running.
+            await this.teardownSyncers();
+
+            // Create setup pipelines for all syncers.
+            const setupStatuses: Promise<StatusResult<StatusError>>[] = [];
+            for (const config of this.settings.syncers) {
+                // Create promise to construct the file syncer and set it up.
+                setupStatuses.push(
+                    FileSyncer.constructFileSyncer(this, config).then((syncerResult) => {
+                        console.log("hi");
+                        if (syncerResult.err) {
+                            return Promise.resolve(syncerResult);
+                        }
+                        console.log("hi2");
+                        this._syncers.push(syncerResult.safeUnwrap());
+                        return syncerResult.safeUnwrap().init();
+                    })
+                );
+            }
+
+            // Check if any of the syncers had an error.
+            let tearDown = false;
+            const results = await Promise.all(setupStatuses);
+            for (const result of results) {
+                if (result.err) {
+                    LogError(result.val);
+                    tearDown = true;
+                }
+            }
+
+            // If any did teardown all syncers.
+            if (tearDown) {
+                await this.teardownSyncers();
+            }
+            this._loadingSyncers = false;
+        });
     }
 }

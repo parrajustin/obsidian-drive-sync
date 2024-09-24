@@ -3,6 +3,7 @@
  * changes have to be done to make them the same.
  */
 
+import type { UploadTask } from "firebase/storage";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import type { Result, StatusResult } from "../lib/result";
@@ -14,16 +15,40 @@ import { FlattenFileNodes, GetNonDeletedByFilePath, MapByFileId } from "./file_n
 
 // Denotes the action that should be taken to sync the two states.
 export enum ConvergenceAction {
+    /** Use cloud to update local file. */
     USE_CLOUD = "using_cloud",
+    /** Use local file to update cloud. */
     USE_LOCAL = "using_local",
+    /** Probably not necessary but this says use local but replace the id with the cloud id. */
     USE_LOCAL_BUT_REPLACE_ID = "using_local_need_to_change_id"
 }
 
-export interface ConvergenceUpdate {
-    action: ConvergenceAction;
-    localState: Option<FileNode>;
+interface SharedUpdateData {
+    fileUploadTask?: UploadTask;
+}
+
+interface LocalConvergenceUpdate extends SharedUpdateData {
+    action: ConvergenceAction.USE_LOCAL;
+    localState: Some<FileNode>;
     cloudState: Option<FileNode<Some<string>>>;
 }
+
+interface LocalReplaceIdConvergenceUpdate extends SharedUpdateData {
+    action: ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID;
+    localState: Some<FileNode>;
+    cloudState: Some<FileNode<Some<string>>>;
+}
+
+interface CloudConvergenceUpdate extends SharedUpdateData {
+    action: ConvergenceAction.USE_CLOUD;
+    localState: Option<FileNode>;
+    cloudState: Some<FileNode<Some<string>>>;
+}
+
+export type ConvergenceUpdate =
+    | CloudConvergenceUpdate
+    | LocalConvergenceUpdate
+    | LocalReplaceIdConvergenceUpdate;
 
 /**
  * Ensures that there is only a single update for a path.
@@ -71,13 +96,12 @@ function CreateConvergenceForOnlyLocalNode(
     }
 
     localVisisted.add(localNode);
-    return Ok(
-        Some({
-            action: ConvergenceAction.USE_LOCAL,
-            localState: Some(localNode),
-            cloudState: None
-        })
-    );
+    const update: LocalConvergenceUpdate = {
+        action: ConvergenceAction.USE_LOCAL,
+        localState: Some(localNode),
+        cloudState: None
+    };
+    return Ok(Some(update));
 }
 
 /**
@@ -105,13 +129,12 @@ function CreateConvergenceForOnlyCloudNode(
     }
 
     cloudVisitedByFileId.add(cloudNode.fileId.safeValue());
-    return Ok(
-        Some({
-            action: ConvergenceAction.USE_CLOUD,
-            localState: None,
-            cloudState: Some(cloudNode)
-        })
-    );
+    const update: CloudConvergenceUpdate = {
+        action: ConvergenceAction.USE_CLOUD,
+        localState: None,
+        cloudState: Some(cloudNode)
+    };
+    return Ok(Some(update));
 }
 
 /**
@@ -241,13 +264,13 @@ export function CompareNodesAndGetUpdate(
  * same.
  * @returns Updates necessary to to make both dates the same.
  */
-export async function ConvergeMapsToUpdateStates({
+export function ConvergeMapsToUpdateStates({
     cloudMapRep,
     localMapRep
 }: {
     cloudMapRep: FileMapOfNodes<Some<string>>;
     localMapRep: FileMapOfNodes;
-}): Promise<Result<ConvergenceUpdate[], StatusError>> {
+}): Result<ConvergenceUpdate[], StatusError> {
     const cloudFlatNodes = FlattenFileNodes(cloudMapRep);
     const localFlatNodes = FlattenFileNodes(localMapRep);
     const localMapOfFileId = MapByFileId(localFlatNodes);

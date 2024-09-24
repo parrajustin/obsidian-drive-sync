@@ -1,15 +1,18 @@
 import type { EventRef, TAbstractFile } from "obsidian";
 import type FirestoreSyncPlugin from "../main";
 import { WatchRootSettingsFolder } from "./file_util";
-import { LogError } from "../log";
-import type { StatusError } from "../lib/status_error";
+import { InternalError, type StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import type { FileMapOfNodes } from "./file_node";
 import { GetFileMapOfNodes } from "./file_node";
 import { SearchString } from "../lib/search_string_parser";
-import type { Result } from "../lib/result";
-import { Ok } from "../lib/result";
+import type { Result, StatusResult } from "../lib/result";
+import { Err, Ok } from "../lib/result";
+import { FirebaseSyncer } from "./firebase_syncer";
+import type { UserCredential } from "firebase/auth";
+import type { FirebaseApp } from "firebase/app";
+import { GetOrCreateSyncProgressView } from "../progressView";
 
 export enum RootSyncType {
     ROOT_SYNCER = "root",
@@ -31,39 +34,100 @@ export interface SyncerConfig {
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
 export class FileSyncer {
     public isValid = false;
-    public error: Option<StatusError> = None;
     private _eventRefs: EventRef[] = [];
+    private _firebaseSyncer: Option<FirebaseSyncer> = None;
 
     private constructor(
         private _plugin: FirestoreSyncPlugin,
+        private _firebaseApp: FirebaseApp,
         private _config: SyncerConfig,
         private _mapOfFileNodes: FileMapOfNodes
-    ) {
-        void this._plugin.loggedIn.then(async () => {
-            const watchRootResult = await WatchRootSettingsFolder(
-                this._plugin.app.vault,
-                this.rootSettingsFileListener
-            );
-            if (watchRootResult.err) {
-                this.error = Some(watchRootResult.val);
-                LogError(watchRootResult.val);
-                return;
-            }
-            void this.listenForFileChanges();
-        });
-    }
+    ) {}
 
     /** Constructs the file syncer. */
     public static async constructFileSyncer(
         plugin: FirestoreSyncPlugin,
         config: SyncerConfig
     ): Promise<Result<FileSyncer, StatusError>> {
-        const searchString = SearchString.parse(config.syncQuery);
-        const buildMapOfNodesResult = GetFileMapOfNodes(plugin.app.vault, searchString);
-        if (buildMapOfNodesResult.err) {
-            return buildMapOfNodesResult;
-        }
-        return Ok(new FileSyncer(plugin, config, buildMapOfNodesResult.safeUnwrap()));
+        return new Promise<Result<FileSyncer, StatusError>>((resolve) => {
+            // Wait till the workspace loads to reduce watcher noise.
+            plugin.app.workspace.onLayoutReady(() => {
+                const searchString = SearchString.parse(config.syncQuery);
+                // Get the file map of the filesystem.
+                const buildMapOfNodesResult = GetFileMapOfNodes(plugin.app, searchString);
+                if (buildMapOfNodesResult.err) {
+                    resolve(buildMapOfNodesResult);
+                    return;
+                }
+                // Make sure firebase is not none.
+                const firebaseApp = plugin.firebaseApp;
+                if (firebaseApp.none) {
+                    resolve(Err(InternalError("No firebase app defined")));
+                    return;
+                }
+                // Build the file syncer
+                resolve(
+                    Ok(
+                        new FileSyncer(
+                            plugin,
+                            firebaseApp.safeValue(),
+                            config,
+                            buildMapOfNodesResult.safeUnwrap()
+                        )
+                    )
+                );
+            });
+        });
+    }
+
+    /** Initialize the file syncer. */
+    public async init(): Promise<StatusResult<StatusError>> {
+        console.log("init");
+        // eslint-disable-next-line @typescript-eslint/return-await
+        return await this._plugin.loggedIn
+            .then<StatusResult<StatusError>>(async (creds: UserCredential) => {
+                console.log("3");
+                // Now make the root settings folders are being watched by the listener.
+                const watchRootResult = await WatchRootSettingsFolder(
+                    this._plugin.app.vault,
+                    this.rootSettingsFileListener
+                );
+                if (watchRootResult.err) {
+                    return watchRootResult;
+                }
+                // Also setup the internal files watched now.
+                await this.listenForFileChanges();
+                // Build the firebase syncer and init it.
+                const buildFirebaseSyncer = await FirebaseSyncer.buildFirebaseSyncer(
+                    this._firebaseApp,
+                    creds
+                );
+                if (buildFirebaseSyncer.err) {
+                    return buildFirebaseSyncer;
+                }
+                console.log("4");
+                const firebaseSyncer = buildFirebaseSyncer.safeUnwrap();
+                this._firebaseSyncer = Some(firebaseSyncer);
+                const convergenceUpdates = firebaseSyncer.getConvergenceUpdates(
+                    this._mapOfFileNodes
+                );
+                if (convergenceUpdates.err) {
+                    return convergenceUpdates;
+                }
+                const view = await GetOrCreateSyncProgressView(this._plugin.app);
+                view.addDetectedChanges(convergenceUpdates.safeUnwrap());
+                console.log("convergenceUpdates", convergenceUpdates);
+
+                return Ok();
+            })
+            .then<StatusResult<StatusError>>((result) => {
+                if (result.ok) {
+                    this.isValid = true;
+                } else {
+                    this.isValid = false;
+                }
+                return result;
+            });
     }
 
     public async teardown() {
@@ -73,33 +137,31 @@ export class FileSyncer {
     }
 
     private async listenForFileChanges() {
-        this._plugin.app.workspace.onLayoutReady(() => {
-            const eventRefs: EventRef[] = [];
-            eventRefs.push(
-                this._plugin.app.vault.on("create", (file) => {
-                    void this.createFileListener(file);
-                })
-            );
-            eventRefs.push(
-                this._plugin.app.vault.on("delete", (file) => {
-                    void this.deleteFileListener(file);
-                })
-            );
-            eventRefs.push(
-                this._plugin.app.vault.on("rename", (file, oldPath: string) => {
-                    void this.renameFileListener(file, oldPath);
-                })
-            );
-            eventRefs.push(
-                this._plugin.app.vault.on("modify", (file) => {
-                    void this.modifyFileListener(file);
-                })
-            );
-            this._eventRefs.push(...eventRefs);
-            for (const ref of eventRefs) {
-                this._plugin.registerEvent(ref);
-            }
-        });
+        const eventRefs: EventRef[] = [];
+        eventRefs.push(
+            this._plugin.app.vault.on("create", (file) => {
+                void this.createFileListener(file);
+            })
+        );
+        eventRefs.push(
+            this._plugin.app.vault.on("delete", (file) => {
+                void this.deleteFileListener(file);
+            })
+        );
+        eventRefs.push(
+            this._plugin.app.vault.on("rename", (file, oldPath: string) => {
+                void this.renameFileListener(file, oldPath);
+            })
+        );
+        eventRefs.push(
+            this._plugin.app.vault.on("modify", (file) => {
+                void this.modifyFileListener(file);
+            })
+        );
+        this._eventRefs.push(...eventRefs);
+        for (const ref of eventRefs) {
+            this._plugin.registerEvent(ref);
+        }
     }
 
     private async rootSettingsFileListener(event: string, fileName: string, path: string) {

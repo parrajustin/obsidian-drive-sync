@@ -52,7 +52,7 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
     public fromFirestore(
         _snapshot: QueryDocumentSnapshot<FileDbModel, DocumentData>,
         _options: SnapshotOptions
-    ): FileNode {
+    ): FileNode<Some<string>> {
         const data = _snapshot.data();
         return new FileNode({
             fullPath: data.path,
