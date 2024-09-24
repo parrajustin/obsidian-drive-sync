@@ -119,7 +119,10 @@ export function CheckFileNodeMatchesSearchString<
 }
 
 /** Gets all the file nodes from the filesystem. */
-export function GetAllFileNodes(app: App, searchString: SearchString): FileNode[] {
+export async function GetAllFileNodes(
+    app: App,
+    searchString: SearchString
+): Promise<Result<FileNode[], StatusError>> {
     const files: FileNode[] = [];
 
     // First get all the files from the filemap.
@@ -128,8 +131,12 @@ export function GetAllFileNodes(app: App, searchString: SearchString): FileNode[
         if (!(file instanceof TFile)) {
             continue;
         }
-        const fileId = GetFileUidFromFrontmatter(app, file);
-        const node = FileNode.constructFromTFile(fileName, file, fileId);
+        const fileIdResult = await GetFileUidFromFrontmatter(app, file);
+        if (fileIdResult.err) {
+            return fileIdResult;
+        }
+
+        const node = FileNode.constructFromTFile(fileName, file, fileIdResult.safeUnwrap());
         if (!CheckFileNodeMatchesSearchString(node, searchString)) {
             continue;
         }
@@ -137,7 +144,7 @@ export function GetAllFileNodes(app: App, searchString: SearchString): FileNode[
     }
 
     // TODO: Add .obisdian folder sync.
-    return files;
+    return Ok(files);
 }
 
 /**
@@ -206,12 +213,15 @@ export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Opt
 }
 
 /** Get the map of nodes or files. Use to keep track of file changes. */
-export function GetFileMapOfNodes(
+export async function GetFileMapOfNodes(
     app: App,
     searchString: SearchString
-): Result<FileMapOfNodes, StatusError> {
-    const fileNodes = GetAllFileNodes(app, searchString);
-    return ConvertArrayOfNodesToMap(fileNodes);
+): Promise<Result<FileMapOfNodes, StatusError>> {
+    const fileNodesResult = await GetAllFileNodes(app, searchString);
+    if (fileNodesResult.err) {
+        return fileNodesResult;
+    }
+    return ConvertArrayOfNodesToMap(fileNodesResult.safeUnwrap());
 }
 
 /** Flattens the file map to get the array of file nodes. */

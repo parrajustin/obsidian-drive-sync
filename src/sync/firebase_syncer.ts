@@ -20,6 +20,7 @@ import type { App } from "obsidian";
 import { TFile } from "obsidian";
 import { UploadFileToStorage } from "./cloud_storage_util";
 import { compress } from "brotli-compress";
+import { WriteUidToFile } from "./file_id_util";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
@@ -114,6 +115,12 @@ export class FirebaseSyncer {
                 ? update.cloudState.safeValue().fileId.safeValue()
                 : update.localState.safeValue().fileId.valueOr(uuidv7());
             const tooBigForFirestore = file.stat.size > ONE_HUNDRED_KB_IN_BYTES;
+
+            // For times we have to replace id do that first, next cycle upload.
+            if (update.action === ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID) {
+                const writeUid = await WriteUidToFile(app, file, fileId);
+                return writeUid;
+            }
 
             const node: FileDbModel = {
                 path: file.path,

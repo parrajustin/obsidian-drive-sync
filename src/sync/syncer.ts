@@ -65,7 +65,7 @@ export class FileSyncer {
 
         const searchString = SearchString.parse(config.syncQuery);
         // Get the file map of the filesystem.
-        const buildMapOfNodesResult = GetFileMapOfNodes(plugin.app, searchString);
+        const buildMapOfNodesResult = await GetFileMapOfNodes(plugin.app, searchString);
         if (buildMapOfNodesResult.err) {
             return buildMapOfNodesResult;
         }

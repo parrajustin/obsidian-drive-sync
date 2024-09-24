@@ -3,7 +3,7 @@ import { TFile } from "obsidian";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import { TypeGuard } from "../lib/type_guard";
-import type { StatusResult } from "../lib/result";
+import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { UnknownError } from "../lib/status_error";
@@ -12,25 +12,46 @@ import { uuidv7 } from "../lib/uuid";
 
 export const FILE_ID_FRONTMATTER_KEY = "File Id";
 
+async function ReadFileIdWithoutCache(
+    app: App,
+    file: TFile
+): Promise<Result<Option<string>, StatusError>> {
+    let fileId: Option<string> = None;
+    const processFrontmatter = await WrapPromise(
+        app.fileManager.processFrontMatter(file, (frontmatter) => {
+            if (frontmatter[FILE_ID_FRONTMATTER_KEY] !== undefined) {
+                fileId = Some(frontmatter[FILE_ID_FRONTMATTER_KEY]);
+            }
+        })
+    );
+    if (processFrontmatter.err) {
+        return Err(UnknownError(`Failed to read frontmatter from "${file.path}".`));
+    }
+    return Ok(fileId);
+}
+
 /** Get the file uid from frontmatter. */
-export function GetFileUidFromFrontmatter(app: App, file: TFile): Option<string> {
+export async function GetFileUidFromFrontmatter(
+    app: App,
+    file: TFile
+): Promise<Result<Option<string>, StatusError>> {
     // TODO: Need to look into the cache not being read sometimes.
     const cache = app.metadataCache.getFileCache(file);
     if (cache === null) {
-        return None;
+        return ReadFileIdWithoutCache(app, file);
     }
     const frontmatterCache = cache.frontmatter;
     if (frontmatterCache === undefined) {
-        return None;
+        return ReadFileIdWithoutCache(app, file);
     }
     const uidValue = frontmatterCache[FILE_ID_FRONTMATTER_KEY];
     if (uidValue === undefined) {
-        return None;
+        return ReadFileIdWithoutCache(app, file);
     }
     if (TypeGuard<string>(uidValue, typeof uidValue === "string" || uidValue instanceof String)) {
-        return Some(uidValue);
+        return Ok(Some(uidValue));
     }
-    return None;
+    return ReadFileIdWithoutCache(app, file);
 }
 
 /** Writes the file uid to all files that don't have one. */
@@ -41,8 +62,11 @@ export async function WriteUidToAllFilesIfNecessary(app: App): Promise<StatusRes
             continue;
         }
 
-        const fileUid = GetFileUidFromFrontmatter(app, entry);
-        if (fileUid.some) {
+        const fileUidResult = await GetFileUidFromFrontmatter(app, entry);
+        if (fileUidResult.err) {
+            return fileUidResult;
+        }
+        if (fileUidResult.safeUnwrap().some) {
             continue;
         }
 
