@@ -159,6 +159,7 @@ export class FirebaseSyncer {
                 node.fileStorageRef = uploadCloudStoreResult.safeUnwrap().fullPath;
             }
 
+            // Upload the data to firestore.
             const uploadCloudState = await this.uploadFile(node, fileId);
             console.log("uploadCloudState", uploadCloudState);
             if (uploadCloudState.err) {

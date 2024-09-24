@@ -1,4 +1,4 @@
-import type { DataAdapterWathcer, EventRef, Vault } from "obsidian";
+import { type DataAdapterWathcer, type EventRef, type Vault } from "obsidian";
 import type { Result } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";

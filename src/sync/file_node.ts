@@ -6,7 +6,7 @@ import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { InternalError, InvalidArgumentError } from "../lib/status_error";
 import { None, Some, type Option } from "../lib/option";
-import { TypeGuard } from "../lib/type_guard";
+import { GetFileUidFromFrontmatter } from "./file_id_util";
 
 interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
     fullPath: string;
@@ -116,26 +116,6 @@ export function CheckFileNodeMatchesSearchString<
     }
 
     return false;
-}
-
-/** Get the file uid from frontmatter. */
-export function GetFileUidFromFrontmatter(app: App, file: TFile): Option<string> {
-    const cache = app.metadataCache.getFileCache(file);
-    if (cache === null) {
-        return None;
-    }
-    const frontmatterCache = cache.frontmatter;
-    if (frontmatterCache === undefined) {
-        return None;
-    }
-    const uidValue = frontmatterCache["uid"];
-    if (uidValue === undefined) {
-        return None;
-    }
-    if (TypeGuard<string>(uidValue, typeof uidValue === "string" || uidValue instanceof String)) {
-        return Some(uidValue);
-    }
-    return None;
 }
 
 /** Gets all the file nodes from the filesystem. */

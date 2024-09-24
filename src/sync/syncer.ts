@@ -13,6 +13,7 @@ import { FirebaseSyncer } from "./firebase_syncer";
 import type { UserCredential } from "firebase/auth";
 import type { FirebaseApp } from "firebase/app";
 import { GetOrCreateSyncProgressView } from "../progressView";
+import { WriteUidToAllFilesIfNecessary } from "./file_id_util";
 
 export enum RootSyncType {
     ROOT_SYNCER = "root",
@@ -49,35 +50,39 @@ export class FileSyncer {
         plugin: FirestoreSyncPlugin,
         config: SyncerConfig
     ): Promise<Result<FileSyncer, StatusError>> {
-        return new Promise<Result<FileSyncer, StatusError>>((resolve) => {
-            // Wait till the workspace loads to reduce watcher noise.
+        // Wait till the workspace loads to reduce watcher noise.
+        await new Promise<void>((onLayoutResolve) => {
             plugin.app.workspace.onLayoutReady(() => {
-                const searchString = SearchString.parse(config.syncQuery);
-                // Get the file map of the filesystem.
-                const buildMapOfNodesResult = GetFileMapOfNodes(plugin.app, searchString);
-                if (buildMapOfNodesResult.err) {
-                    resolve(buildMapOfNodesResult);
-                    return;
-                }
-                // Make sure firebase is not none.
-                const firebaseApp = plugin.firebaseApp;
-                if (firebaseApp.none) {
-                    resolve(Err(InternalError("No firebase app defined")));
-                    return;
-                }
-                // Build the file syncer
-                resolve(
-                    Ok(
-                        new FileSyncer(
-                            plugin,
-                            firebaseApp.safeValue(),
-                            config,
-                            buildMapOfNodesResult.safeUnwrap()
-                        )
-                    )
-                );
+                onLayoutResolve();
             });
         });
+
+        // First I'm gonna make sure all markdown files have a fileId
+        const fileUidWrite = await WriteUidToAllFilesIfNecessary(plugin.app);
+        if (fileUidWrite.err) {
+            return fileUidWrite;
+        }
+
+        const searchString = SearchString.parse(config.syncQuery);
+        // Get the file map of the filesystem.
+        const buildMapOfNodesResult = GetFileMapOfNodes(plugin.app, searchString);
+        if (buildMapOfNodesResult.err) {
+            return buildMapOfNodesResult;
+        }
+        // Make sure firebase is not none.
+        const firebaseApp = plugin.firebaseApp;
+        if (firebaseApp.none) {
+            return Err(InternalError("No firebase app defined"));
+        }
+        // Build the file syncer
+        return Ok(
+            new FileSyncer(
+                plugin,
+                firebaseApp.safeValue(),
+                config,
+                buildMapOfNodesResult.safeUnwrap()
+            )
+        );
     }
 
     /** Initialize the file syncer. */
