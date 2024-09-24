@@ -119,13 +119,13 @@ export class FileSyncer {
                 if (convergenceUpdates.err) {
                     return convergenceUpdates;
                 }
-                const cloudResolveResult = await firebaseSyncer.resolveUsingCloudConvergenceUpdates(
-                    this._plugin.app,
-                    convergenceUpdates.safeUnwrap()
-                );
-                if (cloudResolveResult.err) {
-                    return cloudResolveResult;
-                }
+                // const cloudResolveResult = await firebaseSyncer.resolveUsingCloudConvergenceUpdates(
+                //     this._plugin.app,
+                //     convergenceUpdates.safeUnwrap()
+                // );
+                // if (cloudResolveResult.err) {
+                //     return cloudResolveResult;
+                // }
                 // const localResolverResult =
                 //     await firebaseSyncer.resolveUsingLocalConvergenceUpdates(
                 //         this._plugin.app,

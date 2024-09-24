@@ -27,7 +27,7 @@ import type { ConvergenceUpdate } from "./converge_file_models";
 import { ConvergeMapsToUpdateStates, ConvergenceAction } from "./converge_file_models";
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
-import { UploadFileToStorage } from "./cloud_storage_util";
+import { DownloadFileFromStorage, UploadFileToStorage } from "./cloud_storage_util";
 import { compress, decompress } from "brotli-compress";
 import { WriteUidToFile } from "./file_id_util";
 import { Buffer } from "buffer";
@@ -203,6 +203,7 @@ export class FirebaseSyncer {
 
             // First check the easy path. The file was small enough to fit into firestore.
             const textData = update.cloudState.safeValue().data;
+            const cloudStorageRef = update.cloudState.safeValue().fileStorageRef;
             if (textData !== undefined) {
                 const encodedData = Buffer.from(textData);
                 const dataCompresssed = await WrapPromise(decompress(encodedData));
@@ -213,6 +214,12 @@ export class FirebaseSyncer {
                     );
                 }
                 dataToWrite = Some(dataCompresssed.safeUnwrap());
+            } else if (cloudStorageRef !== undefined) {
+                const getDataResult = await DownloadFileFromStorage(cloudStorageRef);
+                if (getDataResult.err) {
+                    return getDataResult;
+                }
+                dataToWrite = Some(new Uint8Array(getDataResult.safeUnwrap()));
             }
 
             if (dataToWrite.none) {

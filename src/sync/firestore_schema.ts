@@ -65,7 +65,8 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             fileId: Some(_snapshot.id),
             userId: Some(data.userId),
             deleted: data.deleted,
-            data: data.data
+            data: data.data,
+            fileStorageRef: data.fileStorageRef
         });
     }
 }

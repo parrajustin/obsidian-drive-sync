@@ -1,6 +1,6 @@
 import type { UserCredential } from "firebase/auth";
 import type { UploadTask } from "firebase/storage";
-import { getStorage, ref, uploadBytesResumable } from "firebase/storage";
+import { getBytes, getStorage, ref, uploadBytesResumable } from "firebase/storage";
 import type { App, TFile } from "obsidian";
 import type { Result } from "../lib/result";
 import { Err, Ok } from "../lib/result";
@@ -22,7 +22,6 @@ export async function UploadFileToStorage(
 ): Promise<Result<UploadFileToStorageResult, StatusError>> {
     const storage = getStorage();
     const storageRef = ref(storage, `${userCreds.user.uid}/${fileId}`);
-    storageRef.fullPath;
     const data = await WrapPromise(app.vault.readBinary(file));
     if (data.err) {
         return Err(
@@ -34,4 +33,21 @@ export async function UploadFileToStorage(
         uploadTask: uploadBytesResumable(storageRef, data.safeUnwrap()),
         fullPath: storageRef.fullPath
     });
+}
+
+/** Download the file from cloud storage as bytes. */
+export async function DownloadFileFromStorage(
+    fileStorageRef: string
+): Promise<Result<ArrayBuffer, StatusError>> {
+    const storage = getStorage();
+    const storageRef = ref(storage, fileStorageRef);
+    const byteDataResult = await WrapPromise(getBytes(storageRef));
+    if (byteDataResult.err) {
+        return byteDataResult.mapErr((err) =>
+            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+            UnknownError(`[DownloadFileFromStorage] failed to get bytes. "${err}"`)
+        );
+    }
+
+    return Ok(byteDataResult.safeUnwrap());
 }

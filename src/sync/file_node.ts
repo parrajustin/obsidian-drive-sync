@@ -19,6 +19,7 @@ interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
     userId: TypeOfData;
     deleted: boolean;
     data?: number[];
+    fileStorageRef?: string;
 }
 
 /** File node for book keeping. */
@@ -41,7 +42,10 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
     public userId: TypeOfData;
     /** Only set by the firestore. */
     public deleted: boolean;
+    /** Data from the cloud storage compress with brotli encoded in uint8. */
     public data?: number[];
+    /** Storage path on cloud storage if any. */
+    public fileStorageRef?: string;
 
     constructor(config: FileNodeParams<TypeOfData>) {
         this.fullPath = config.fullPath;
@@ -54,6 +58,7 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
         this.userId = config.userId;
         this.deleted = config.deleted;
         this.data = config.data;
+        this.fileStorageRef = config.fileStorageRef;
     }
 
     /** Constructs the FileNode from TFiles. */
