@@ -114,6 +114,15 @@ export class FileSyncer {
                 if (convergenceUpdates.err) {
                     return convergenceUpdates;
                 }
+                // const localResolverResult =
+                //     await firebaseSyncer.resolveUsingLocalConvergenceUpdates(
+                //         this._plugin.app,
+                //         convergenceUpdates.safeUnwrap()
+                //     );
+                // console.log("localResolverResult", localResolverResult);
+                // if (localResolverResult.err) {
+                //     return localResolverResult;
+                // }
                 const view = await GetOrCreateSyncProgressView(this._plugin.app);
                 view.addDetectedChanges(convergenceUpdates.safeUnwrap());
                 console.log("convergenceUpdates", convergenceUpdates);

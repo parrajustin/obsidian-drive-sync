@@ -7,7 +7,8 @@ import type { UserCredential } from "firebase/auth";
 import type { Result } from "../lib/result";
 import { Err, Ok, type StatusResult } from "../lib/result";
 import { NotFoundError, UnknownError, type StatusError } from "../lib/status_error";
-import type { Option, Some } from "../lib/option";
+import type { Option } from "../lib/option";
+import { Some } from "../lib/option";
 import { None } from "../lib/option";
 import type { FileDbModel } from "./firestore_schema";
 import { FileSchemaConverter } from "./firestore_schema";
@@ -18,6 +19,7 @@ import { ConvergeMapsToUpdateStates, ConvergenceAction } from "./converge_file_m
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
 import { UploadFileToStorage } from "./cloud_storage_util";
+import { compress } from "brotli-compress";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
@@ -133,7 +135,16 @@ export class FirebaseSyncer {
                         UnknownError(`Failed to read string "${err}".`)
                     );
                 }
-                node.data = readDataResult.safeUnwrap();
+                const data = new TextEncoder().encode(readDataResult.safeUnwrap());
+                const dataCompresssed = await WrapPromise(compress(data));
+                if (dataCompresssed.err) {
+                    return dataCompresssed.mapErr((err) =>
+                        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+                        UnknownError(`Failed to compress data "${err}".`)
+                    );
+                }
+
+                node.data = new TextDecoder().decode(dataCompresssed.safeUnwrap());
             } else {
                 const uploadCloudStoreResult = await UploadFileToStorage(
                     app,
@@ -149,14 +160,20 @@ export class FirebaseSyncer {
             }
 
             const uploadCloudState = await this.uploadFile(node, fileId);
+            console.log("uploadCloudState", uploadCloudState);
             if (uploadCloudState.err) {
                 return uploadCloudState;
             }
+
+            // Update the local file node.
+            update.localState.safeValue().fileId = Some(fileId);
+            update.localState.safeValue().userId = Some(this._creds.user.uid);
         }
 
         return Ok();
     }
 
+    /** Upload the file to firestore. */
     private async uploadFile(
         node: FileDbModel,
         fileId: string
