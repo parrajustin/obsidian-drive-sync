@@ -18,6 +18,7 @@ interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
     fileId: TypeOfData;
     userId: TypeOfData;
     deleted: boolean;
+    data?: number[];
 }
 
 /** File node for book keeping. */
@@ -40,6 +41,7 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
     public userId: TypeOfData;
     /** Only set by the firestore. */
     public deleted: boolean;
+    public data?: number[];
 
     constructor(config: FileNodeParams<TypeOfData>) {
         this.fullPath = config.fullPath;
@@ -51,6 +53,7 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
         this.fileId = config.fileId;
         this.userId = config.userId;
         this.deleted = config.deleted;
+        this.data = config.data;
     }
 
     /** Constructs the FileNode from TFiles. */

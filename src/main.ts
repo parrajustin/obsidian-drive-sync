@@ -22,6 +22,7 @@ import { LogError } from "./log";
 import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
 import { GetOrCreateSyncProgressView, PROGRESS_VIEW_TYPE, SyncProgressView } from "./progressView";
+import { compress, decompress } from "brotli-compress";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -37,6 +38,7 @@ export default class FirestoreSyncPlugin extends Plugin {
     private _loadingSyncers = false;
 
     public override async onload(): Promise<void> {
+        console.log(compress, decompress);
         // Register the sync progress view.
         this.registerView(PROGRESS_VIEW_TYPE, (leaf) => new SyncProgressView(leaf));
         this.addRibbonIcon("dice", "Activate view", async () => {

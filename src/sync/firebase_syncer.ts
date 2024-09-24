@@ -2,11 +2,20 @@ import type { FirebaseApp } from "firebase/app";
 import type { FileNode } from "./file_node";
 import { ConvertArrayOfNodesToMap, type FileMapOfNodes } from "./file_node";
 import type { Firestore } from "firebase/firestore";
-import { collection, doc, getDocs, getFirestore, query, setDoc, where } from "firebase/firestore";
+import {
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    getFirestore,
+    query,
+    setDoc,
+    where
+} from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
 import type { Result } from "../lib/result";
 import { Err, Ok, type StatusResult } from "../lib/result";
-import { NotFoundError, UnknownError, type StatusError } from "../lib/status_error";
+import { InternalError, NotFoundError, UnknownError, type StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
 import { Some } from "../lib/option";
 import { None } from "../lib/option";
@@ -19,8 +28,9 @@ import { ConvergeMapsToUpdateStates, ConvergenceAction } from "./converge_file_m
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
 import { UploadFileToStorage } from "./cloud_storage_util";
-import { compress } from "brotli-compress";
+import { compress, decompress } from "brotli-compress";
 import { WriteUidToFile } from "./file_id_util";
+import { Buffer } from "buffer";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
@@ -142,8 +152,8 @@ export class FirebaseSyncer {
                         UnknownError(`Failed to read string "${err}".`)
                     );
                 }
-                const data = new TextEncoder().encode(readDataResult.safeUnwrap());
-                const dataCompresssed = await WrapPromise(compress(data));
+                const buffer = Buffer.from(readDataResult.safeUnwrap());
+                const dataCompresssed = await WrapPromise(compress(buffer));
                 if (dataCompresssed.err) {
                     return dataCompresssed.mapErr((err) =>
                         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -151,7 +161,7 @@ export class FirebaseSyncer {
                     );
                 }
 
-                node.data = new TextDecoder().decode(dataCompresssed.safeUnwrap());
+                node.data = [...dataCompresssed.safeUnwrap()];
             } else {
                 const uploadCloudStoreResult = await UploadFileToStorage(
                     app,
@@ -176,6 +186,74 @@ export class FirebaseSyncer {
             // Update the local file node.
             update.localState.safeValue().fileId = Some(fileId);
             update.localState.safeValue().userId = Some(this._creds.user.uid);
+        }
+
+        return Ok();
+    }
+
+    public async resolveUsingCloudConvergenceUpdates(
+        app: App,
+        updates: ConvergenceUpdate[]
+    ): Promise<StatusResult<StatusError>> {
+        const cloudUpdates = updates.filter((v) => v.action === ConvergenceAction.USE_CLOUD);
+
+        for (const update of cloudUpdates) {
+            const fileId = update.cloudState.safeValue().fileId.safeValue();
+            let dataToWrite: Option<Uint8Array> = None;
+
+            // First check the easy path. The file was small enough to fit into firestore.
+            const textData = update.cloudState.safeValue().data;
+            if (textData !== undefined) {
+                const encodedData = Buffer.from(textData);
+                const dataCompresssed = await WrapPromise(decompress(encodedData));
+                if (dataCompresssed.err) {
+                    return dataCompresssed.mapErr((err) =>
+                        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+                        UnknownError(`Failed to compress data "${err}".`)
+                    );
+                }
+                dataToWrite = Some(dataCompresssed.safeUnwrap());
+            }
+
+            if (dataToWrite.none) {
+                return Err(UnknownError(`Unable to get data to write for "${fileId}`));
+            }
+
+            const file = app.vault.getAbstractFileByPath(update.cloudState.safeValue().fullPath);
+            if (file === null) {
+                const createResult = await WrapPromise(
+                    app.vault.createBinary(
+                        update.cloudState.safeValue().fullPath,
+                        dataToWrite.safeValue()
+                    )
+                );
+                if (createResult.err) {
+                    return createResult.mapErr((err) =>
+                        UnknownError(
+                            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+                            `Failed to create file for "${update.cloudState.safeValue().fullPath}" "${err}".`
+                        )
+                    );
+                }
+            } else if (file instanceof TFile) {
+                const modifyResult = await WrapPromise(
+                    app.vault.modifyBinary(file, dataToWrite.safeValue())
+                );
+                if (modifyResult.err) {
+                    return modifyResult.mapErr((err) =>
+                        UnknownError(
+                            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+                            `Failed to modify file for "${update.cloudState.safeValue().fullPath}" "${err}".`
+                        )
+                    );
+                }
+            } else {
+                return Err(
+                    InternalError(
+                        `File "${update.cloudState.safeValue().fullPath}" leads to a folder when file is expected!`
+                    )
+                );
+            }
         }
 
         return Ok();

@@ -206,11 +206,12 @@ export function CompareNodesAndGetUpdate(
     const lNode = localNode.safeValue();
     // Cloud node removing the option.
     const cNode = cloudNode.safeValue();
+    const notMarkdownFile = lNode.extension !== "md";
     if (
         lNode.mtime === cNode.mtime &&
         lNode.fullPath === cNode.fullPath &&
         lNode.deleted === cNode.deleted &&
-        lNode.fileId.valueOr("") === cNode.fileId.safeValue() &&
+        (lNode.fileId.valueOr("") === cNode.fileId.safeValue() || notMarkdownFile) &&
         lNode.size === cNode.size
     ) {
         // No update needed, everything is the same.

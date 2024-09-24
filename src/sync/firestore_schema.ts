@@ -27,7 +27,7 @@ export interface FileDbModel {
     /** If the file has been deleted. */
     deleted: boolean;
     /** The data of the file if less than 100Kb */
-    data?: string;
+    data?: number[];
     /** The location of the file in cloud storage if not in `data`. */
     fileStorageRef?: string;
 }
@@ -54,6 +54,7 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
         _options: SnapshotOptions
     ): FileNode<Some<string>> {
         const data = _snapshot.data();
+
         return new FileNode({
             fullPath: data.path,
             ctime: data.cTime,
@@ -63,7 +64,8 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             extension: data.ext,
             fileId: Some(_snapshot.id),
             userId: Some(data.userId),
-            deleted: data.deleted
+            deleted: data.deleted,
+            data: data.data
         });
     }
 }
