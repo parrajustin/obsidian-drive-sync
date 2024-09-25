@@ -19,7 +19,7 @@ export enum ConvergenceAction {
     USE_CLOUD = "using_cloud",
     /** Use local file to update cloud. */
     USE_LOCAL = "using_local",
-    /** These files take 2 cycles to update. 1 to change the id, another to upload. */
+    /** Uses the local state but repalces local id with the cloud id. */
     USE_LOCAL_BUT_REPLACE_ID = "using_local_need_to_change_id"
 }
 
