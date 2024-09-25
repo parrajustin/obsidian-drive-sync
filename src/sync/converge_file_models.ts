@@ -24,6 +24,7 @@ export enum ConvergenceAction {
 }
 
 interface SharedUpdateData {
+    /** Cloud upload data. */
     fileUploadTask?: UploadTask;
 }
 
@@ -43,6 +44,8 @@ interface CloudConvergenceUpdate extends SharedUpdateData {
     action: ConvergenceAction.USE_CLOUD;
     localState: Option<FileNode>;
     cloudState: Some<FileNode<Some<string>>>;
+    /** A full file path of a possible left over local file. */
+    leftOverLocalFile: Option<string>;
 }
 
 export type ConvergenceUpdate =
@@ -132,7 +135,8 @@ function CreateConvergenceForOnlyCloudNode(
     const update: CloudConvergenceUpdate = {
         action: ConvergenceAction.USE_CLOUD,
         localState: None,
-        cloudState: Some(cloudNode)
+        cloudState: Some(cloudNode),
+        leftOverLocalFile: None
     };
     return Ok(Some(update));
 }
@@ -249,13 +253,15 @@ export function CompareNodesAndGetUpdate(
     localVisisted.add(lNode);
     cloudVisitedByFileId.add(cNode.fileId.safeValue());
     const pathResult = EnsureReservedPathValidity(reservedFullPath, cNode);
+    const hasLeftOverLocalFile = lNode.fullPath !== cNode.fullPath;
     if (pathResult.err) {
         return pathResult;
     }
     const action: ConvergenceUpdate = {
         action: ConvergenceAction.USE_CLOUD,
         localState: localNode,
-        cloudState: cloudNode
+        cloudState: cloudNode,
+        leftOverLocalFile: hasLeftOverLocalFile ? Some(lNode.fullPath) : None
     };
     return Ok(Some(action));
 }

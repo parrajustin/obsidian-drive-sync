@@ -24,6 +24,8 @@ import { WriteUidToFile } from "./file_id_util";
 import type { FileDbModel } from "./firestore_schema";
 import type { UserCredential } from "firebase/auth";
 import { GetOrCreateSyncProgressView } from "../progressView";
+import type { FileMapOfNodes } from "./file_node";
+import { GetNonDeletedByFilePath } from "./file_node";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
@@ -238,7 +240,8 @@ export function CreateOperationsToUpdateLocal(
                 const createResult = await WrapPromise(
                     app.vault.createBinary(
                         update.cloudState.safeValue().fullPath,
-                        dataToWrite.safeValue()
+                        dataToWrite.safeValue(),
+                        { mtime: update.cloudState.safeValue().mtime }
                     )
                 );
                 view.setEntryProgress(fileId, 0.75);
@@ -251,7 +254,9 @@ export function CreateOperationsToUpdateLocal(
                 }
             } else if (file instanceof TFile) {
                 const modifyResult = await WrapPromise(
-                    app.vault.modifyBinary(file, dataToWrite.safeValue())
+                    app.vault.modifyBinary(file, dataToWrite.safeValue(), {
+                        mtime: update.cloudState.safeValue().mtime
+                    })
                 );
                 view.setEntryProgress(fileId, 0.75);
                 if (modifyResult.err) {
@@ -268,10 +273,78 @@ export function CreateOperationsToUpdateLocal(
                     )
                 );
             }
+
+            // Update local file if there is one.
+            if (update.localState.some) {
+                update.localState.safeValue().overwrite(update.cloudState.safeValue());
+            }
+
+            // Update progress view.
             view.setEntryProgress(fileId, 1);
             return Ok();
         }
     );
 
     return ops;
+}
+
+/**
+ * Cleans up the local left over files for download cloud files.
+ * @param app obsidian app
+ * @param updates convergence updates
+ * @param localFileNodes the local file nodes
+ * @returns result of operation
+ */
+export async function CleanUpLeftOverLocalFiles(
+    app: App,
+    updates: ConvergenceUpdate[],
+    localFileNodes: FileMapOfNodes
+): Promise<StatusResult<StatusError>> {
+    for (const update of updates) {
+        if (update.action !== ConvergenceAction.USE_CLOUD) {
+            continue;
+        }
+
+        // Look for cloud updates that possible have a left over local file.
+        const possibleLocalFile = update.leftOverLocalFile;
+        if (possibleLocalFile.none) {
+            continue;
+        }
+
+        // Check to make sure nothing else used that local file path.
+        const realLocalFileResult = GetNonDeletedByFilePath(
+            localFileNodes,
+            possibleLocalFile.safeValue()
+        );
+        if (realLocalFileResult.err) {
+            return realLocalFileResult;
+        }
+
+        // check if the option has a value.
+        const fileOption = realLocalFileResult.safeUnwrap();
+        if (fileOption.some) {
+            // Another file is using the directory
+            continue;
+        }
+
+        // The file was not found in any current localFileNodes therefore it is a left over file.
+        const file = app.vault.getAbstractFileByPath(possibleLocalFile.safeValue());
+        if (file === null) {
+            // Somehow the file is gone? *shrug* I guess the problem is gone?
+            console.error("left over local file error gone");
+            continue;
+        }
+
+        // Now sent the file to trash.
+        const trashResult = await WrapPromise(app.vault.trash(file, /*system=*/ true));
+        if (trashResult.err) {
+            return trashResult.mapErr(
+                ConvertToUnknownError(
+                    `Faild to send to trash local file ${possibleLocalFile.safeValue()}`
+                )
+            );
+        }
+    }
+
+    return Ok();
 }

@@ -76,6 +76,20 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
         });
     }
 
+    public overwrite(other: FileNode<TypeOfData>) {
+        this.fullPath = other.fullPath;
+        this.ctime = other.ctime;
+        this.mtime = other.mtime;
+        this.size = other.size;
+        this.baseName = other.baseName;
+        this.extension = other.extension;
+        this.fileId = other.fileId;
+        this.userId = other.userId;
+        this.deleted = other.deleted;
+        this.data = other.data;
+        this.fileStorageRef = other.fileStorageRef;
+    }
+
     public toString() {
         return this.fullPath;
     }

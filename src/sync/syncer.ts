@@ -5,7 +5,7 @@ import { InternalError, type StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import type { FileMapOfNodes } from "./file_node";
-import { GetFileMapOfNodes } from "./file_node";
+import { ConvertArrayOfNodesToMap, FlattenFileNodes, GetFileMapOfNodes } from "./file_node";
 import { SearchString } from "../lib/search_string_parser";
 import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
@@ -15,6 +15,7 @@ import type { FirebaseApp } from "firebase/app";
 import { GetOrCreateSyncProgressView } from "../progressView";
 import { WriteUidToAllFilesIfNecessary } from "./file_id_util";
 import { LogError } from "../log";
+import { CleanUpLeftOverLocalFiles } from "./syncer_update_util";
 
 export enum RootSyncType {
     ROOT_SYNCER = "root",
@@ -229,6 +230,24 @@ export class FileSyncer {
             if (result.err) {
                 return result;
             }
+        }
+
+        // Fix the local file map representation.
+        const flatFiles = FlattenFileNodes(this._mapOfFileNodes);
+        const resultOfMap = ConvertArrayOfNodesToMap(flatFiles);
+        if (resultOfMap.err) {
+            return resultOfMap;
+        }
+        this._mapOfFileNodes = resultOfMap.safeUnwrap();
+
+        // Clean up local files
+        const cleanUpResult = await CleanUpLeftOverLocalFiles(
+            this._plugin.app,
+            convergenceUpdates.safeUnwrap(),
+            this._mapOfFileNodes
+        );
+        if (cleanUpResult.err) {
+            return cleanUpResult;
         }
 
         const endTime = window.performance.now();

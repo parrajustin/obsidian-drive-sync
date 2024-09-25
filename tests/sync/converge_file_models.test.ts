@@ -130,7 +130,77 @@ describe("ConvergeMapsToUpdateStates", () => {
             {
                 action: "using_cloud",
                 localState: None,
-                cloudState: Some(cloudNodes[0])
+                cloudState: Some(cloudNodes[0]),
+                leftOverLocalFile: None
+            }
+        ]);
+    });
+
+    test("returns valid change for moving local node based on cloud node.", async () => {
+        const cloudNodes: FileNode<Some<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: false
+            }),
+            new FileNode({
+                fullPath: "folder/file_1/file_2.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: Some("ID2"),
+                userId: Some("User1"),
+                deleted: false
+            })
+        ];
+        const localNodes: FileNode<Some<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1/file_2.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: Some("ID2"),
+                userId: Some("User1"),
+                deleted: false
+            }),
+            new FileNode({
+                fullPath: "file_1.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: false
+            })
+        ];
+
+        const localMapRep = ConvertArrayOfNodesToMap(localNodes);
+        expect(localMapRep.ok).toBeTruthy();
+        const cloudMapRep = ConvertArrayOfNodesToMap(cloudNodes);
+        expect(cloudMapRep.ok).toBeTruthy();
+        const result = await ConvergeMapsToUpdateStates({
+            localMapRep: localMapRep.unsafeUnwrap(),
+            cloudMapRep: cloudMapRep.unsafeUnwrap()
+        });
+        expect(result.ok).toBeTruthy();
+        expect(result.val).toStrictEqual([
+            {
+                action: "using_cloud",
+                localState: Some(localNodes[1]),
+                cloudState: Some(cloudNodes[0]),
+                leftOverLocalFile: Some("file_1.md")
             }
         ]);
     });
