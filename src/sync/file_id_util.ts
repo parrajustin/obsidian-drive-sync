@@ -1,4 +1,4 @@
-import type { App, TAbstractFile } from "obsidian";
+import type { App, DataWriteOptions, TAbstractFile } from "obsidian";
 import { TFile } from "obsidian";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
@@ -82,12 +82,17 @@ export async function WriteUidToAllFilesIfNecessary(app: App): Promise<StatusRes
 export async function WriteUidToFile(
     app: App,
     file: TFile,
-    uid: string
+    uid: string,
+    dataWriteOptions?: DataWriteOptions
 ): Promise<StatusResult<StatusError>> {
     const processFrontmatter = await WrapPromise(
-        app.fileManager.processFrontMatter(file, (frontmatter) => {
-            frontmatter[FILE_ID_FRONTMATTER_KEY] = uid;
-        })
+        app.fileManager.processFrontMatter(
+            file,
+            (frontmatter) => {
+                frontmatter[FILE_ID_FRONTMATTER_KEY] = uid;
+            },
+            dataWriteOptions
+        )
     );
     if (processFrontmatter.err) {
         return Err(UnknownError(`Failed to write frontmatter to "${uid}".`));
