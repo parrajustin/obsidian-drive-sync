@@ -119,6 +119,19 @@ export class FileSyncer {
                 if (convergenceUpdates.err) {
                     return convergenceUpdates;
                 }
+                const view = await GetOrCreateSyncProgressView(this._plugin.app);
+                view.newSyncerCycle();
+                // const buildConvergenceOperations = firebaseSyncer.resolveConvergenceUpdates(
+                //     this._plugin.app,
+                //     convergenceUpdates.safeUnwrap()
+                // );
+                // console.log('after newSyncerCycle');
+                // const running = Promise.all(buildConvergenceOperations);
+                // for (const result of await running) {
+                //     if (result.err) {
+                //         return result;
+                //     }
+                // }
                 // const cloudResolveResult = await firebaseSyncer.resolveUsingCloudConvergenceUpdates(
                 //     this._plugin.app,
                 //     convergenceUpdates.safeUnwrap()
@@ -135,8 +148,6 @@ export class FileSyncer {
                 // if (localResolverResult.err) {
                 //     return localResolverResult;
                 // }
-                const view = await GetOrCreateSyncProgressView(this._plugin.app);
-                view.addDetectedChanges(convergenceUpdates.safeUnwrap());
                 console.log("convergenceUpdates", convergenceUpdates);
 
                 return Ok();

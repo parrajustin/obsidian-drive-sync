@@ -11,7 +11,9 @@ export function AsyncForEach<InputType, OutputType>(
     data: InputType[],
     cb: (input: InputType) => Promise<OutputType>
 ): Promise<OutputType>[] {
-    return data.map(cb);
+    return data.map((innerData) => {
+        return Promise.resolve(cb(innerData));
+    });
 }
 
 /** Converts unknown data to an unknown error. */

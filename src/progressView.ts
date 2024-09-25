@@ -1,6 +1,6 @@
 import type { App, WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
-import type { ConvergenceAction } from "./sync/converge_file_models";
+import { ConvergenceAction } from "./sync/converge_file_models";
 import type { Option } from "./lib/option";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
@@ -12,21 +12,29 @@ interface SyncProgress {
     finalFileName: string;
     actionTaken: ConvergenceAction;
     progress: number;
-    updateProgress?: () => void;
+    updateProgress?: (amount: number) => void;
 }
 
 export class SyncProgressView extends ItemView {
     private _progressDiv: Element;
+    /** The list of in progress entries. */
+    private _progressListDiv: HTMLDivElement;
     private _historicalDiv: Element;
     /** Past cycle of sync changes. */
     private _historicalChanges: SyncProgress[] = [];
     /** The current cycle of sync changes. */
     private _currentCycleChanges: SyncProgress[] = [];
     private _mapOfCurrentCycleChanges = new Map<string, SyncProgress>();
-    private _queuedUpdateTask = false;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
+        const container = this.containerEl.children[1] as Element;
+        container.empty();
+        container.createEl("h2", { text: "Sync Progress View" });
+
+        this._progressDiv = container.createEl("div", "progress-div");
+        this._historicalDiv = container.createEl("div", "hsitorical-div");
+        this.updateProgressView();
     }
 
     public getViewType() {
@@ -74,6 +82,8 @@ export class SyncProgressView extends ItemView {
         };
         this._currentCycleChanges.unshift(syncProgress);
         this._mapOfCurrentCycleChanges.set(fileId, syncProgress);
+
+        this.createInProgressEntry(syncProgress);
     }
 
     /**
@@ -92,20 +102,9 @@ export class SyncProgressView extends ItemView {
         if (entry.progress === -1) {
             return;
         }
-        entry.progress = Math.max(0, Math.min(1, progress));
-        if (!this._queuedUpdateTask) {
-            this.register(
-                (() => {
-                    const timeout = window.setTimeout(() => {
-                        this.updateProgressView();
-                        this._queuedUpdateTask = false;
-                    }, 0);
-                    return () => {
-                        this._queuedUpdateTask = false;
-                        window.clearTimeout(timeout);
-                    };
-                })()
-            );
+        entry.progress = Math.max(entry.progress, Math.min(1, progress));
+        if (entry.updateProgress) {
+            entry.updateProgress(entry.progress);
         }
     }
 
@@ -113,28 +112,17 @@ export class SyncProgressView extends ItemView {
     public updateProgressView() {
         this._progressDiv.empty();
         this._progressDiv.createEl("h4", { text: "In Progress Sync:" });
-        const progressContainer = this._progressDiv.createDiv("progress-list");
-        progressContainer.style.display = "flex";
-        progressContainer.style.flexDirection = "column";
+        this._progressListDiv = this._progressDiv.createDiv("progress-list");
+        this._progressListDiv.style.display = "flex";
+        this._progressListDiv.style.flexDirection = "column";
 
         for (const entry of this._currentCycleChanges) {
-            const entryDiv = progressContainer.createDiv("progress-entry");
-            progressContainer.style.display = "flex";
-            progressContainer.style.flexDirection = "row";
-            entryDiv.createEl("span", {
-                text: `[${entry.actionTaken}] ${entry.fileId} final: ${entry.finalFileName} inital: ${entry.initalFileName.valueOr("N/A")}`
-            });
-            const progress = entryDiv.createEl("span", {
-                text: `Progress: ${entry.progress}`
-            });
-            entry.updateProgress = () => {
-                progress.innerText = `Progress: ${entry.progress}`;
-            };
+            this.createInProgressEntry(entry);
         }
 
         this._historicalDiv.empty();
         this._historicalDiv.createEl("h4", { text: "Historical Sync:" });
-        const historicalContainer = this._progressDiv.createDiv("history-list");
+        const historicalContainer = this._historicalDiv.createDiv("history-list");
         historicalContainer.style.display = "flex";
         historicalContainer.style.flexDirection = "column";
 
@@ -153,16 +141,61 @@ export class SyncProgressView extends ItemView {
     }
 
     public async onOpen() {
-        const container = this.containerEl.children[1] as Element;
-        container.empty();
-        container.createEl("h2", { text: "Sync Progress View" });
-
-        this._progressDiv = container.createEl("div");
-        this._historicalDiv = container.createEl("div");
+        this.updateProgressView();
     }
 
     public async onClose() {
         // Nothing to clean up.
+    }
+
+    private createInProgressEntry(syncProgress: SyncProgress, noProgress: boolean = false) {
+        const entryDiv = this._progressListDiv.createDiv("progress-entry");
+        entryDiv.style.display = "flex";
+        entryDiv.style.flexDirection = "row";
+        const iconName =
+            syncProgress.actionTaken === ConvergenceAction.USE_CLOUD
+                ? "cloud-download"
+                : "hard-drive-upload";
+        const iconSpan = createSpan({
+            cls: "progress-icons",
+            attr: {
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "aria-label": syncProgress.fileId,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "data-icon": iconName,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "aria-hidden": "true"
+            }
+        });
+        if (syncProgress.actionTaken === ConvergenceAction.USE_CLOUD) {
+            iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cloud-download"><path d="M12 13v8l-4-4"/><path d="m12 21 4-4"/><path d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"/></svg>`;
+        } else {
+            iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hard-drive-upload"><path d="m16 6-4-4-4 4"/><path d="M12 2v8"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 18h.01"/><path d="M10 18h.01"/></svg>`;
+        }
+        entryDiv.appendChild(iconSpan);
+
+        const progressFields = entryDiv.createDiv("progress-fields");
+        progressFields.style.display = "flex";
+        progressFields.style.flexDirection = "column";
+        progressFields.style.width = "100%";
+        progressFields.createEl("span", {
+            text: `${syncProgress.finalFileName}${syncProgress.initalFileName.andThen((v) => ` from: ${v}`).valueOr("")}`
+        });
+
+        if (!noProgress) {
+            const progressBar = progressFields.createDiv("entry-progress-bar");
+            progressBar.style.backgroundColor = "#e0e0e0";
+            progressBar.style.borderRadius = "3px";
+            progressBar.style.boxShadow = "inset 0 1px 3px rgba(0, 0, 0, .2)";
+            const progressBarFill = progressBar.createDiv("entry-progress-bar-fill");
+            progressBarFill.style.height = "8px";
+            progressBarFill.style.backgroundColor = "#659cef";
+            progressBarFill.style.borderRadius = "3px";
+            progressBarFill.style.width = `${syncProgress.progress * 100}%`;
+            syncProgress.updateProgress = (amount: number) => {
+                progressBarFill.style.width = `${amount * 100}%`;
+            };
+        }
     }
 }
 
