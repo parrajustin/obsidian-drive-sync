@@ -1,3 +1,8 @@
+/**
+ * Root file stateful syncer. This watches the files and keeps track of the interal state of file
+ * nodes.
+ */
+
 import type { EventRef, TAbstractFile } from "obsidian";
 import type FirestoreSyncPlugin from "../main";
 import { WatchRootSettingsFolder } from "./file_util";
@@ -132,6 +137,9 @@ export class FileSyncer {
         for (const ref of this._eventRefs) {
             ref.e.off(ref.name, ref.fn);
         }
+        if (this._firebaseSyncer.some) {
+            this._firebaseSyncer.safeValue().teardown();
+        }
     }
 
     private async listenForFileChanges() {
@@ -181,7 +189,7 @@ export class FileSyncer {
 
     /** Execute a filesyncer tick. */
     private async fileSyncerTick() {
-        console.log("tick");
+        console.log("syncer tick");
         const tickResult = await this.fileSyncerTickLogic();
         if (tickResult.err) {
             LogError(tickResult.val);
@@ -214,7 +222,6 @@ export class FileSyncer {
         if (convergenceUpdates.safeUnwrap().length === 0) {
             return Ok();
         }
-        console.log(convergenceUpdates);
 
         // Build the operations necessary to sync.
         const buildConvergenceOperations = this._firebaseSyncer

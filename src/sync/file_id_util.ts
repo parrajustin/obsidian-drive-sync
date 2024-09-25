@@ -1,3 +1,7 @@
+/**
+ * Utils for file unique ids in markdown files with frontmatter.
+ */
+
 import type { App, DataWriteOptions, TAbstractFile } from "obsidian";
 import { TFile } from "obsidian";
 import type { Option } from "../lib/option";
@@ -78,7 +82,7 @@ export async function WriteUidToAllFilesIfNecessary(app: App): Promise<StatusRes
     return Ok();
 }
 
-/** Write the uid to the file. */
+/** Write the uid to the file. If no supported frontmatter returns Ok(). */
 export async function WriteUidToFile(
     app: App,
     file: TFile,

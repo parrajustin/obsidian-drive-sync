@@ -1,3 +1,7 @@
+/**
+ * Util functions to handle writing and reading from firebase cloud storage.
+ */
+
 import type { UserCredential } from "firebase/auth";
 import type { UploadTask } from "firebase/storage";
 import { getBytes, getStorage, ref, uploadBytesResumable } from "firebase/storage";
