@@ -1,7 +1,7 @@
 import { describe, expect, jest, test } from "@jest/globals";
 import type { Option } from "../../src/lib/option";
 import { None, Some } from "../../src/lib/option";
-import { ConvertArrayOfNodesToMap, FileNode } from "../../src/sync/file_node";
+import { ConvertArrayOfNodesToMap, FileNode } from "../../src/sync/file_node_util";
 import { ConvergeMapsToUpdateStates } from "../../src/sync/converge_file_models";
 
 jest.mock(

@@ -5,12 +5,13 @@
 import type { UserCredential } from "firebase/auth";
 import type { UploadTask } from "firebase/storage";
 import { getBytes, getStorage, ref, uploadBytesResumable } from "firebase/storage";
-import type { App, TFile } from "obsidian";
+import type { App } from "obsidian";
 import type { Result } from "../lib/result";
-import { Err, Ok } from "../lib/result";
+import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { UnknownError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
+import { ReadFile } from "./file_util";
 
 interface UploadFileToStorageResult {
     uploadTask: UploadTask;
@@ -20,21 +21,19 @@ interface UploadFileToStorageResult {
 /** uploads a file to storage using a resumable upload task. */
 export async function UploadFileToStorage(
     app: App,
-    file: TFile,
+    filePath: string,
     userCreds: UserCredential,
     fileId: string
 ): Promise<Result<UploadFileToStorageResult, StatusError>> {
     const storage = getStorage();
     const storageRef = ref(storage, `${userCreds.user.uid}/${fileId}`);
-    const data = await WrapPromise(app.vault.readBinary(file));
-    if (data.err) {
-        return Err(
-            UnknownError(`[UploadFileToStorage] Failed when reading binary "${file.path}".`)
-        );
+    const readResult = await ReadFile(app, filePath, { type: "OBSIDIAN" });
+    if (readResult.err) {
+        return readResult;
     }
 
     return Ok({
-        uploadTask: uploadBytesResumable(storageRef, data.safeUnwrap()),
+        uploadTask: uploadBytesResumable(storageRef, readResult.safeUnwrap()),
         fullPath: storageRef.fullPath
     });
 }

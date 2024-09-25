@@ -1,4 +1,5 @@
 import type { FSWatcher } from "fs";
+import type { readdir, stat, readFile, writeFile, rm } from "fs/promises";
 
 declare module "obsidian" {
     interface DataAdapterWathcer {
@@ -7,7 +8,16 @@ declare module "obsidian" {
     }
 
     interface DataAdapter {
+        /** Base path of the vault. */
+        basePath: string;
         watchers: { [key: string]: DataAdapterWathcer };
+        fsPromises: {
+            readdir: typeof readdir;
+            stat: typeof stat;
+            readFile: typeof readFile;
+            writeFile: typeof writeFile;
+            rm: typeof rm;
+        };
     }
 
     interface EventRef {

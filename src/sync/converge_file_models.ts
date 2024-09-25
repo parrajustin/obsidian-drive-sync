@@ -10,8 +10,9 @@ import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { AlreadyExistsError, InvalidArgumentError, UnknownError } from "../lib/status_error";
-import type { FileMapOfNodes, FileNode } from "./file_node";
-import { FlattenFileNodes, GetNonDeletedByFilePath, MapByFileId } from "./file_node";
+import type { FileMapOfNodes } from "./file_node_util";
+import { FlattenFileNodes, GetNonDeletedByFilePath, MapByFileId } from "./file_node_util";
+import type { FileNode } from "./file_node";
 
 // Denotes the action that should be taken to sync the two states.
 export enum ConvergenceAction {

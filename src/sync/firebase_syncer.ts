@@ -9,7 +9,7 @@ import {
     FlattenFileNodes,
     MapByFileId,
     type FileMapOfNodes
-} from "./file_node";
+} from "./file_node_util";
 import type { Firestore, Unsubscribe } from "firebase/firestore";
 import { collection, getDocs, getFirestore, onSnapshot, query, where } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
@@ -25,6 +25,7 @@ import { ConvergeMapsToUpdateStates } from "./converge_file_models";
 import type { App } from "obsidian";
 import { CreateOperationsToUpdateCloud, CreateOperationsToUpdateLocal } from "./syncer_update_util";
 import { LogError } from "../log";
+import type { SyncerConfig } from "./syncer";
 
 /**
  * Syncer that maintains the firebase file map state.
@@ -74,6 +75,7 @@ export class FirebaseSyncer {
         return Ok(new FirebaseSyncer(creds, db, fileMap.safeUnwrap()));
     }
 
+    /** Initializes the real time subscription on firestore data. */
     public async initailizeRealTimeUpdates() {
         const queryOfFiles = query(
             collection(this._db, "file"),
@@ -148,28 +150,31 @@ export class FirebaseSyncer {
      */
     public resolveConvergenceUpdates(
         app: App,
+        syncConfig: SyncerConfig,
         updates: ConvergenceUpdate[]
     ): Result<Promise<StatusResult<StatusError>>[], StatusError> {
         if (!this._isValid) {
             return Err(InternalError(`Firebase syncer not in valid state.`));
         }
         return Ok([
-            ...this.resolveLocalActionConvergenceUpdates(app, updates),
-            ...this.resolveCloudActionConvergenceUpdates(app, updates)
+            ...this.resolveLocalActionConvergenceUpdates(app, syncConfig, updates),
+            ...this.resolveCloudActionConvergenceUpdates(app, syncConfig, updates)
         ]);
     }
 
     private resolveLocalActionConvergenceUpdates(
         app: App,
+        syncConfig: SyncerConfig,
         updates: ConvergenceUpdate[]
     ): Promise<StatusResult<StatusError>>[] {
-        return CreateOperationsToUpdateCloud(this._db, updates, app, this._creds);
+        return CreateOperationsToUpdateCloud(this._db, updates, app, syncConfig, this._creds);
     }
 
     private resolveCloudActionConvergenceUpdates(
         app: App,
+        syncConfig: SyncerConfig,
         updates: ConvergenceUpdate[]
     ): Promise<StatusResult<StatusError>>[] {
-        return CreateOperationsToUpdateLocal(updates, app);
+        return CreateOperationsToUpdateLocal(updates, app, syncConfig);
     }
 }

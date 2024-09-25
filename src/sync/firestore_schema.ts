@@ -8,7 +8,7 @@ import type {
 } from "firebase/firestore";
 import { FileNode } from "./file_node";
 import type { UserCredential } from "firebase/auth";
-import { Some } from "../lib/option";
+import { None, Some } from "../lib/option";
 
 export interface FileDbModel {
     // Full filepath.
@@ -67,7 +67,8 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             userId: Some(data.userId),
             deleted: data.deleted,
             data: data.data !== undefined ? data.data.toUint8Array() : undefined,
-            fileStorageRef: data.fileStorageRef
+            fileStorageRef: data.fileStorageRef,
+            localDataType: None
         });
     }
 }

@@ -9,8 +9,8 @@ import { WatchRootSettingsFolder } from "./file_util";
 import { InternalError, type StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
-import type { FileMapOfNodes } from "./file_node";
-import { ConvertArrayOfNodesToMap, FlattenFileNodes, GetFileMapOfNodes } from "./file_node";
+import type { FileMapOfNodes } from "./file_node_util";
+import { ConvertArrayOfNodesToMap, FlattenFileNodes, GetFileMapOfNodes } from "./file_node_util";
 import { SearchString } from "../lib/search_string_parser";
 import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
@@ -37,6 +37,8 @@ export interface SyncerConfig {
     encryptionPassword?: string;
     /** Filter for files. */
     syncQuery: string;
+    /** Query to denote raw files to add to syncing. */
+    rawFileSyncQuery: string;
 }
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
@@ -97,6 +99,7 @@ export class FileSyncer {
         // eslint-disable-next-line @typescript-eslint/return-await
         return await this._plugin.loggedIn
             .then<StatusResult<StatusError>>(async (creds: UserCredential) => {
+                console.log("init");
                 // Now make the root settings folders are being watched by the listener.
                 const watchRootResult = await WatchRootSettingsFolder(
                     this._plugin.app.vault,
@@ -118,9 +121,12 @@ export class FileSyncer {
                 // Now initalize firebase.
                 const firebaseSyncer = buildFirebaseSyncer.safeUnwrap();
                 this._firebaseSyncer = Some(firebaseSyncer);
+                console.log("before realtime");
                 await firebaseSyncer.initailizeRealTimeUpdates();
+                console.log("after realtime");
                 // Start the file syncer repeating tick.
                 await this.fileSyncerTick();
+                console.log("after tick realtime");
                 return Ok();
             })
             .then<StatusResult<StatusError>>((result) => {
@@ -197,9 +203,9 @@ export class FileSyncer {
             view.publishSyncerError(tickResult.val);
             return;
         }
-        setTimeout(() => {
-            void this.fileSyncerTick();
-        }, 500);
+        // setTimeout(() => {
+        //     void this.fileSyncerTick();
+        // }, 500);
     }
 
     /** The logic that runs for the file syncer very tick. */
@@ -226,7 +232,11 @@ export class FileSyncer {
         // Build the operations necessary to sync.
         const buildConvergenceOperations = this._firebaseSyncer
             .safeValue()
-            .resolveConvergenceUpdates(this._plugin.app, convergenceUpdates.safeUnwrap());
+            .resolveConvergenceUpdates(
+                this._plugin.app,
+                this._config,
+                convergenceUpdates.safeUnwrap()
+            );
         if (buildConvergenceOperations.err) {
             return buildConvergenceOperations;
         }
@@ -250,6 +260,7 @@ export class FileSyncer {
         // Clean up local files
         const cleanUpResult = await CleanUpLeftOverLocalFiles(
             this._plugin.app,
+            this._config,
             convergenceUpdates.safeUnwrap(),
             this._mapOfFileNodes
         );

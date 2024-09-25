@@ -15,7 +15,9 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
-        syncQuery: ""
+        syncQuery: "",
+        // eslint-disable-next-line prettier/prettier, no-useless-escape
+        rawFileSyncQuery: "^.obsidian"
     };
 }
 
