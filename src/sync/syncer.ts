@@ -14,6 +14,7 @@ import type { UserCredential } from "firebase/auth";
 import type { FirebaseApp } from "firebase/app";
 import { GetOrCreateSyncProgressView } from "../progressView";
 import { WriteUidToAllFilesIfNecessary } from "./file_id_util";
+import { LogError } from "../log";
 
 export enum RootSyncType {
     ROOT_SYNCER = "root",
@@ -87,11 +88,9 @@ export class FileSyncer {
 
     /** Initialize the file syncer. */
     public async init(): Promise<StatusResult<StatusError>> {
-        console.log("init");
         // eslint-disable-next-line @typescript-eslint/return-await
         return await this._plugin.loggedIn
             .then<StatusResult<StatusError>>(async (creds: UserCredential) => {
-                console.log("3");
                 // Now make the root settings folders are being watched by the listener.
                 const watchRootResult = await WatchRootSettingsFolder(
                     this._plugin.app.vault,
@@ -110,46 +109,12 @@ export class FileSyncer {
                 if (buildFirebaseSyncer.err) {
                     return buildFirebaseSyncer;
                 }
-                console.log("4");
+                // Now initalize firebase.
                 const firebaseSyncer = buildFirebaseSyncer.safeUnwrap();
                 this._firebaseSyncer = Some(firebaseSyncer);
-                const convergenceUpdates = firebaseSyncer.getConvergenceUpdates(
-                    this._mapOfFileNodes
-                );
-                if (convergenceUpdates.err) {
-                    return convergenceUpdates;
-                }
-                const view = await GetOrCreateSyncProgressView(this._plugin.app);
-                view.newSyncerCycle();
-                // const buildConvergenceOperations = firebaseSyncer.resolveConvergenceUpdates(
-                //     this._plugin.app,
-                //     convergenceUpdates.safeUnwrap()
-                // );
-                // console.log('after newSyncerCycle');
-                // const running = Promise.all(buildConvergenceOperations);
-                // for (const result of await running) {
-                //     if (result.err) {
-                //         return result;
-                //     }
-                // }
-                // const cloudResolveResult = await firebaseSyncer.resolveUsingCloudConvergenceUpdates(
-                //     this._plugin.app,
-                //     convergenceUpdates.safeUnwrap()
-                // );
-                // if (cloudResolveResult.err) {
-                //     return cloudResolveResult;
-                // }
-                // const localResolverResult =
-                //     await firebaseSyncer.resolveUsingLocalConvergenceUpdates(
-                //         this._plugin.app,
-                //         convergenceUpdates.safeUnwrap()
-                //     );
-                // console.log("localResolverResult", localResolverResult);
-                // if (localResolverResult.err) {
-                //     return localResolverResult;
-                // }
-                console.log("convergenceUpdates", convergenceUpdates);
-
+                await firebaseSyncer.initailizeRealTimeUpdates();
+                // Start the file syncer repeating tick.
+                await this.fileSyncerTick();
                 return Ok();
             })
             .then<StatusResult<StatusError>>((result) => {
@@ -211,5 +176,63 @@ export class FileSyncer {
     }
     private async deleteFileListener(file: TAbstractFile) {
         console.log("delete", file);
+    }
+
+    /** Execute a filesyncer tick. */
+    private async fileSyncerTick() {
+        console.log("tick");
+        const tickResult = await this.fileSyncerTickLogic();
+        if (tickResult.err) {
+            LogError(tickResult.val);
+            const view = await GetOrCreateSyncProgressView(this._plugin.app);
+            view.publishSyncerError(tickResult.val);
+            return;
+        }
+        setTimeout(() => {
+            void this.fileSyncerTick();
+        }, 500);
+    }
+
+    /** The logic that runs for the file syncer very tick. */
+    private async fileSyncerTickLogic(): Promise<StatusResult<StatusError>> {
+        const startTime = window.performance.now();
+        if (this._firebaseSyncer.none) {
+            return Err(InternalError(`Firebase syncer hasn't been initialized!`));
+        }
+        // Setup the progress view.
+        const view = await GetOrCreateSyncProgressView(this._plugin.app);
+        view.newSyncerCycle();
+
+        // Get the updates necessary.
+        const convergenceUpdates = this._firebaseSyncer
+            .safeValue()
+            .getConvergenceUpdates(this._mapOfFileNodes);
+        if (convergenceUpdates.err) {
+            return convergenceUpdates;
+        }
+        if (convergenceUpdates.safeUnwrap().length === 0) {
+            return Ok();
+        }
+        console.log(convergenceUpdates);
+
+        // Build the operations necessary to sync.
+        const buildConvergenceOperations = this._firebaseSyncer
+            .safeValue()
+            .resolveConvergenceUpdates(this._plugin.app, convergenceUpdates.safeUnwrap());
+        if (buildConvergenceOperations.err) {
+            return buildConvergenceOperations;
+        }
+
+        // Now wait for all the operations to execute.
+        const running = Promise.all(buildConvergenceOperations.safeUnwrap());
+        for (const result of await running) {
+            if (result.err) {
+                return result;
+            }
+        }
+
+        const endTime = window.performance.now();
+        view.publishSyncerCycleDone(convergenceUpdates.safeUnwrap().length, endTime - startTime);
+        return Ok();
     }
 }

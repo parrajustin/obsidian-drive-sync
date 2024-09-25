@@ -2,6 +2,7 @@ import type { App, WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
 import { ConvergenceAction } from "./sync/converge_file_models";
 import type { Option } from "./lib/option";
+import type { StatusError } from "./lib/status_error";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
 const MAX_NUMBER_OF_CHANGES = 150;
@@ -15,13 +16,24 @@ interface SyncProgress {
     updateProgress?: (amount: number) => void;
 }
 
+class SyncerPublishedCycle {
+    constructor(
+        public numOfUpdates: number,
+        public updateTime: number
+    ) {}
+}
+
+class SyncerError {
+    constructor(public error: StatusError) {}
+}
+
 export class SyncProgressView extends ItemView {
     private _progressDiv: Element;
     /** The list of in progress entries. */
     private _progressListDiv: HTMLDivElement;
     private _historicalDiv: Element;
     /** Past cycle of sync changes. */
-    private _historicalChanges: SyncProgress[] = [];
+    private _historicalChanges: (SyncProgress | SyncerPublishedCycle | SyncerError)[] = [];
     /** The current cycle of sync changes. */
     private _currentCycleChanges: SyncProgress[] = [];
     private _mapOfCurrentCycleChanges = new Map<string, SyncProgress>();
@@ -61,6 +73,34 @@ export class SyncProgressView extends ItemView {
     }
 
     /**
+     * Publish that a full sync cycle is done.
+     * @param numOfUpdates number of updates that took place in the cycle.
+     * @param updateTime the total number of MS that the update took.
+     */
+    public publishSyncerCycleDone(numOfUpdates: number, updateTime: number) {
+        this._historicalChanges = [
+            new SyncerPublishedCycle(numOfUpdates, updateTime),
+            ...this._currentCycleChanges,
+            ...this._historicalChanges
+        ].slice(0, MAX_NUMBER_OF_CHANGES);
+        this._currentCycleChanges = [];
+        this._mapOfCurrentCycleChanges = new Map<string, SyncProgress>();
+        this.updateProgressView();
+    }
+
+    /** Publishes a syncer error to the progress view. */
+    public publishSyncerError(error: StatusError) {
+        this._historicalChanges = [
+            new SyncerError(error),
+            ...this._currentCycleChanges,
+            ...this._historicalChanges
+        ].slice(0, MAX_NUMBER_OF_CHANGES);
+        this._currentCycleChanges = [];
+        this._mapOfCurrentCycleChanges = new Map<string, SyncProgress>();
+        this.updateProgressView();
+    }
+
+    /**
      * Adds a progress entry to the view.
      * @param fileId the file id
      * @param initalFileName the initial file path if it differs
@@ -83,7 +123,7 @@ export class SyncProgressView extends ItemView {
         this._currentCycleChanges.unshift(syncProgress);
         this._mapOfCurrentCycleChanges.set(fileId, syncProgress);
 
-        this.createInProgressEntry(syncProgress);
+        this.createInProgressEntry(this._progressListDiv, syncProgress);
     }
 
     /**
@@ -117,7 +157,7 @@ export class SyncProgressView extends ItemView {
         this._progressListDiv.style.flexDirection = "column";
 
         for (const entry of this._currentCycleChanges) {
-            this.createInProgressEntry(entry);
+            this.createInProgressEntry(this._progressListDiv, entry);
         }
 
         this._historicalDiv.empty();
@@ -127,16 +167,15 @@ export class SyncProgressView extends ItemView {
         historicalContainer.style.flexDirection = "column";
 
         for (const entry of this._historicalChanges) {
-            const entryDiv = historicalContainer.createDiv("progress-entry");
-            historicalContainer.style.display = "flex";
-            historicalContainer.style.flexDirection = "row";
-            entryDiv.createEl("span", {
-                text: `[${entry.actionTaken}] ${entry.fileId} final: ${entry.finalFileName} inital: ${entry.initalFileName.valueOr("N/A")}`
-            });
-            entryDiv.createEl("span", {
-                text: `Progress: ${entry.progress}`
-            });
-            entry.updateProgress = undefined;
+            if (entry instanceof SyncerPublishedCycle) {
+                console.log("Finish entry", entry);
+                continue;
+            }
+            if (entry instanceof SyncerError) {
+                console.error("Syncer error", entry);
+                continue;
+            }
+            this.createInProgressEntry(historicalContainer, entry);
         }
     }
 
@@ -148,8 +187,12 @@ export class SyncProgressView extends ItemView {
         // Nothing to clean up.
     }
 
-    private createInProgressEntry(syncProgress: SyncProgress, noProgress: boolean = false) {
-        const entryDiv = this._progressListDiv.createDiv("progress-entry");
+    private createInProgressEntry(
+        container: HTMLDivElement,
+        syncProgress: SyncProgress,
+        noProgress: boolean = false
+    ) {
+        const entryDiv = container.createDiv("progress-entry");
         entryDiv.style.display = "flex";
         entryDiv.style.flexDirection = "row";
         const iconName =

@@ -41,7 +41,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         console.log(compress, decompress);
         // Register the sync progress view.
         this.registerView(PROGRESS_VIEW_TYPE, (leaf) => new SyncProgressView(leaf));
-        this.addRibbonIcon("dice", "Activate view", async () => {
+        this.addRibbonIcon("cloud", "Show sync view", async () => {
             await GetOrCreateSyncProgressView(this.app);
         });
         // Your web app's Firebase configuration

@@ -35,11 +35,9 @@ async function UploadFileToFirestore(
 ): Promise<StatusResult<StatusError>> {
     const documentRef = doc(db, `file/${fileId}`);
 
-    const setResult = (await WrapPromise(setDoc(documentRef, node))).mapErr((err) => {
-        console.error("setDoc error", err);
-        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-        return UnknownError(`Unknown setDoc Error "${err}".`);
-    });
+    const setResult = (await WrapPromise(setDoc(documentRef, node))).mapErr(
+        ConvertToUnknownError(`Unknown setDoc Error`)
+    );
     if (setResult.err) {
         return setResult;
     }
