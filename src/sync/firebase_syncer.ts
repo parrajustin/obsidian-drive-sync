@@ -3,9 +3,9 @@ import type { FileNode } from "./file_node";
 import { ConvertArrayOfNodesToMap, type FileMapOfNodes } from "./file_node";
 import type { Firestore } from "firebase/firestore";
 import {
+    Bytes,
     collection,
     doc,
-    getDoc,
     getDocs,
     getFirestore,
     query,
@@ -161,7 +161,7 @@ export class FirebaseSyncer {
                     );
                 }
 
-                node.data = [...dataCompresssed.safeUnwrap()];
+                node.data = Bytes.fromUint8Array(dataCompresssed.safeUnwrap());
             } else {
                 const uploadCloudStoreResult = await UploadFileToStorage(
                     app,
@@ -205,8 +205,7 @@ export class FirebaseSyncer {
             const textData = update.cloudState.safeValue().data;
             const cloudStorageRef = update.cloudState.safeValue().fileStorageRef;
             if (textData !== undefined) {
-                const encodedData = Buffer.from(textData);
-                const dataCompresssed = await WrapPromise(decompress(encodedData));
+                const dataCompresssed = await WrapPromise(decompress(textData));
                 if (dataCompresssed.err) {
                     return dataCompresssed.mapErr((err) =>
                         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions

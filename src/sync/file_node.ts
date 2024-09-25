@@ -18,7 +18,7 @@ interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
     fileId: TypeOfData;
     userId: TypeOfData;
     deleted: boolean;
-    data?: number[];
+    data?: Uint8Array;
     fileStorageRef?: string;
 }
 
@@ -43,7 +43,7 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
     /** Only set by the firestore. */
     public deleted: boolean;
     /** Data from the cloud storage compress with brotli encoded in uint8. */
-    public data?: number[];
+    public data?: Uint8Array;
     /** Storage path on cloud storage if any. */
     public fileStorageRef?: string;
 

@@ -1,4 +1,5 @@
 import type {
+    Bytes,
     DocumentData,
     FirestoreDataConverter,
     QueryDocumentSnapshot,
@@ -27,7 +28,7 @@ export interface FileDbModel {
     /** If the file has been deleted. */
     deleted: boolean;
     /** The data of the file if less than 100Kb */
-    data?: number[];
+    data?: Bytes;
     /** The location of the file in cloud storage if not in `data`. */
     fileStorageRef?: string;
 }
@@ -65,7 +66,7 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             fileId: Some(_snapshot.id),
             userId: Some(data.userId),
             deleted: data.deleted,
-            data: data.data,
+            data: data.data !== undefined ? data.data.toUint8Array() : undefined,
             fileStorageRef: data.fileStorageRef
         });
     }
