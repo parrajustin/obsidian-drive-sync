@@ -1,19 +1,8 @@
 import { describe, expect, jest, test } from "@jest/globals";
+import type { Option } from "../../src/lib/option";
 import { None, Some } from "../../src/lib/option";
 import { ConvertArrayOfNodesToMap, FileNode } from "../../src/sync/file_node";
 import { ConvergeMapsToUpdateStates } from "../../src/sync/converge_file_models";
-
-// interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
-//     fullPath: string;
-//     ctime: number;
-//     mtime: number;
-//     size: number;
-//     baseName: string;
-//     extension: string;
-//     fileId: TypeOfData;
-//     userId: TypeOfData;
-//     deleted: boolean;
-// }
 
 jest.mock(
     "obsidian",
@@ -201,6 +190,53 @@ describe("ConvergeMapsToUpdateStates", () => {
                 localState: Some(localNodes[1]),
                 cloudState: Some(cloudNodes[0]),
                 leftOverLocalFile: Some("file_1.md")
+            }
+        ]);
+    });
+
+    test("deletes local node based on cloud node", async () => {
+        const cloudNodes: FileNode<Some<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: true
+            })
+        ];
+        const localNodes: FileNode<Option<string>>[] = [
+            new FileNode<Option<string>>({
+                fullPath: "folder/file_1.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: Some("ID1"),
+                userId: None,
+                deleted: false
+            })
+        ];
+
+        const localMapRep = ConvertArrayOfNodesToMap(localNodes);
+        expect(localMapRep.ok).toBeTruthy();
+        const cloudMapRep = ConvertArrayOfNodesToMap(cloudNodes);
+        expect(cloudMapRep.ok).toBeTruthy();
+        const result = await ConvergeMapsToUpdateStates({
+            localMapRep: localMapRep.unsafeUnwrap(),
+            cloudMapRep: cloudMapRep.unsafeUnwrap()
+        });
+        expect(result.ok).toBeTruthy();
+        expect(result.val).toStrictEqual([
+            {
+                action: "using_cloud",
+                localState: Some(localNodes[0]),
+                cloudState: Some(cloudNodes[0]),
+                leftOverLocalFile: None
             }
         ]);
     });

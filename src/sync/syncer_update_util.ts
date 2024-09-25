@@ -18,11 +18,12 @@ import { uuidv7 } from "../lib/uuid";
 import { WrapPromise } from "../lib/wrap_promise";
 import { AsyncForEach, ConvertToUnknownError } from "../util";
 import { DownloadFileFromStorage, UploadFileToStorage } from "./cloud_storage_util";
-import type { ConvergenceUpdate } from "./converge_file_models";
+import type { CloudConvergenceUpdate, ConvergenceUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { WriteUidToFile } from "./file_id_util";
 import type { FileDbModel } from "./firestore_schema";
 import type { UserCredential } from "firebase/auth";
+import type { SyncProgressView } from "../progressView";
 import { GetOrCreateSyncProgressView } from "../progressView";
 import type { FileMapOfNodes } from "./file_node";
 import { GetNonDeletedByFilePath } from "./file_node";
@@ -173,6 +174,83 @@ export function CreateOperationsToUpdateCloud(
     return localOperations;
 }
 
+/** Does the update by downloading the cloud file to local files. */
+async function DownloadCloudUpdate(
+    app: App,
+    update: CloudConvergenceUpdate,
+    view: SyncProgressView,
+    fileId: string
+): Promise<StatusResult<StatusError>> {
+    let dataToWrite: Option<Uint8Array> = None;
+
+    // First check the easy path. The file was small enough to fit into firestore.
+    const textData = update.cloudState.safeValue().data;
+    if (textData !== undefined) {
+        const dataCompresssed = await WrapPromise(decompress(textData));
+        view.setEntryProgress(fileId, 0.5);
+        if (dataCompresssed.err) {
+            return dataCompresssed.mapErr(ConvertToUnknownError(`Failed to compress data`));
+        }
+        dataToWrite = Some(dataCompresssed.safeUnwrap());
+    }
+    // Now check if the file was uploaded to cloud storage.
+    const cloudStorageRef = update.cloudState.safeValue().fileStorageRef;
+    if (cloudStorageRef !== undefined) {
+        const getDataResult = await DownloadFileFromStorage(cloudStorageRef);
+        view.setEntryProgress(fileId, 0.5);
+        if (getDataResult.err) {
+            return getDataResult;
+        }
+        dataToWrite = Some(new Uint8Array(getDataResult.safeUnwrap()));
+    }
+
+    if (dataToWrite.none) {
+        return Err(UnknownError(`Unable to get data to write for "${fileId}`));
+    }
+    view.setEntryProgress(fileId, 0.5);
+
+    const file = app.vault.getAbstractFileByPath(update.cloudState.safeValue().fullPath);
+    if (file === null) {
+        const createResult = await WrapPromise(
+            app.vault.createBinary(
+                update.cloudState.safeValue().fullPath,
+                dataToWrite.safeValue(),
+                { mtime: update.cloudState.safeValue().mtime }
+            )
+        );
+        view.setEntryProgress(fileId, 0.75);
+        if (createResult.err) {
+            return createResult.mapErr(
+                ConvertToUnknownError(
+                    `Failed to create file for "${update.cloudState.safeValue().fullPath}"`
+                )
+            );
+        }
+    } else if (file instanceof TFile) {
+        const modifyResult = await WrapPromise(
+            app.vault.modifyBinary(file, dataToWrite.safeValue(), {
+                mtime: update.cloudState.safeValue().mtime
+            })
+        );
+        view.setEntryProgress(fileId, 0.75);
+        if (modifyResult.err) {
+            return modifyResult.mapErr(
+                ConvertToUnknownError(
+                    `Failed to modify file for "${update.cloudState.safeValue().fullPath}"`
+                )
+            );
+        }
+    } else {
+        return Err(
+            InternalError(
+                `File "${update.cloudState.safeValue().fullPath}" leads to a folder when file is expected!`
+            )
+        );
+    }
+
+    return Ok();
+}
+
 /**
  * Creates the operations to update the local files with cloud data.
  * @param localUpdates the updates that have cloud -> local actions
@@ -184,7 +262,11 @@ export function CreateOperationsToUpdateLocal(
     cloudUpdates: ConvergenceUpdate[],
     app: App
 ): Promise<StatusResult<StatusError>>[] {
-    const filteredUpdates = cloudUpdates.filter((v) => v.action === ConvergenceAction.USE_CLOUD);
+    const filteredUpdates = cloudUpdates.filter(
+        (v) =>
+            v.action === ConvergenceAction.USE_CLOUD ||
+            v.action === ConvergenceAction.USE_CLOUD_DELETE_LOCAL
+    );
 
     const ops = AsyncForEach(
         filteredUpdates,
@@ -207,71 +289,18 @@ export function CreateOperationsToUpdateLocal(
                 update.cloudState.safeValue().fullPath,
                 update.action
             );
-            let dataToWrite: Option<Uint8Array> = None;
 
-            // First check the easy path. The file was small enough to fit into firestore.
-            const textData = update.cloudState.safeValue().data;
-            if (textData !== undefined) {
-                const dataCompresssed = await WrapPromise(decompress(textData));
+            // Do the convergence operation.
+            if (update.action === ConvergenceAction.USE_CLOUD) {
+                const downloadResult = await DownloadCloudUpdate(app, update, view, fileId);
+                if (downloadResult.err) {
+                    return downloadResult;
+                }
+            } else if (update.action === ConvergenceAction.USE_CLOUD_DELETE_LOCAL) {
+                console.log("delete local");
+                // For `USE_CLOUD_DELETE_LOCAL` update leave it to the delete left over file system.
+                update.leftOverLocalFile = Some(update.cloudState.safeValue().fullPath);
                 view.setEntryProgress(fileId, 0.5);
-                if (dataCompresssed.err) {
-                    return dataCompresssed.mapErr(ConvertToUnknownError(`Failed to compress data`));
-                }
-                dataToWrite = Some(dataCompresssed.safeUnwrap());
-            }
-            // Now check if the file was uploaded to cloud storage.
-            const cloudStorageRef = update.cloudState.safeValue().fileStorageRef;
-            if (cloudStorageRef !== undefined) {
-                const getDataResult = await DownloadFileFromStorage(cloudStorageRef);
-                view.setEntryProgress(fileId, 0.5);
-                if (getDataResult.err) {
-                    return getDataResult;
-                }
-                dataToWrite = Some(new Uint8Array(getDataResult.safeUnwrap()));
-            }
-
-            if (dataToWrite.none) {
-                return Err(UnknownError(`Unable to get data to write for "${fileId}`));
-            }
-            view.setEntryProgress(fileId, 0.5);
-
-            const file = app.vault.getAbstractFileByPath(update.cloudState.safeValue().fullPath);
-            if (file === null) {
-                const createResult = await WrapPromise(
-                    app.vault.createBinary(
-                        update.cloudState.safeValue().fullPath,
-                        dataToWrite.safeValue(),
-                        { mtime: update.cloudState.safeValue().mtime }
-                    )
-                );
-                view.setEntryProgress(fileId, 0.75);
-                if (createResult.err) {
-                    return createResult.mapErr(
-                        ConvertToUnknownError(
-                            `Failed to create file for "${update.cloudState.safeValue().fullPath}"`
-                        )
-                    );
-                }
-            } else if (file instanceof TFile) {
-                const modifyResult = await WrapPromise(
-                    app.vault.modifyBinary(file, dataToWrite.safeValue(), {
-                        mtime: update.cloudState.safeValue().mtime
-                    })
-                );
-                view.setEntryProgress(fileId, 0.75);
-                if (modifyResult.err) {
-                    return modifyResult.mapErr(
-                        ConvertToUnknownError(
-                            `Failed to modify file for "${update.cloudState.safeValue().fullPath}"`
-                        )
-                    );
-                }
-            } else {
-                return Err(
-                    InternalError(
-                        `File "${update.cloudState.safeValue().fullPath}" leads to a folder when file is expected!`
-                    )
-                );
             }
 
             // Update local file if there is one.
@@ -301,7 +330,10 @@ export async function CleanUpLeftOverLocalFiles(
     localFileNodes: FileMapOfNodes
 ): Promise<StatusResult<StatusError>> {
     for (const update of updates) {
-        if (update.action !== ConvergenceAction.USE_CLOUD) {
+        if (
+            update.action !== ConvergenceAction.USE_CLOUD &&
+            update.action !== ConvergenceAction.USE_CLOUD_DELETE_LOCAL
+        ) {
             continue;
         }
 

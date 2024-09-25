@@ -51,8 +51,7 @@ export class FirebaseSyncer {
         // Get the file metadata from firestore.
         const queryOfFiles = query(
             collection(db, "file"),
-            where("userId", "==", creds.user.uid),
-            where("deleted", "!=", true)
+            where("userId", "==", creds.user.uid)
         ).withConverter(new FileSchemaConverter(creds));
         const querySnapshotResult = await WrapPromise(getDocs(queryOfFiles));
         if (querySnapshotResult.err) {
@@ -78,8 +77,7 @@ export class FirebaseSyncer {
     public async initailizeRealTimeUpdates() {
         const queryOfFiles = query(
             collection(this._db, "file"),
-            where("userId", "==", this._creds.user.uid),
-            where("deleted", "!=", true)
+            where("userId", "==", this._creds.user.uid)
         ).withConverter(new FileSchemaConverter(this._creds));
 
         this._unsubscribe = Some(

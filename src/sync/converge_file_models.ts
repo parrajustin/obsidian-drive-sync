@@ -17,6 +17,8 @@ import { FlattenFileNodes, GetNonDeletedByFilePath, MapByFileId } from "./file_n
 export enum ConvergenceAction {
     /** Use cloud to update local file. */
     USE_CLOUD = "using_cloud",
+    /** Use cloud to update local file. */
+    USE_CLOUD_DELETE_LOCAL = "using_cloud_to_remove_local",
     /** Use local file to update cloud. */
     USE_LOCAL = "using_local",
     /** Uses the local state but repalces local id with the cloud id. */
@@ -40,7 +42,7 @@ interface LocalReplaceIdConvergenceUpdate extends SharedUpdateData {
     cloudState: Some<FileNode<Some<string>>>;
 }
 
-interface CloudConvergenceUpdate extends SharedUpdateData {
+export interface CloudConvergenceUpdate extends SharedUpdateData {
     action: ConvergenceAction.USE_CLOUD;
     localState: Option<FileNode>;
     cloudState: Some<FileNode<Some<string>>>;
@@ -48,8 +50,17 @@ interface CloudConvergenceUpdate extends SharedUpdateData {
     leftOverLocalFile: Option<string>;
 }
 
+/** An update that trashes the local file. */
+export interface CloudDeleteLocalConvergenceUpdate extends SharedUpdateData {
+    action: ConvergenceAction.USE_CLOUD_DELETE_LOCAL;
+    localState: Some<FileNode>;
+    cloudState: Some<FileNode<Some<string>>>;
+    leftOverLocalFile: Option<string>;
+}
+
 export type ConvergenceUpdate =
     | CloudConvergenceUpdate
+    | CloudDeleteLocalConvergenceUpdate
     | LocalConvergenceUpdate
     | LocalReplaceIdConvergenceUpdate;
 
@@ -257,6 +268,19 @@ export function CompareNodesAndGetUpdate(
     if (pathResult.err) {
         return pathResult;
     }
+
+    // Special delete local version.
+    const deleteLocalFile = cNode.deleted && cNode.deleted !== lNode.deleted;
+    if (deleteLocalFile) {
+        const action: ConvergenceUpdate = {
+            action: ConvergenceAction.USE_CLOUD_DELETE_LOCAL,
+            localState: localNode,
+            cloudState: cloudNode,
+            leftOverLocalFile: None
+        };
+        return Ok(Some(action));
+    }
+
     const action: ConvergenceUpdate = {
         action: ConvergenceAction.USE_CLOUD,
         localState: localNode,
