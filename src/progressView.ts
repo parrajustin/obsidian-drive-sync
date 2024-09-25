@@ -168,7 +168,7 @@ export class SyncProgressView extends ItemView {
 
         for (const entry of this._historicalChanges) {
             if (entry instanceof SyncerPublishedCycle) {
-                console.log("Finish entry", entry);
+                this.createHistoricalCycleStats(historicalContainer, entry);
                 continue;
             }
             if (entry instanceof SyncerError) {
@@ -185,6 +185,34 @@ export class SyncProgressView extends ItemView {
 
     public async onClose() {
         // Nothing to clean up.
+    }
+
+    private createHistoricalCycleStats(container: HTMLDivElement, cycle: SyncerPublishedCycle) {
+        const progressDiv = container.createDiv("progress-cycle");
+        progressDiv.style.display = "flex";
+        progressDiv.style.flexDirection = "row";
+        const iconName = "route";
+        const iconSpan = createSpan({
+            cls: "progress-icons",
+            attr: {
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "aria-label": iconName,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "data-icon": iconName,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "aria-hidden": "true"
+            }
+        });
+        iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>`;
+        progressDiv.appendChild(iconSpan);
+
+        const cycleStats = progressDiv.createDiv("progress-fields");
+        cycleStats.style.display = "flex";
+        cycleStats.style.flexDirection = "column";
+        cycleStats.style.width = "100%";
+
+        cycleStats.createEl("span").innerText = `#updates: ${cycle.numOfUpdates}`;
+        cycleStats.createEl("span").innerText = `#Seconds: ${cycle.updateTime / 1000}`;
     }
 
     private createInProgressEntry(
