@@ -22,7 +22,6 @@ import { LogError } from "./log";
 import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
 import { GetOrCreateSyncProgressView, PROGRESS_VIEW_TYPE, SyncProgressView } from "./progressView";
-import { compress, decompress } from "brotli-compress";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -38,11 +37,10 @@ export default class FirestoreSyncPlugin extends Plugin {
     private _loadingSyncers = false;
 
     public override async onload(): Promise<void> {
-        console.log(compress, decompress);
         // Register the sync progress view.
         this.registerView(PROGRESS_VIEW_TYPE, (leaf) => new SyncProgressView(leaf));
         this.addRibbonIcon("cloud", "Show sync view", async () => {
-            await GetOrCreateSyncProgressView(this.app);
+            await GetOrCreateSyncProgressView(this.app, /*reveal=*/ true);
         });
         // Your web app's Firebase configuration
         // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -164,56 +162,68 @@ export default class FirestoreSyncPlugin extends Plugin {
      * Sets up all the syncers based on their configs. Will shutdown them all if any have an error.
      */
     private async startupSyncers() {
-        console.log("startup microtask");
         if (this._loadingSyncers) {
-            console.log("startup microtask");
             return;
         }
 
         this._loadingSyncers = true;
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
-        queueMicrotask(async () => {
-            console.log("startup microtask");
+        const timeoutId = window.setTimeout(async () => {
+            const view = await GetOrCreateSyncProgressView(this.app, /*reveal=*/ false);
+            view.setStatus("Waiting for login");
+            await this.loggedIn;
+
+            view.setStatus("Cleaning up old syncers");
             // Make sure there are no syncers already running.
             await this.teardownSyncers();
-            console.log("after teardownSyncers");
 
+            view.setStatus("Init syncers...");
+            view.setSyncers(this.settings.syncers);
             // Create setup pipelines for all syncers.
             const setupStatuses: Promise<StatusResult<StatusError>>[] = [];
             for (const config of this.settings.syncers) {
                 // Create promise to construct the file syncer and set it up.
                 setupStatuses.push(
-                    FileSyncer.constructFileSyncer(this, config).then((syncerResult) => {
-                        console.log("hi");
-                        if (syncerResult.err) {
-                            return Promise.resolve(syncerResult);
-                        }
-                        console.log("hi2");
-                        this._syncers.push(syncerResult.safeUnwrap());
-                        return syncerResult.safeUnwrap().init();
-                    })
+                    FileSyncer.constructFileSyncer(this, config)
+                        .then((syncerResult) => {
+                            if (syncerResult.err) {
+                                return Promise.resolve(syncerResult);
+                            }
+                            this._syncers.push(syncerResult.safeUnwrap());
+                            return syncerResult.safeUnwrap().init();
+                        })
+                        .then((status) => {
+                            if (status.err) {
+                                view.setSyncerStatus(config.syncerId, status.val.message, "red");
+                            }
+                            return status;
+                        })
                 );
             }
-            console.log("after setupStatuses", setupStatuses);
 
             // Check if any of the syncers had an error.
             let tearDown = false;
             const results = await Promise.all(setupStatuses);
             for (const result of results) {
                 if (result.err) {
+                    view.publishSyncerError(result.val);
                     LogError(result.val);
                     tearDown = true;
                     break;
                 }
             }
-            console.log("after Promise.all", setupStatuses);
 
             // If any did teardown all syncers.
             if (tearDown) {
-                console.log("after Promise.all tearDown", tearDown);
+                view.setStatus("Error...");
                 await this.teardownSyncers();
+            } else {
+                view.setStatus("Ready");
             }
             this._loadingSyncers = false;
+        }, 0);
+        this.register(() => {
+            window.clearTimeout(timeoutId);
         });
     }
 }

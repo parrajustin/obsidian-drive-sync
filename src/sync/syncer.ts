@@ -60,6 +60,8 @@ export class FileSyncer {
         plugin: FirestoreSyncPlugin,
         config: SyncerConfig
     ): Promise<Result<FileSyncer, StatusError>> {
+        const view = await GetOrCreateSyncProgressView(plugin.app, /*reveal=*/ false);
+        view.setSyncerStatus(config.syncerId, "Waiting for layout...");
         // Wait till the workspace loads to reduce watcher noise.
         await new Promise<void>((onLayoutResolve) => {
             plugin.app.workspace.onLayoutReady(() => {
@@ -67,17 +69,21 @@ export class FileSyncer {
             });
         });
 
+        view.setSyncerStatus(config.syncerId, "Writing file uids...");
         // First I'm gonna make sure all markdown files have a fileId
         const fileUidWrite = await WriteUidToAllFilesIfNecessary(plugin.app);
         if (fileUidWrite.err) {
             return fileUidWrite;
         }
 
+        view.setSyncerStatus(config.syncerId, "Getting file nodes");
         // Get the file map of the filesystem.
         const buildMapOfNodesResult = await GetFileMapOfNodes(plugin.app, config);
         if (buildMapOfNodesResult.err) {
             return buildMapOfNodesResult;
         }
+
+        view.setSyncerStatus(config.syncerId, "checking firebase app");
         // Make sure firebase is not none.
         const firebaseApp = plugin.firebaseApp;
         if (firebaseApp.none) {
@@ -99,7 +105,8 @@ export class FileSyncer {
         // eslint-disable-next-line @typescript-eslint/return-await
         return await this._plugin.loggedIn
             .then<StatusResult<StatusError>>(async (creds: UserCredential) => {
-                console.log("init");
+                const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
+                view.setSyncerStatus(this._config.syncerId, "setting up root watcher");
                 // Now make the root settings folders are being watched by the listener.
                 const watchRootResult = await WatchRootSettingsFolder(
                     this._plugin.app.vault,
@@ -108,8 +115,12 @@ export class FileSyncer {
                 if (watchRootResult.err) {
                     return watchRootResult;
                 }
+
+                view.setSyncerStatus(this._config.syncerId, "setting up obsidian watcher");
                 // Also setup the internal files watched now.
                 await this.listenForFileChanges();
+
+                view.setSyncerStatus(this._config.syncerId, "building firebase syncer");
                 // Build the firebase syncer and init it.
                 const buildFirebaseSyncer = await FirebaseSyncer.buildFirebaseSyncer(
                     this._firebaseApp,
@@ -121,9 +132,14 @@ export class FileSyncer {
                 // Now initalize firebase.
                 const firebaseSyncer = buildFirebaseSyncer.safeUnwrap();
                 this._firebaseSyncer = Some(firebaseSyncer);
+                view.setSyncerStatus(this._config.syncerId, "firebase building realtime sync");
                 await firebaseSyncer.initailizeRealTimeUpdates();
+
+                view.setSyncerStatus(this._config.syncerId, "running first tick");
                 // Start the file syncer repeating tick.
                 await this.fileSyncerTick();
+
+                view.setSyncerStatus(this._config.syncerId, "good", "green");
                 return Ok();
             })
             .then<StatusResult<StatusError>>((result) => {

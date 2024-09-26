@@ -2,7 +2,8 @@ import type { App, WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
 import { ConvergenceAction } from "./sync/converge_file_models";
 import type { Option } from "./lib/option";
-import type { StatusError } from "./lib/status_error";
+import { ErrorCode, type StatusError } from "./lib/status_error";
+import type { SyncerConfig } from "./sync/syncer";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
 const MAX_NUMBER_OF_CHANGES = 150;
@@ -35,15 +36,25 @@ export class SyncProgressView extends ItemView {
     /** Past cycle of sync changes. */
     private _historicalChanges: (SyncProgress | SyncerPublishedCycle | SyncerError)[] = [];
     /** The current cycle of sync changes. */
-    private _currentCycleChanges: SyncProgress[] = [];
+    private _currentCycleChanges: (SyncProgress | SyncerError)[] = [];
+    /** File Id to progress. */
     private _mapOfCurrentCycleChanges = new Map<string, SyncProgress>();
+    /** The header element. */
+    private _headerElement: HTMLHeadingElement;
+    private _syncerDiv: HTMLDivElement;
+    private _syncerConfigs: SyncerConfig[] = [];
+    /** Statuses of individal syncers. */
+    private _syncerStatuses = new Map<string, HTMLSpanElement>();
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
         const container = this.containerEl.children[1] as Element;
         container.empty();
-        container.createEl("h2", { text: "Sync Progress View" });
+        this._headerElement = container.createEl("h2", {
+            text: "Sync Progress View (Need to login...)"
+        });
 
+        this._syncerDiv = container.createEl("div", "syncer-statuses");
         this._progressDiv = container.createEl("div", "progress-div");
         this._historicalDiv = container.createEl("div", "hsitorical-div");
         this.updateProgressView();
@@ -55,6 +66,29 @@ export class SyncProgressView extends ItemView {
 
     public getDisplayText() {
         return "Sync Progress View";
+    }
+
+    /** Set all the syncer configs to setup the view. */
+    public setSyncers(configs: SyncerConfig[]) {
+        this._syncerConfigs = configs;
+        this.updateProgressView();
+    }
+
+    /** Set an individual syncer status text. */
+    public setSyncerStatus(syncerId: string, status: string, color?: string) {
+        const statusDiv = this._syncerStatuses.get(syncerId);
+        if (statusDiv === undefined) {
+            return;
+        }
+
+        statusDiv.innerText = `${syncerId}: ${status}`;
+        if (color !== undefined) {
+            statusDiv.style.color = color;
+        }
+    }
+
+    public setStatus(status: string) {
+        this._headerElement.innerText = `Sync Progress View (${status})`;
     }
 
     /** Tell the progress viewer that a new syncer cycle has started. */
@@ -150,6 +184,11 @@ export class SyncProgressView extends ItemView {
 
     /** Updates the progress viewer. */
     public updateProgressView() {
+        this._syncerDiv.empty();
+        for (const config of this._syncerConfigs) {
+            this._syncerStatuses.set(config.syncerId, this._syncerDiv.createSpan());
+        }
+
         this._progressDiv.empty();
         this._progressDiv.createEl("h4", { text: "In Progress Sync:" });
         this._progressListDiv = this._progressDiv.createDiv("progress-list");
@@ -157,6 +196,10 @@ export class SyncProgressView extends ItemView {
         this._progressListDiv.style.flexDirection = "column";
 
         for (const entry of this._currentCycleChanges) {
+            if (entry instanceof SyncerError) {
+                this.createErrorEntry(this._progressListDiv, entry);
+                continue;
+            }
             this.createInProgressEntry(this._progressListDiv, entry);
         }
 
@@ -172,7 +215,7 @@ export class SyncProgressView extends ItemView {
                 continue;
             }
             if (entry instanceof SyncerError) {
-                console.error("Syncer error", entry);
+                this.createErrorEntry(historicalContainer, entry);
                 continue;
             }
             this.createInProgressEntry(historicalContainer, entry);
@@ -213,6 +256,33 @@ export class SyncProgressView extends ItemView {
 
         cycleStats.createEl("span").innerText = `#updates: ${cycle.numOfUpdates}`;
         cycleStats.createEl("span").innerText = `#Seconds: ${cycle.updateTime / 1000}`;
+    }
+
+    private createErrorEntry(container: HTMLDivElement, error: SyncerError) {
+        const errorDiv = container.createDiv("progress-entry");
+        errorDiv.style.display = "flex";
+        errorDiv.style.flexDirection = "row";
+        const iconSpan = createSpan({
+            cls: "progress-icons",
+            attr: {
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "aria-label": ErrorCode[error.error.errorCode],
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "data-icon": "circle-alert",
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "aria-hidden": "true"
+            }
+        });
+        iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-alert"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>`;
+        errorDiv.appendChild(iconSpan);
+
+        const errorContent = errorDiv.createDiv("progress-fields");
+        errorContent.style.display = "flex";
+        errorContent.style.flexDirection = "column";
+        errorContent.style.width = "100%";
+        errorContent.createEl("span", {
+            text: error.error.toString()
+        });
     }
 
     private createInProgressEntry(
@@ -294,6 +364,12 @@ export async function GetOrCreateSyncProgressView(
     app: App,
     reveal = true
 ): Promise<SyncProgressView> {
+    // Wait for layout ready.
+    await new Promise<void>((resolve) => {
+        app.workspace.onLayoutReady(() => {
+            resolve();
+        });
+    });
     const { workspace } = app;
 
     let leaf: WorkspaceLeaf | null = null;
