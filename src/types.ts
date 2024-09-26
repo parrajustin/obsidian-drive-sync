@@ -11,6 +11,9 @@ declare module "obsidian" {
         /** Base path of the vault. */
         basePath: string;
         watchers: { [key: string]: DataAdapterWathcer };
+        /** Returns the full system path to the file. */
+        getFullPath: (path: string) => string;
+        applyWriteOptions: (path: string, opts: DataWriteOptions) => Promise<void>;
         fsPromises: {
             readdir: typeof readdir;
             stat: typeof stat;

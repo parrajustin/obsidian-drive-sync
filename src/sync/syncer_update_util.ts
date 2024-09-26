@@ -29,7 +29,11 @@ import type { FileMapOfNodes } from "./file_node_util";
 import { GetNonDeletedByFilePath } from "./file_node_util";
 import { DeleteFile, ReadFile, WriteFile } from "./file_util";
 import type { SyncerConfig } from "./syncer";
-import { ConvertFileNodeToLocalDataType, IsLocalFileRaw } from "./query_util";
+import {
+    ConvertFileNodeToLocalDataType,
+    ConvertFilePathToLocalDataType,
+    IsLocalFileRaw
+} from "./query_util";
 import type { LocalDataType } from "./file_node";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
@@ -147,6 +151,7 @@ export function CreateOperationsToUpdateCloud(
             } else {
                 const uploadCloudStoreResult = await UploadFileToStorage(
                     app,
+                    syncConfig,
                     localState.fullPath,
                     creds,
                     fileId
@@ -155,8 +160,6 @@ export function CreateOperationsToUpdateCloud(
                 if (uploadCloudStoreResult.err) {
                     return uploadCloudStoreResult;
                 }
-                update.fileUploadTask = uploadCloudStoreResult.safeUnwrap().uploadTask;
-                node.fileStorageRef = uploadCloudStoreResult.safeUnwrap().fullPath;
             }
 
             // Upload the data to firestore.
@@ -169,11 +172,6 @@ export function CreateOperationsToUpdateCloud(
             // Update the local file node.
             update.localState.safeValue().fileId = Some(fileId);
             update.localState.safeValue().userId = Some(creds.user.uid);
-
-            // If we are uploading to cloud storage wait till that is done.
-            if (update.fileUploadTask !== undefined) {
-                await update.fileUploadTask;
-            }
 
             view.setEntryProgress(fileId, 1.0);
             return Ok();
@@ -218,12 +216,10 @@ async function DownloadCloudUpdate(
     }
     view.setEntryProgress(fileId, 0.5);
 
-    const localDataType: LocalDataType = IsLocalFileRaw(
+    const localDataType: LocalDataType = ConvertFilePathToLocalDataType(
         update.cloudState.safeValue().fullPath,
         syncConfig
-    )
-        ? { type: "RAW" }
-        : { type: "OBSIDIAN" };
+    );
     const writeResult = await WriteFile(
         app,
         update.cloudState.safeValue().fullPath,

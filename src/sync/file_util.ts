@@ -74,7 +74,7 @@ export async function WriteFile(
         case "OBSIDIAN":
             return WriteToObsidianFile(app, filePath, data, opts);
         case "RAW":
-            return WriteToRawFile(app, filePath, data);
+            return WriteToRawFile(app, filePath, data, opts);
     }
 }
 

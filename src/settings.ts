@@ -6,7 +6,6 @@ import { RootSyncType } from "./sync/syncer";
 import { uuidv7 } from "./lib/uuid";
 import { SearchStringFuzzySearch } from "./ui/querySuggest";
 import { GetAllFileNodes } from "./sync/file_node_util";
-import { SearchString } from "./lib/search_string_parser";
 import { LogError } from "./log";
 
 export interface FolderTemplate {
@@ -20,8 +19,8 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
         syncQuery: "*",
-        // eslint-disable-next-line prettier/prettier, no-useless-escape
-        rawFileSyncQuery: "f:^.obsidian"
+        rawFileSyncQuery: "f:^.obsidian -f:^.obsidian.*.md$",
+        obsidianFileSyncQuery: "-f:^.obsidian"
     };
 }
 
@@ -51,7 +50,6 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
     }
 
     public override display(): void {
-        console.log("serttings");
         this.containerEl.empty();
 
         this.addIdentifiers();
@@ -168,17 +166,22 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                         });
                     });
 
+                let setSyncFilter: (data: string) => void = () => {};
                 new Setting(liContainer)
                     .setName("Syncer Filter")
                     .setDesc(
                         "Gmail style filter. Based on https://github.com/mixmaxhq/search-string."
-                    );
-                const allFileFilter = liContainer.createEl("span");
-                allFileFilter.innerText = elem.syncQuery;
+                    )
+                    .addText((cb) => {
+                        cb.disabled = true;
+                        cb.setValue(elem.syncQuery);
+                        setSyncFilter = (data: string) => {
+                            cb.setValue(data);
+                        };
+                    });
                 new Setting(liContainer).setName("Edit syncer filter query").addButton((cb) => {
                     cb.setIcon("pencil").onClick(() => {
-                        const searchString = SearchString.parse("");
-                        void GetAllFileNodes(this.app, searchString).then((nodes) => {
+                        void GetAllFileNodes(this.app, CreateDefaultSyncConfig()).then((nodes) => {
                             if (nodes.err) {
                                 LogError(nodes.val);
                                 return;
@@ -189,7 +192,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                                 elem.syncQuery,
                                 (str) => {
                                     elem.syncQuery = str;
-                                    allFileFilter.innerText = str;
+                                    setSyncFilter(str);
                                 }
                             );
                             searchStringChecker.open();
@@ -198,15 +201,20 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     });
                 });
 
+                let rawFileFilterText: (data: string) => void = () => {};
                 new Setting(liContainer)
                     .setName("Raw Filter")
-                    .setDesc("Raw file locations. Gmail style filter.");
-                const rawFileFilterText = liContainer.createEl("span");
-                rawFileFilterText.innerText = elem.rawFileSyncQuery;
+                    .setDesc("Raw file locations. Gmail style filter.")
+                    .addText((cb) => {
+                        cb.disabled = true;
+                        cb.setValue(elem.rawFileSyncQuery);
+                        rawFileFilterText = (data: string) => {
+                            cb.setValue(data);
+                        };
+                    });
                 new Setting(liContainer).setName("Edit raw file query").addButton((cb) => {
                     cb.setIcon("pencil").onClick(() => {
-                        const searchString = SearchString.parse(elem.syncQuery);
-                        void GetAllFileNodes(this.app, searchString).then((nodes) => {
+                        void GetAllFileNodes(this.app, CreateDefaultSyncConfig()).then((nodes) => {
                             if (nodes.err) {
                                 LogError(nodes.val);
                                 return;
@@ -217,7 +225,40 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                                 elem.rawFileSyncQuery,
                                 (str) => {
                                     elem.rawFileSyncQuery = str;
-                                    rawFileFilterText.innerText = str;
+                                    rawFileFilterText(str);
+                                }
+                            );
+                            searchStringChecker.open();
+                            return;
+                        });
+                    });
+                });
+
+                let setObsidianFileFilter: (data: string) => void = () => {};
+                new Setting(liContainer)
+                    .setName("Obisdian Filter")
+                    .setDesc("Obisdian file locations. Gmail style filter.")
+                    .addText((cb) => {
+                        cb.disabled = true;
+                        cb.setValue(elem.obsidianFileSyncQuery);
+                        setObsidianFileFilter = (data: string) => {
+                            cb.setValue(data);
+                        };
+                    });
+                new Setting(liContainer).setName("Edit obsidian file query").addButton((cb) => {
+                    cb.setIcon("pencil").onClick(() => {
+                        void GetAllFileNodes(this.app, CreateDefaultSyncConfig()).then((nodes) => {
+                            if (nodes.err) {
+                                LogError(nodes.val);
+                                return;
+                            }
+                            const searchStringChecker = new SearchStringFuzzySearch(
+                                this.app,
+                                nodes.safeUnwrap(),
+                                elem.obsidianFileSyncQuery,
+                                (str) => {
+                                    elem.obsidianFileSyncQuery = str;
+                                    setObsidianFileFilter(str);
                                 }
                             );
                             searchStringChecker.open();

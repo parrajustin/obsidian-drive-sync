@@ -1,6 +1,5 @@
 import type { App, TAbstractFile } from "obsidian";
 import { TFile } from "obsidian";
-import type { SearchString } from "../lib/search_string_parser";
 import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
@@ -11,6 +10,8 @@ import { WrapPromise } from "../lib/wrap_promise";
 import { ConvertToUnknownError } from "../util";
 import type { LocalDataType } from "./file_node";
 import { FileNode } from "./file_node";
+import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
+import type { SyncerConfig } from "./syncer";
 
 /** Flat array of all nodes to a single file path. */
 export class FileNodeArray<TypeOfData extends Option<string> = Option<string>> {
@@ -22,50 +23,19 @@ export type FileMapOfNodes<TypeOfData extends Option<string> = Option<string>> =
     FileMapOfNodes<TypeOfData> | FileNodeArray<TypeOfData>
 >;
 
-/**
- * Checks if the `node` matches the `searchString`.
- * @param node file node to check.
- * @param searchString search node query.
- * @returns true if the node passes the query.
- */
-export function CheckFileNodeMatchesSearchString<
-    TypeOfData extends Option<string> = Option<string>
->(node: FileNode<TypeOfData>, searchString: SearchString): boolean {
-    const query = searchString.getParsedQuery();
-
-    // check if any of the exclude filters match.
-    const fileExcludeFilters = [...(query.exclude["f"] ?? []), ...(query.exclude["file"] ?? [])];
-    for (const filter of fileExcludeFilters) {
-        if (node.fullPath.match(filter)) {
-            return false;
-        }
-    }
-
-    // Check if any include filters match if any.
-    const fileIncludeFilter = [...(query.include["f"] ?? []), ...(query.include["file"] ?? [])];
-    // If there are no include filters all are included.
-    if (fileIncludeFilter.length === 0) {
-        return true;
-    }
-
-    for (const filter of fileIncludeFilter) {
-        if (node.fullPath.match(filter)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 /** Gets all the file nodes from the filesystem. */
 export async function GetAllFileNodes(
     app: App,
-    searchString: SearchString
+    config: SyncerConfig
 ): Promise<Result<FileNode[], StatusError>> {
     const files: FileNode[] = [];
 
     // First get all the files from the filemap.
     for (const fileName in app.vault.fileMap) {
+        if (!IsAcceptablePath(fileName, config) || !IsObsidianFile(fileName, config)) {
+            continue;
+        }
+
         const file = app.vault.fileMap[fileName] as TAbstractFile;
         if (!(file instanceof TFile)) {
             continue;
@@ -76,13 +46,9 @@ export async function GetAllFileNodes(
         }
 
         const node = FileNode.constructFromTFile(fileName, file, fileIdResult.safeUnwrap());
-        if (!CheckFileNodeMatchesSearchString(node, searchString)) {
-            continue;
-        }
         files.push(node);
     }
 
-    // TODO: everything should use the fs api to simplify logic.
     const recursivelyCheckFiles = async (path: string): Promise<StatusResult<StatusError>> => {
         const rootDirResult = (
             await WrapPromise(
@@ -97,6 +63,9 @@ export async function GetAllFileNodes(
             const baseName = splitSegment[0] as string;
             const extension = splitSegment[1] ?? "";
             const vaultPath = `${path}/${segment}`;
+            if (!IsAcceptablePath(vaultPath, config) || !IsLocalFileRaw(vaultPath, config)) {
+                continue;
+            }
             const filePath = `${app.vault.adapter.basePath}/${vaultPath}`;
             const statResult = (
                 await WrapPromise(app.vault.adapter.fsPromises.stat(filePath))
@@ -118,7 +87,7 @@ export async function GetAllFileNodes(
 
             const fileNode = new FileNode<None>({
                 fullPath: vaultPath,
-                ctime: statResult.safeUnwrap().ctimeMs,
+                ctime: statResult.safeUnwrap().birthtimeMs,
                 mtime: statResult.safeUnwrap().mtimeMs,
                 size: statResult.safeUnwrap().size,
                 baseName: baseName,
@@ -128,9 +97,6 @@ export async function GetAllFileNodes(
                 deleted: false,
                 localDataType: Some<LocalDataType>({ type: "RAW" })
             });
-            if (!CheckFileNodeMatchesSearchString(fileNode, searchString)) {
-                continue;
-            }
             files.push(fileNode);
         }
 
@@ -212,9 +178,9 @@ export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Opt
 /** Get the map of nodes or files. Use to keep track of file changes. */
 export async function GetFileMapOfNodes(
     app: App,
-    searchString: SearchString
+    config: SyncerConfig
 ): Promise<Result<FileMapOfNodes, StatusError>> {
-    const fileNodesResult = await GetAllFileNodes(app, searchString);
+    const fileNodesResult = await GetAllFileNodes(app, config);
     if (fileNodesResult.err) {
         return fileNodesResult;
     }

@@ -2,9 +2,11 @@ import type { App, FuzzyMatch } from "obsidian";
 import { FuzzySuggestModal } from "obsidian";
 import type { FileNode } from "../sync/file_node";
 import { SearchString } from "../lib/search_string_parser";
+import { GetQueryString } from "../sync/query_util";
 
 export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
     private _searchString: SearchString;
+    private _originalQuery: string;
     constructor(
         app: App,
         private _files: FileNode[],
@@ -12,15 +14,19 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
         private _cb: (str: string) => void
     ) {
         super(app);
-        this.setPlaceholder(_query ?? "Type name of a template...");
+        this.setPlaceholder(_query);
         this._searchString = SearchString.parse(_query);
+        this._originalQuery = _query;
     }
 
     /**
      * @public
      */
     public override getSuggestions(query: string): FuzzyMatch<FileNode>[] {
-        this._searchString = SearchString.parse(query);
+        if (query === "") {
+            query = this._originalQuery;
+        }
+        this._searchString = GetQueryString(query);
         this._query = query;
         const parsedQuery = this._searchString.getParsedQuery();
         // check if any of the exclude filters match.

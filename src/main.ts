@@ -154,23 +154,29 @@ export default class FirestoreSyncPlugin extends Plugin {
 
     private async teardownSyncers(): Promise<void> {
         for (const syncer of this._syncers) {
+            console.log("tearing down ", syncer);
             await syncer.teardown();
         }
+        console.log("finish teardown");
     }
 
     /**
      * Sets up all the syncers based on their configs. Will shutdown them all if any have an error.
      */
     private async startupSyncers() {
+        console.log("startup microtask");
         if (this._loadingSyncers) {
+            console.log("startup microtask");
             return;
         }
 
         this._loadingSyncers = true;
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         queueMicrotask(async () => {
+            console.log("startup microtask");
             // Make sure there are no syncers already running.
             await this.teardownSyncers();
+            console.log("after teardownSyncers");
 
             // Create setup pipelines for all syncers.
             const setupStatuses: Promise<StatusResult<StatusError>>[] = [];
@@ -188,6 +194,7 @@ export default class FirestoreSyncPlugin extends Plugin {
                     })
                 );
             }
+            console.log("after setupStatuses", setupStatuses);
 
             // Check if any of the syncers had an error.
             let tearDown = false;
@@ -196,11 +203,14 @@ export default class FirestoreSyncPlugin extends Plugin {
                 if (result.err) {
                     LogError(result.val);
                     tearDown = true;
+                    break;
                 }
             }
+            console.log("after Promise.all", setupStatuses);
 
             // If any did teardown all syncers.
             if (tearDown) {
+                console.log("after Promise.all tearDown", tearDown);
                 await this.teardownSyncers();
             }
             this._loadingSyncers = false;

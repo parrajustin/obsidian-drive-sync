@@ -11,7 +11,6 @@ import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import type { FileMapOfNodes } from "./file_node_util";
 import { ConvertArrayOfNodesToMap, FlattenFileNodes, GetFileMapOfNodes } from "./file_node_util";
-import { SearchString } from "../lib/search_string_parser";
 import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import { FirebaseSyncer } from "./firebase_syncer";
@@ -39,6 +38,8 @@ export interface SyncerConfig {
     syncQuery: string;
     /** Query to denote raw files to add to syncing. */
     rawFileSyncQuery: string;
+    /** Query to denote obsidian files to add to syncing. */
+    obsidianFileSyncQuery: string;
 }
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
@@ -72,9 +73,8 @@ export class FileSyncer {
             return fileUidWrite;
         }
 
-        const searchString = SearchString.parse(config.syncQuery);
         // Get the file map of the filesystem.
-        const buildMapOfNodesResult = await GetFileMapOfNodes(plugin.app, searchString);
+        const buildMapOfNodesResult = await GetFileMapOfNodes(plugin.app, config);
         if (buildMapOfNodesResult.err) {
             return buildMapOfNodesResult;
         }
@@ -121,12 +121,9 @@ export class FileSyncer {
                 // Now initalize firebase.
                 const firebaseSyncer = buildFirebaseSyncer.safeUnwrap();
                 this._firebaseSyncer = Some(firebaseSyncer);
-                console.log("before realtime");
                 await firebaseSyncer.initailizeRealTimeUpdates();
-                console.log("after realtime");
                 // Start the file syncer repeating tick.
                 await this.fileSyncerTick();
-                console.log("after tick realtime");
                 return Ok();
             })
             .then<StatusResult<StatusError>>((result) => {
@@ -195,7 +192,6 @@ export class FileSyncer {
 
     /** Execute a filesyncer tick. */
     private async fileSyncerTick() {
-        console.log("syncer tick");
         const tickResult = await this.fileSyncerTickLogic();
         if (tickResult.err) {
             LogError(tickResult.val);
@@ -203,9 +199,9 @@ export class FileSyncer {
             view.publishSyncerError(tickResult.val);
             return;
         }
-        // setTimeout(() => {
-        //     void this.fileSyncerTick();
-        // }, 500);
+        setTimeout(() => {
+            void this.fileSyncerTick();
+        }, 500);
     }
 
     /** The logic that runs for the file syncer very tick. */
