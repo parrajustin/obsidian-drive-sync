@@ -4,6 +4,10 @@ import type TemplaterPlugin from "main";
 import type { SyncerConfig } from "./sync/syncer";
 import { RootSyncType } from "./sync/syncer";
 import { uuidv7 } from "./lib/uuid";
+import { SearchStringFuzzySearch } from "./ui/querySuggest";
+import { GetAllFileNodes } from "./sync/file_node_util";
+import { SearchString } from "./lib/search_string_parser";
+import { LogError } from "./log";
 
 export interface FolderTemplate {
     folder: string;
@@ -15,9 +19,9 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
-        syncQuery: "",
+        syncQuery: "*",
         // eslint-disable-next-line prettier/prettier, no-useless-escape
-        rawFileSyncQuery: "^.obsidian"
+        rawFileSyncQuery: "f:^.obsidian"
     };
 }
 
@@ -163,16 +167,64 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                             elem.encryptionPassword = val;
                         });
                     });
+
                 new Setting(liContainer)
                     .setName("Syncer Filter")
                     .setDesc(
                         "Gmail style filter. Based on https://github.com/mixmaxhq/search-string."
-                    )
-                    .addText((cb) => {
-                        cb.setValue(elem.syncQuery).onChange((val) => {
-                            elem.encryptionPassword = val;
+                    );
+                const allFileFilter = liContainer.createEl("span");
+                allFileFilter.innerText = elem.syncQuery;
+                new Setting(liContainer).setName("Edit syncer filter query").addButton((cb) => {
+                    cb.setIcon("pencil").onClick(() => {
+                        const searchString = SearchString.parse("");
+                        void GetAllFileNodes(this.app, searchString).then((nodes) => {
+                            if (nodes.err) {
+                                LogError(nodes.val);
+                                return;
+                            }
+                            const searchStringChecker = new SearchStringFuzzySearch(
+                                this.app,
+                                nodes.safeUnwrap(),
+                                elem.syncQuery,
+                                (str) => {
+                                    elem.syncQuery = str;
+                                    allFileFilter.innerText = str;
+                                }
+                            );
+                            searchStringChecker.open();
+                            return;
                         });
                     });
+                });
+
+                new Setting(liContainer)
+                    .setName("Raw Filter")
+                    .setDesc("Raw file locations. Gmail style filter.");
+                const rawFileFilterText = liContainer.createEl("span");
+                rawFileFilterText.innerText = elem.rawFileSyncQuery;
+                new Setting(liContainer).setName("Edit raw file query").addButton((cb) => {
+                    cb.setIcon("pencil").onClick(() => {
+                        const searchString = SearchString.parse(elem.syncQuery);
+                        void GetAllFileNodes(this.app, searchString).then((nodes) => {
+                            if (nodes.err) {
+                                LogError(nodes.val);
+                                return;
+                            }
+                            const searchStringChecker = new SearchStringFuzzySearch(
+                                this.app,
+                                nodes.safeUnwrap(),
+                                elem.rawFileSyncQuery,
+                                (str) => {
+                                    elem.rawFileSyncQuery = str;
+                                    rawFileFilterText.innerText = str;
+                                }
+                            );
+                            searchStringChecker.open();
+                            return;
+                        });
+                    });
+                });
             };
             for (const setting of this._plugin.settings.syncers) {
                 createElement(setting);
