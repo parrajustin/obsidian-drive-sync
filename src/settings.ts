@@ -19,7 +19,7 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
         syncQuery: "*",
-        rawFileSyncQuery: "f:^.obsidian -f:^.obsidian.*.md$",
+        rawFileSyncQuery: "f:^.obsidian.*.json$",
         obsidianFileSyncQuery: "-f:^.obsidian"
     };
 }
