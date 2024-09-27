@@ -3,6 +3,8 @@ import { FuzzySuggestModal } from "obsidian";
 import type { FileNode } from "../sync/file_node";
 import { SearchString } from "../lib/search_string_parser";
 import { GetQueryString } from "../sync/query_util";
+import { LogError } from "../log";
+import { ConvertToUnknownError } from "../util";
 
 export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
     private _searchString: SearchString;
@@ -138,7 +140,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
         try {
             this.open();
         } catch (e) {
-            console.error(e);
+            LogError(ConvertToUnknownError("Query Suggest View")(e));
         }
     }
 }

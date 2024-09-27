@@ -133,7 +133,6 @@ export default class FirestoreSyncPlugin extends Plugin {
             signInWithEmailAndPassword(auth, email, password)
         );
         return loginResult.mapErr((err) => {
-            console.error("Uknown login error", err);
             // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
             return UnknownError(`Unknown Error "${err}"`);
         });
@@ -152,10 +151,8 @@ export default class FirestoreSyncPlugin extends Plugin {
 
     private async teardownSyncers(): Promise<void> {
         for (const syncer of this._syncers) {
-            console.log("tearing down ", syncer);
             await syncer.teardown();
         }
-        console.log("finish teardown");
     }
 
     /**

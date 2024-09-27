@@ -165,11 +165,12 @@ export class FileSyncer {
             LogError(tickResult.val);
             const view = await GetOrCreateSyncProgressView(this._plugin.app);
             view.publishSyncerError(tickResult.val);
+            view.setSyncerStatus(this._config.syncerId, "Tick Crash!", "red");
             return;
         }
-        // setTimeout(() => {
-        //     void this.fileSyncerTick();
-        // }, 500);
+        setTimeout(() => {
+            void this.fileSyncerTick();
+        }, 500);
     }
 
     /** The logic that runs for the file syncer very tick. */

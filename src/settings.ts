@@ -43,10 +43,10 @@ export interface Settings {
 /** The firebase sync settings. */
 export class FirebaseSyncSettingTab extends PluginSettingTab {
     constructor(
-        private _app: App,
+        app: App,
         private _plugin: TemplaterPlugin
     ) {
-        super(_app, _plugin);
+        super(app, _plugin);
     }
 
     public override display(): void {
