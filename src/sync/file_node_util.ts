@@ -3,6 +3,7 @@ import { TFile } from "obsidian";
 import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
+import { UnknownError } from "../lib/status_error";
 import { InternalError, InvalidArgumentError } from "../lib/status_error";
 import { None, Some, type Option } from "../lib/option";
 import { GetFileUidFromFrontmatter } from "./file_id_util";
@@ -76,6 +77,102 @@ async function GetRawNode(
     };
     const node = new FileNode(config);
     return Ok(Some(node));
+}
+
+/**
+ * Updates the file map with changes that took place.
+ * @param app obsidian app
+ * @param config the syncer based config.
+ * @param fileMap the preexisting file node tree map
+ * @param changedNodes file nodes that have been modified
+ * @param changedPath paths that have been changed.
+ */
+export async function UpdateFileMapWithChanges(
+    app: App,
+    config: SyncerConfig,
+    fileMap: FileMapOfNodes<Option<string>>,
+    changedNodes: Set<FileNode<Option<string>>>,
+    changedPath: Set<string>
+): Promise<Result<FileMapOfNodes<Option<string>>, StatusError>> {
+    // These are all paths that have been checked.
+    const checkedPaths = new Set<string>();
+    let flatNodes = FlattenFileNodes(fileMap);
+
+    for (const node of changedNodes) {
+        checkedPaths.add(node.fullPath);
+        const dataType = node.localDataType;
+        if (dataType.none) {
+            return Err(
+                UnknownError(`Somehow trying to update a cloud node for "${node.fullPath}"`)
+            );
+        }
+        const newNodeResult = await (dataType.safeValue().type === "RAW"
+            ? GetRawNode(app, node.fullPath)
+            : GetObsidianNode(app, node.fullPath));
+        if (newNodeResult.err) {
+            return newNodeResult;
+        }
+        const optNode = newNodeResult.safeUnwrap();
+        if (optNode.none) {
+            return Err(UnknownError(`No node found! "${node.fullPath}"`));
+        }
+        node.overwrite(optNode.safeValue());
+    }
+
+    for (const path of changedPath) {
+        if (checkedPaths.has(path)) {
+            continue;
+        }
+        checkedPaths.add(path);
+        const foundNode = GetNonDeletedByFilePath(fileMap, path);
+        if (foundNode.err) {
+            // We don't care about errors here. all errors are just bout not files found.
+            continue;
+        }
+        const origNode = foundNode.safeUnwrap();
+
+        let newNode: Option<FileNode<Option<string>>> = None;
+        if (!IsAcceptablePath(path, config)) {
+            continue;
+        }
+        if (IsObsidianFile(path, config)) {
+            const fileResult = await GetObsidianNode(app, path);
+            if (fileResult.err) {
+                return fileResult;
+            }
+            newNode = fileResult.safeUnwrap();
+        }
+        if (IsLocalFileRaw(path, config)) {
+            const fileResult = await GetRawNode(app, path);
+            if (fileResult.err) {
+                return fileResult;
+            }
+            newNode = fileResult.safeUnwrap();
+        }
+
+        if (origNode.none && newNode.none) {
+            continue;
+        } else if (origNode.some && newNode.none) {
+            // Couldn't get new file information, maybe the file is gone? just delete the file node.
+            flatNodes = flatNodes.filter((node) => node !== origNode.safeValue());
+        } else if (origNode.none && newNode.some) {
+            // Only found the new file.
+            flatNodes.push(newNode.safeValue());
+        } else if (origNode.some && newNode.some) {
+            // Both file nodes exist, merge information.
+            const fileIdsAreTheSame =
+                origNode.safeValue().fileId.valueOr("") === newNode.safeValue().fileId.valueOr("");
+            if (!fileIdsAreTheSame) {
+                // Filter out the original node.
+                flatNodes = flatNodes.filter((node) => node !== origNode.safeValue());
+                flatNodes.push(newNode.safeValue());
+            } else {
+                origNode.safeValue().overwrite(newNode.safeValue());
+            }
+        }
+    }
+
+    return ConvertArrayOfNodesToMap(flatNodes);
 }
 
 /** Gets all the file nodes from the filesystem. */

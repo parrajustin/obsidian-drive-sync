@@ -1,8 +1,9 @@
 import { describe, expect, jest, test } from "@jest/globals";
 import type { Option } from "../../src/lib/option";
 import { None, Some } from "../../src/lib/option";
-import { ConvertArrayOfNodesToMap, FileNode } from "../../src/sync/file_node_util";
+import { ConvertArrayOfNodesToMap } from "../../src/sync/file_node_util";
 import { ConvergeMapsToUpdateStates } from "../../src/sync/converge_file_models";
+import { FileNode } from "../../src/sync/file_node";
 
 jest.mock(
     "obsidian",
@@ -18,7 +19,7 @@ jest.mock(
 );
 
 describe("ConvergeMapsToUpdateStates", () => {
-    test("Returns empty for all nodes the same.", async () => {
+    test("Returns null updates for all nodes the same.", async () => {
         const nodes: FileNode<Some<string>>[] = [
             new FileNode({
                 fullPath: "folder/file_1.md",
@@ -29,7 +30,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -40,7 +42,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "file_2.md",
@@ -51,7 +54,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID3"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
 
@@ -64,7 +68,23 @@ describe("ConvergeMapsToUpdateStates", () => {
             cloudMapRep: cloudMapRep.unsafeUnwrap()
         });
         expect(result.ok).toBeTruthy();
-        expect(result.val).toStrictEqual([]);
+        expect(result.val).toStrictEqual([
+            {
+                action: "null_update",
+                localState: Some(nodes[0]),
+                cloudState: Some(nodes[0])
+            },
+            {
+                action: "null_update",
+                localState: Some(nodes[1]),
+                cloudState: Some(nodes[1])
+            },
+            {
+                action: "null_update",
+                localState: Some(nodes[2]),
+                cloudState: Some(nodes[2])
+            }
+        ]);
     });
 
     test("returns valid change for missing cloud node.", async () => {
@@ -78,7 +98,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -89,7 +110,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
         const localNodes: FileNode<Some<string>>[] = [
@@ -102,7 +124,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
 
@@ -116,6 +139,11 @@ describe("ConvergeMapsToUpdateStates", () => {
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
+            {
+                action: "null_update",
+                localState: Some(localNodes[0]),
+                cloudState: Some(cloudNodes[1])
+            },
             {
                 action: "using_cloud",
                 localState: None,
@@ -136,7 +164,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -147,7 +176,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
         const localNodes: FileNode<Some<string>>[] = [
@@ -160,7 +190,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "file_1.md",
@@ -171,7 +202,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
 
@@ -190,6 +222,11 @@ describe("ConvergeMapsToUpdateStates", () => {
                 localState: Some(localNodes[1]),
                 cloudState: Some(cloudNodes[0]),
                 leftOverLocalFile: Some("file_1.md")
+            },
+            {
+                action: "null_update",
+                localState: Some(localNodes[0]),
+                cloudState: Some(cloudNodes[1])
             }
         ]);
     });
@@ -205,7 +242,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: true
+                deleted: true,
+                localDataType: None
             })
         ];
         const localNodes: FileNode<Option<string>>[] = [
@@ -218,7 +256,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: None,
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
 
@@ -233,7 +272,7 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
             {
-                action: "using_cloud",
+                action: "using_cloud_to_remove_local",
                 localState: Some(localNodes[0]),
                 cloudState: Some(cloudNodes[0]),
                 leftOverLocalFile: None
@@ -252,7 +291,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -263,7 +303,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -276,7 +317,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
 
@@ -290,6 +332,11 @@ describe("ConvergeMapsToUpdateStates", () => {
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
+            {
+                action: "null_update",
+                localState: Some(localNodes[1]),
+                cloudState: Some(cloudNodes[0])
+            },
             {
                 action: "using_local",
                 localState: Some(localNodes[0]),
@@ -309,7 +356,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -320,7 +368,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -333,7 +382,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
 
@@ -371,7 +421,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -384,7 +435,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
 
@@ -417,7 +469,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -428,7 +481,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -441,7 +495,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
 
@@ -470,7 +525,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -481,7 +537,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -494,7 +551,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID1"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             }),
             new FileNode({
                 fullPath: "folder/file_1.md",
@@ -505,7 +563,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 extension: "md",
                 fileId: Some("ID2"),
                 userId: Some("User1"),
-                deleted: false
+                deleted: false,
+                localDataType: None
             })
         ];
 
@@ -521,5 +580,101 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(result.val.toString()).toContain(
             `There is a conflict between synced files and local ones having multiple resolving to the path "folder/file_1.md". Recommend complete local removal of file ids.`
         );
+    });
+
+    test("returns 'using_local_delete_cloud' for local deletion", async () => {
+        const cloudNodes: FileNode<Some<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: false,
+                localDataType: None
+            })
+        ];
+        const localNodes: FileNode<Some<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: true,
+                localDataType: None
+            })
+        ];
+
+        const localMapRep = ConvertArrayOfNodesToMap(localNodes);
+        expect(localMapRep.ok).toBeTruthy();
+        const cloudMapRep = ConvertArrayOfNodesToMap(cloudNodes);
+        expect(cloudMapRep.ok).toBeTruthy();
+        const result = await ConvergeMapsToUpdateStates({
+            localMapRep: localMapRep.unsafeUnwrap(),
+            cloudMapRep: cloudMapRep.unsafeUnwrap()
+        });
+        expect(result.ok).toBeTruthy();
+        expect(result.val).toStrictEqual([
+            {
+                action: "using_local_delete_cloud",
+                localState: Some(localNodes[0]),
+                cloudState: Some(cloudNodes[0])
+            }
+        ]);
+    });
+
+    test("returns no change update for matched nodes", async () => {
+        const cloudNodes: FileNode<Some<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.png",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "png",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: false,
+                localDataType: None
+            })
+        ];
+        const localNodes: FileNode<Option<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.png",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "png",
+                fileId: None,
+                userId: None,
+                deleted: false,
+                localDataType: None
+            })
+        ];
+
+        const localMapRep = ConvertArrayOfNodesToMap(localNodes);
+        expect(localMapRep.ok).toBeTruthy();
+        const cloudMapRep = ConvertArrayOfNodesToMap(cloudNodes);
+        expect(cloudMapRep.ok).toBeTruthy();
+        const result = await ConvergeMapsToUpdateStates({
+            localMapRep: localMapRep.unsafeUnwrap(),
+            cloudMapRep: cloudMapRep.unsafeUnwrap()
+        });
+        expect(result.ok).toBeTruthy();
+        expect(result.val).toStrictEqual([
+            {
+                action: "null_update",
+                localState: Some(localNodes[0]),
+                cloudState: Some(cloudNodes[0])
+            }
+        ]);
     });
 });

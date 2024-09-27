@@ -18,7 +18,14 @@ import { uuidv7 } from "../lib/uuid";
 import { WrapPromise } from "../lib/wrap_promise";
 import { AsyncForEach, ConvertToUnknownError } from "../util";
 import { DownloadFileFromStorage, UploadFileToStorage } from "./cloud_storage_util";
-import type { CloudConvergenceUpdate, ConvergenceUpdate } from "./converge_file_models";
+import type {
+    CloudConvergenceUpdate,
+    CloudDeleteLocalConvergenceUpdate,
+    ConvergenceUpdate,
+    LocalConvergenceUpdate,
+    LocalDeleteCloudConvergenceUpdate,
+    LocalReplaceIdConvergenceUpdate
+} from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { WriteUidToFile } from "./file_id_util";
 import type { FileDbModel } from "./firestore_schema";
@@ -65,18 +72,17 @@ async function UploadFileToFirestore(
  */
 export function CreateOperationsToUpdateCloud(
     db: Firestore,
-    localUpdates: ConvergenceUpdate[],
+    localUpdates: (
+        | LocalConvergenceUpdate
+        | LocalReplaceIdConvergenceUpdate
+        | LocalDeleteCloudConvergenceUpdate
+    )[],
     app: App,
     syncConfig: SyncerConfig,
     creds: UserCredential
 ): Promise<StatusResult<StatusError>>[] {
-    const filteredUpdates = localUpdates.filter(
-        (v) =>
-            v.action === ConvergenceAction.USE_LOCAL ||
-            v.action === ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID
-    );
     const localOperations = AsyncForEach(
-        filteredUpdates,
+        localUpdates,
         async (update): Promise<StatusResult<StatusError>> => {
             const view = await GetOrCreateSyncProgressView(app, /*reveal=*/ false);
             // Get the file id.
@@ -85,6 +91,7 @@ export function CreateOperationsToUpdateCloud(
                 : update.localState.safeValue().fileId.valueOr(uuidv7());
             const localState = update.localState.safeValue();
             const tooBigForFirestore = localState.size > ONE_HUNDRED_KB_IN_BYTES;
+            const writeData = update.action !== ConvergenceAction.USE_LOCAL_DELETE_CLOUD;
 
             // For times we have to replace id do that first.
             if (update.action === ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID) {
@@ -112,7 +119,7 @@ export function CreateOperationsToUpdateCloud(
                 baseName: localState.baseName,
                 ext: localState.extension,
                 userId: creds.user.uid,
-                deleted: false
+                deleted: update.localState.safeValue().deleted
             };
 
             const initalFileName: Option<string> = update.cloudState.andThen<string>(
@@ -127,7 +134,7 @@ export function CreateOperationsToUpdateCloud(
             view.setEntryProgress(fileId, 0.1);
 
             // Handle how the data is stored.
-            if (!tooBigForFirestore) {
+            if (writeData && !tooBigForFirestore) {
                 // When the data is small enough compress it and upload to
                 const readDataResult = await ReadFile(
                     app,
@@ -147,7 +154,7 @@ export function CreateOperationsToUpdateCloud(
                 }
 
                 node.data = Bytes.fromUint8Array(dataCompresssed.safeUnwrap());
-            } else {
+            } else if (writeData) {
                 const uploadCloudStoreResult = await UploadFileToStorage(
                     app,
                     syncConfig,
@@ -246,66 +253,49 @@ async function DownloadCloudUpdate(
  * @returns the array of operations taking place.
  */
 export function CreateOperationsToUpdateLocal(
-    cloudUpdates: ConvergenceUpdate[],
+    cloudUpdates: (CloudConvergenceUpdate | CloudDeleteLocalConvergenceUpdate)[],
     app: App,
     syncConfig: SyncerConfig
 ): Promise<StatusResult<StatusError>>[] {
-    const filteredUpdates = cloudUpdates.filter(
-        (v) =>
-            v.action === ConvergenceAction.USE_CLOUD ||
-            v.action === ConvergenceAction.USE_CLOUD_DELETE_LOCAL
-    );
+    const ops = AsyncForEach(cloudUpdates, async (update): Promise<StatusResult<StatusError>> => {
+        const view = await GetOrCreateSyncProgressView(app, /*reveal=*/ false);
+        const fileId = update.cloudState.safeValue().fileId.safeValue();
 
-    const ops = AsyncForEach(
-        filteredUpdates,
-        async (update): Promise<StatusResult<StatusError>> => {
-            const view = await GetOrCreateSyncProgressView(app, /*reveal=*/ false);
-            const fileId = update.cloudState.safeValue().fileId.safeValue();
-
-            const initalFileName: Option<string> = update.localState.andThen<string>(
-                (localState) => {
-                    if (localState.fullPath !== update.cloudState.safeValue().fullPath) {
-                        return Some(localState.fullPath);
-                    }
-                    return None;
-                }
-            );
-            // Add the progress viewer entry.
-            view.addEntry(
-                fileId,
-                initalFileName,
-                update.cloudState.safeValue().fullPath,
-                update.action
-            );
-
-            // Do the convergence operation.
-            if (update.action === ConvergenceAction.USE_CLOUD) {
-                const downloadResult = await DownloadCloudUpdate(
-                    app,
-                    syncConfig,
-                    update,
-                    view,
-                    fileId
-                );
-                if (downloadResult.err) {
-                    return downloadResult;
-                }
-            } else if (update.action === ConvergenceAction.USE_CLOUD_DELETE_LOCAL) {
-                // For `USE_CLOUD_DELETE_LOCAL` update leave it to the delete left over file system.
-                update.leftOverLocalFile = Some(update.cloudState.safeValue().fullPath);
-                view.setEntryProgress(fileId, 0.5);
+        const initalFileName: Option<string> = update.localState.andThen<string>((localState) => {
+            if (localState.fullPath !== update.cloudState.safeValue().fullPath) {
+                return Some(localState.fullPath);
             }
+            return None;
+        });
+        // Add the progress viewer entry.
+        view.addEntry(
+            fileId,
+            initalFileName,
+            update.cloudState.safeValue().fullPath,
+            update.action
+        );
 
-            // Update local file if there is one.
-            if (update.localState.some) {
-                update.localState.safeValue().overwrite(update.cloudState.safeValue());
+        // Do the convergence operation.
+        if (update.action === ConvergenceAction.USE_CLOUD) {
+            const downloadResult = await DownloadCloudUpdate(app, syncConfig, update, view, fileId);
+            if (downloadResult.err) {
+                return downloadResult;
             }
-
-            // Update progress view.
-            view.setEntryProgress(fileId, 1);
-            return Ok();
+        } else if (update.action === ConvergenceAction.USE_CLOUD_DELETE_LOCAL) {
+            // For `USE_CLOUD_DELETE_LOCAL` update leave it to the delete left over file system.
+            update.leftOverLocalFile = Some(update.cloudState.safeValue().fullPath);
+            view.setEntryProgress(fileId, 0.5);
         }
-    );
+
+        // Update local file if there is one.
+        if (update.localState.some) {
+            update.localState.safeValue().overwrite(update.cloudState.safeValue());
+        }
+
+        // Update progress view.
+        view.setEntryProgress(fileId, 1);
+        return Ok();
+    });
 
     return ops;
 }

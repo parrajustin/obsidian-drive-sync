@@ -6,6 +6,4 @@
 
 - For encrpytion only the file data is encrypted. The size, modification and creation time, full file name, and other metadata is stored in plain text.
 
-- Some bug around modified time when download from cloud
-
-- weird issues with markdown files existing in the .obsidian folder.
+- if you move selected files to filereed file path it will still be synced.

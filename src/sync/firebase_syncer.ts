@@ -20,8 +20,16 @@ import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import { FileSchemaConverter } from "./firestore_schema";
 import { WrapPromise } from "../lib/wrap_promise";
-import type { ConvergenceUpdate } from "./converge_file_models";
-import { ConvergeMapsToUpdateStates } from "./converge_file_models";
+import type {
+    CloudConvergenceUpdate,
+    CloudDeleteLocalConvergenceUpdate,
+    ConvergenceUpdate,
+    LocalConvergenceUpdate,
+    LocalDeleteCloudConvergenceUpdate,
+    LocalReplaceIdConvergenceUpdate,
+    NullUpdate
+} from "./converge_file_models";
+import { ConvergeMapsToUpdateStates, ConvergenceAction } from "./converge_file_models";
 import type { App } from "obsidian";
 import { CreateOperationsToUpdateCloud, CreateOperationsToUpdateLocal } from "./syncer_update_util";
 import { LogError } from "../log";
@@ -151,30 +159,33 @@ export class FirebaseSyncer {
     public resolveConvergenceUpdates(
         app: App,
         syncConfig: SyncerConfig,
-        updates: ConvergenceUpdate[]
+        updates: Exclude<ConvergenceUpdate, NullUpdate>[]
     ): Result<Promise<StatusResult<StatusError>>[], StatusError> {
         if (!this._isValid) {
             return Err(InternalError(`Firebase syncer not in valid state.`));
         }
+        const localUpdates: (
+            | LocalConvergenceUpdate
+            | LocalReplaceIdConvergenceUpdate
+            | LocalDeleteCloudConvergenceUpdate
+        )[] = [];
+        const cloudUpdates: (CloudConvergenceUpdate | CloudDeleteLocalConvergenceUpdate)[] = [];
+        for (const update of updates) {
+            switch (update.action) {
+                case ConvergenceAction.USE_CLOUD:
+                case ConvergenceAction.USE_CLOUD_DELETE_LOCAL:
+                    cloudUpdates.push(update);
+                    break;
+                case ConvergenceAction.USE_LOCAL:
+                case ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID:
+                case ConvergenceAction.USE_LOCAL_DELETE_CLOUD:
+                    localUpdates.push(update);
+                    break;
+            }
+        }
         return Ok([
-            ...this.resolveLocalActionConvergenceUpdates(app, syncConfig, updates),
-            ...this.resolveCloudActionConvergenceUpdates(app, syncConfig, updates)
+            ...CreateOperationsToUpdateLocal(cloudUpdates, app, syncConfig),
+            ...CreateOperationsToUpdateCloud(this._db, localUpdates, app, syncConfig, this._creds)
         ]);
-    }
-
-    private resolveLocalActionConvergenceUpdates(
-        app: App,
-        syncConfig: SyncerConfig,
-        updates: ConvergenceUpdate[]
-    ): Promise<StatusResult<StatusError>>[] {
-        return CreateOperationsToUpdateCloud(this._db, updates, app, syncConfig, this._creds);
-    }
-
-    private resolveCloudActionConvergenceUpdates(
-        app: App,
-        syncConfig: SyncerConfig,
-        updates: ConvergenceUpdate[]
-    ): Promise<StatusResult<StatusError>>[] {
-        return CreateOperationsToUpdateLocal(updates, app, syncConfig);
     }
 }

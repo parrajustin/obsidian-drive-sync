@@ -23,7 +23,11 @@ export enum ConvergenceAction {
     /** Use local file to update cloud. */
     USE_LOCAL = "using_local",
     /** Uses the local state but repalces local id with the cloud id. */
-    USE_LOCAL_BUT_REPLACE_ID = "using_local_need_to_change_id"
+    USE_LOCAL_BUT_REPLACE_ID = "using_local_need_to_change_id",
+    /** Uses the local state to mark cloud as deleted. */
+    USE_LOCAL_DELETE_CLOUD = "using_local_delete_cloud",
+    /** No update needed just update the local file id and other metadata. */
+    NULL_UPDATE = "null_update"
 }
 
 interface SharedUpdateData {
@@ -31,14 +35,26 @@ interface SharedUpdateData {
     fileUploadTask?: UploadTask;
 }
 
-interface LocalConvergenceUpdate extends SharedUpdateData {
+export interface NullUpdate {
+    action: ConvergenceAction.NULL_UPDATE;
+    localState: Some<FileNode>;
+    cloudState: Some<FileNode<Some<string>>>;
+}
+
+export interface LocalConvergenceUpdate extends SharedUpdateData {
     action: ConvergenceAction.USE_LOCAL;
     localState: Some<FileNode>;
     cloudState: Option<FileNode<Some<string>>>;
 }
 
-interface LocalReplaceIdConvergenceUpdate extends SharedUpdateData {
+export interface LocalReplaceIdConvergenceUpdate extends SharedUpdateData {
     action: ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID;
+    localState: Some<FileNode>;
+    cloudState: Some<FileNode<Some<string>>>;
+}
+
+export interface LocalDeleteCloudConvergenceUpdate extends SharedUpdateData {
+    action: ConvergenceAction.USE_LOCAL_DELETE_CLOUD;
     localState: Some<FileNode>;
     cloudState: Some<FileNode<Some<string>>>;
 }
@@ -60,10 +76,12 @@ export interface CloudDeleteLocalConvergenceUpdate extends SharedUpdateData {
 }
 
 export type ConvergenceUpdate =
+    | NullUpdate
     | CloudConvergenceUpdate
     | CloudDeleteLocalConvergenceUpdate
     | LocalConvergenceUpdate
-    | LocalReplaceIdConvergenceUpdate;
+    | LocalReplaceIdConvergenceUpdate
+    | LocalDeleteCloudConvergenceUpdate;
 
 /**
  * Ensures that there is only a single update for a path.
@@ -222,7 +240,10 @@ export function CompareNodesAndGetUpdate(
     const lNode = localNode.safeValue();
     // Cloud node removing the option.
     const cNode = cloudNode.safeValue();
+    // checks if the file is not a markdown file.
     const notMarkdownFile = lNode.extension !== "md";
+
+    // Case where everything is the same.
     if (
         lNode.mtime === cNode.mtime &&
         lNode.fullPath === cNode.fullPath &&
@@ -237,7 +258,31 @@ export function CompareNodesAndGetUpdate(
         if (pathResult.err) {
             return pathResult;
         }
-        return Ok(None);
+        const action: ConvergenceUpdate = {
+            action: ConvergenceAction.NULL_UPDATE,
+            localState: localNode,
+            cloudState: cloudNode
+        };
+        return Ok(Some(action));
+    }
+
+    // Case where the local node has been marked for deletion. Only happens when file is watched, as
+    // local deletion means the file is gone.
+    if (
+        lNode.mtime >= cNode.mtime &&
+        (lNode.fileId.valueOr("") === cNode.fileId.safeValue() || notMarkdownFile) &&
+        lNode.deleted &&
+        lNode.deleted !== cNode.deleted
+    ) {
+        // The local node is newer, so replace the cloud one.
+        localVisisted.add(lNode);
+        cloudVisitedByFileId.add(cNode.fileId.safeValue());
+        const action: ConvergenceUpdate = {
+            action: ConvergenceAction.USE_LOCAL_DELETE_CLOUD,
+            localState: localNode,
+            cloudState: cloudNode
+        };
+        return Ok(Some(action));
     }
 
     // Checks if both have a file id and they are different.
