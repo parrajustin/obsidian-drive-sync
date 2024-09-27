@@ -45,6 +45,13 @@ import type { LocalDataType } from "./file_node";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
+export interface Identifiers {
+    /** The id of the syncer. */
+    syncerId: string;
+    /** The id of the cycle. */
+    cycleId: string;
+}
+
 /** Upload the file to firestore. */
 async function UploadFileToFirestore(
     db: Firestore,
@@ -71,6 +78,7 @@ async function UploadFileToFirestore(
  * @returns the array of operations taking place.
  */
 export function CreateOperationsToUpdateCloud(
+    ids: Identifiers,
     db: Firestore,
     localUpdates: (
         | LocalConvergenceUpdate
@@ -130,8 +138,8 @@ export function CreateOperationsToUpdateCloud(
                     return None;
                 }
             );
-            view.addEntry(fileId, initalFileName, localState.fullPath, update.action);
-            view.setEntryProgress(fileId, 0.1);
+            view.addEntry(ids.syncerId, fileId, initalFileName, localState.fullPath, update.action);
+            view.setEntryProgress(ids.syncerId, fileId, 0.1);
 
             // Handle how the data is stored.
             if (writeData && !tooBigForFirestore) {
@@ -141,14 +149,14 @@ export function CreateOperationsToUpdateCloud(
                     localState.fullPath,
                     ConvertFileNodeToLocalDataType(update.localState.safeValue(), syncConfig)
                 );
-                view.setEntryProgress(fileId, 0.2);
+                view.setEntryProgress(ids.syncerId, fileId, 0.2);
                 if (readDataResult.err) {
                     return readDataResult.mapErr(
                         ConvertToUnknownError(`Failed to read binary string`)
                     );
                 }
                 const dataCompresssed = await WrapPromise(compress(readDataResult.safeUnwrap()));
-                view.setEntryProgress(fileId, 0.4);
+                view.setEntryProgress(ids.syncerId, fileId, 0.4);
                 if (dataCompresssed.err) {
                     return dataCompresssed.mapErr(ConvertToUnknownError("Failed to compress data"));
                 }
@@ -162,7 +170,7 @@ export function CreateOperationsToUpdateCloud(
                     creds,
                     fileId
                 );
-                view.setEntryProgress(fileId, 0.6);
+                view.setEntryProgress(ids.syncerId, fileId, 0.6);
                 if (uploadCloudStoreResult.err) {
                     return uploadCloudStoreResult;
                 }
@@ -171,7 +179,7 @@ export function CreateOperationsToUpdateCloud(
 
             // Upload the data to firestore.
             const uploadCloudState = await UploadFileToFirestore(db, node, fileId);
-            view.setEntryProgress(fileId, 0.7);
+            view.setEntryProgress(ids.syncerId, fileId, 0.7);
             if (uploadCloudState.err) {
                 return uploadCloudState;
             }
@@ -180,7 +188,7 @@ export function CreateOperationsToUpdateCloud(
             update.localState.safeValue().fileId = Some(fileId);
             update.localState.safeValue().userId = Some(creds.user.uid);
 
-            view.setEntryProgress(fileId, 1.0);
+            view.setEntryProgress(ids.syncerId, fileId, 1.0);
             return Ok();
         }
     );
@@ -189,6 +197,7 @@ export function CreateOperationsToUpdateCloud(
 
 /** Does the update by downloading the cloud file to local files. */
 async function DownloadCloudUpdate(
+    ids: Identifiers,
     app: App,
     syncConfig: SyncerConfig,
     update: CloudConvergenceUpdate,
@@ -201,7 +210,7 @@ async function DownloadCloudUpdate(
     const textData = update.cloudState.safeValue().data;
     if (textData !== undefined) {
         const dataCompresssed = await WrapPromise(decompress(textData));
-        view.setEntryProgress(fileId, 0.5);
+        view.setEntryProgress(ids.syncerId, fileId, 0.5);
         if (dataCompresssed.err) {
             return dataCompresssed.mapErr(ConvertToUnknownError(`Failed to compress data`));
         }
@@ -211,7 +220,7 @@ async function DownloadCloudUpdate(
     const cloudStorageRef = update.cloudState.safeValue().fileStorageRef;
     if (cloudStorageRef !== undefined) {
         const getDataResult = await DownloadFileFromStorage(cloudStorageRef);
-        view.setEntryProgress(fileId, 0.5);
+        view.setEntryProgress(ids.syncerId, fileId, 0.5);
         if (getDataResult.err) {
             return getDataResult;
         }
@@ -221,7 +230,7 @@ async function DownloadCloudUpdate(
     if (dataToWrite.none) {
         return Err(UnknownError(`Unable to get data to write for "${fileId}`));
     }
-    view.setEntryProgress(fileId, 0.5);
+    view.setEntryProgress(ids.syncerId, fileId, 0.5);
 
     const localDataType: LocalDataType = ConvertFilePathToLocalDataType(
         update.cloudState.safeValue().fullPath,
@@ -237,7 +246,7 @@ async function DownloadCloudUpdate(
             mtime: update.cloudState.safeValue().mtime
         }
     );
-    view.setEntryProgress(fileId, 0.75);
+    view.setEntryProgress(ids.syncerId, fileId, 0.75);
     if (writeResult.err) {
         return writeResult;
     }
@@ -253,6 +262,7 @@ async function DownloadCloudUpdate(
  * @returns the array of operations taking place.
  */
 export function CreateOperationsToUpdateLocal(
+    ids: Identifiers,
     cloudUpdates: (CloudConvergenceUpdate | CloudDeleteLocalConvergenceUpdate)[],
     app: App,
     syncConfig: SyncerConfig
@@ -269,6 +279,7 @@ export function CreateOperationsToUpdateLocal(
         });
         // Add the progress viewer entry.
         view.addEntry(
+            ids.syncerId,
             fileId,
             initalFileName,
             update.cloudState.safeValue().fullPath,
@@ -277,14 +288,21 @@ export function CreateOperationsToUpdateLocal(
 
         // Do the convergence operation.
         if (update.action === ConvergenceAction.USE_CLOUD) {
-            const downloadResult = await DownloadCloudUpdate(app, syncConfig, update, view, fileId);
+            const downloadResult = await DownloadCloudUpdate(
+                ids,
+                app,
+                syncConfig,
+                update,
+                view,
+                fileId
+            );
             if (downloadResult.err) {
                 return downloadResult;
             }
         } else if (update.action === ConvergenceAction.USE_CLOUD_DELETE_LOCAL) {
             // For `USE_CLOUD_DELETE_LOCAL` update leave it to the delete left over file system.
             update.leftOverLocalFile = Some(update.cloudState.safeValue().fullPath);
-            view.setEntryProgress(fileId, 0.5);
+            view.setEntryProgress(ids.syncerId, fileId, 0.5);
         }
 
         // Update local file if there is one.
@@ -293,7 +311,7 @@ export function CreateOperationsToUpdateLocal(
         }
 
         // Update progress view.
-        view.setEntryProgress(fileId, 1);
+        view.setEntryProgress(ids.syncerId, fileId, 1);
         return Ok();
     });
 

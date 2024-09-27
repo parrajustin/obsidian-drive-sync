@@ -3,7 +3,6 @@
  * nodes.
  */
 
-import type { EventRef } from "obsidian";
 import type FirestoreSyncPlugin from "../main";
 import { InternalError, type StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
@@ -30,6 +29,7 @@ import { AddWatchHandler } from "../watcher";
 import type { FileNode } from "./file_node";
 import type { ConvergenceUpdate, NullUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
+import { uuidv7 } from "../lib/uuid";
 
 export enum RootSyncType {
     ROOT_SYNCER = "root",
@@ -54,8 +54,6 @@ export interface SyncerConfig {
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
 export class FileSyncer {
-    /** event refs to clear on teardown. */
-    private _eventRefs: EventRef[] = [];
     /** firebase syncer if one has been created. */
     private _firebaseSyncer: Option<FirebaseSyncer> = None;
     /** Identified file changes to check for changes. */
@@ -64,6 +62,8 @@ export class FileSyncer {
     private _touchedFileNodes = new Set<FileNode>();
     /** Function to handle unsubing the watch func. */
     private _unsubWatchHandler: Option<UnsubFunc> = None;
+    /** timeid to kill the tick function. */
+    private _timeoutId: Option<number> = None;
 
     private constructor(
         private _plugin: FirestoreSyncPlugin,
@@ -154,14 +154,14 @@ export class FileSyncer {
     }
 
     public async teardown() {
-        for (const ref of this._eventRefs) {
-            ref.e.off(ref.name, ref.fn);
-        }
         if (this._firebaseSyncer.some) {
             this._firebaseSyncer.safeValue().teardown();
         }
         if (this._unsubWatchHandler.some) {
             this._unsubWatchHandler.safeValue()();
+        }
+        if (this._timeoutId.some) {
+            clearTimeout(this._timeoutId.safeValue());
         }
     }
 
@@ -263,20 +263,33 @@ export class FileSyncer {
         if (tickResult.err) {
             LogError(tickResult.val);
             const view = await GetOrCreateSyncProgressView(this._plugin.app);
-            view.publishSyncerError(tickResult.val);
+            view.publishSyncerError(this._config.syncerId, tickResult.val);
             view.setSyncerStatus(this._config.syncerId, "Tick Crash!", "red");
             return;
         }
-        setTimeout(() => {
-            void this.fileSyncerTick();
-        }, 500);
+
+        this._timeoutId = Some(
+            window.setTimeout(
+                () => {
+                    void this.fileSyncerTick();
+                },
+                Math.max(500 - tickResult.safeUnwrap(), 0)
+            )
+        );
     }
 
-    /** The logic that runs for the file syncer very tick. */
-    private async fileSyncerTickLogic(): Promise<StatusResult<StatusError>> {
+    /** The logic that runs for the file syncer very tick. Returns ms it took to do the update. */
+    private async fileSyncerTickLogic(): Promise<Result<number, StatusError>> {
         if (this._firebaseSyncer.none) {
             return Err(InternalError(`Firebase syncer hasn't been initialized!`));
         }
+
+        // Id for the cycle.
+        const cycleId = uuidv7();
+        // Setup the progress view.
+        const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
+        view.newSyncerCycle(this._config.syncerId, cycleId);
+
         const startTime = window.performance.now();
         // First converge the file updates.
         const touchedFilePaths = this._touchedFilepaths;
@@ -295,10 +308,6 @@ export class FileSyncer {
         }
         this._mapOfFileNodes = mergeResult.safeUnwrap();
 
-        // Setup the progress view.
-        const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
-        view.newSyncerCycle();
-
         // Get the updates necessary.
         const convergenceUpdates = this._firebaseSyncer
             .safeValue()
@@ -307,16 +316,21 @@ export class FileSyncer {
             return convergenceUpdates;
         }
 
+        // Filter out and resolve the null updates.
         const filteredUpdates = this.resolveNullUpdates(convergenceUpdates.safeUnwrap());
         if (filteredUpdates.length === 0) {
-            return Ok();
+            return Ok(0);
         }
-        console.log("filteredUpdates", filteredUpdates, this._mapOfFileNodes);
 
         // Build the operations necessary to sync.
         const buildConvergenceOperations = this._firebaseSyncer
             .safeValue()
-            .resolveConvergenceUpdates(this._plugin.app, this._config, filteredUpdates);
+            .resolveConvergenceUpdates(
+                { syncerId: this._config.syncerId, cycleId },
+                this._plugin.app,
+                this._config,
+                filteredUpdates
+            );
         if (buildConvergenceOperations.err) {
             return buildConvergenceOperations;
         }
@@ -349,8 +363,12 @@ export class FileSyncer {
         }
 
         const endTime = window.performance.now();
-        view.publishSyncerCycleDone(filteredUpdates.length, endTime - startTime);
-        return Ok();
+        view.publishSyncerCycleDone(
+            this._config.syncerId,
+            filteredUpdates.length,
+            endTime - startTime
+        );
+        return Ok(endTime - startTime);
     }
 
     /** Resolve the logic for null updates removing them. */

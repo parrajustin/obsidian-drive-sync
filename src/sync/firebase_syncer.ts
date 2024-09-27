@@ -31,6 +31,7 @@ import type {
 } from "./converge_file_models";
 import { ConvergeMapsToUpdateStates, ConvergenceAction } from "./converge_file_models";
 import type { App } from "obsidian";
+import type { Identifiers } from "./syncer_update_util";
 import { CreateOperationsToUpdateCloud, CreateOperationsToUpdateLocal } from "./syncer_update_util";
 import { LogError } from "../log";
 import type { SyncerConfig } from "./syncer";
@@ -157,6 +158,7 @@ export class FirebaseSyncer {
      * @returns the operation async funcs
      */
     public resolveConvergenceUpdates(
+        ids: Identifiers,
         app: App,
         syncConfig: SyncerConfig,
         updates: Exclude<ConvergenceUpdate, NullUpdate>[]
@@ -184,8 +186,15 @@ export class FirebaseSyncer {
             }
         }
         return Ok([
-            ...CreateOperationsToUpdateLocal(cloudUpdates, app, syncConfig),
-            ...CreateOperationsToUpdateCloud(this._db, localUpdates, app, syncConfig, this._creds)
+            ...CreateOperationsToUpdateLocal(ids, cloudUpdates, app, syncConfig),
+            ...CreateOperationsToUpdateCloud(
+                ids,
+                this._db,
+                localUpdates,
+                app,
+                syncConfig,
+                this._creds
+            )
         ]);
     }
 }

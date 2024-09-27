@@ -1,18 +1,18 @@
 import type { App, WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
 import { ConvergenceAction } from "./sync/converge_file_models";
-import type { Option } from "./lib/option";
+import { None, Some, type Option } from "./lib/option";
 import { ErrorCode, type StatusError } from "./lib/status_error";
 import type { SyncerConfig } from "./sync/syncer";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
-const MAX_NUMBER_OF_CHANGES = 150;
+const MAX_NUMBER_OF_CYCLES = 50;
 
 interface SyncProgress {
     fileId: string;
     initalFileName: Option<string>;
     finalFileName: string;
-    actionTaken: ConvergenceAction;
+    actionTaken: Exclude<ConvergenceAction, ConvergenceAction.NULL_UPDATE>;
     progress: number;
     updateProgress?: (amount: number) => void;
 }
@@ -28,17 +28,45 @@ class SyncerError {
     constructor(public error: StatusError) {}
 }
 
+interface CycleProgress {
+    /** Id of the syncer. */
+    syncerId: string;
+    /** Id of this cycle. */
+    cycleId: string;
+    /** Last update ms from unix epoch for sorting. */
+    lastUpdate: number;
+    /** Final publishing entry. */
+    publishedEntry: Option<SyncerPublishedCycle>;
+    /** Changes that have been published. */
+    changesInCycle: (SyncProgress | SyncerError)[];
+    /** File id to progress of upload. */
+    mapOfCurrentCycleChanges: Map<string, SyncProgress>;
+    /** Container for the entire element. */
+    progressContainerDiv?: HTMLDivElement;
+    /** The div of the list. */
+    listDiv?: HTMLDivElement;
+}
+
+enum IconName {
+    FOLDER_SYNC = "folder-sync",
+    CLOUD_DOWNLOAD = "cloud-download",
+    TRASH_2 = "trash-2",
+    HARD_DRIVE_UPLOAD = "hard-drive-upload",
+    ROUTE = "route"
+}
+
 export class SyncProgressView extends ItemView {
-    private _progressDiv: Element;
+    /** Container for all progress elements. */
+    private _progressContainer: Element;
     /** The list of in progress entries. */
-    private _progressListDiv: HTMLDivElement;
+    private _progressListContainer: HTMLDivElement;
     private _historicalDiv: Element;
     /** Past cycle of sync changes. */
-    private _historicalChanges: (SyncProgress | SyncerPublishedCycle | SyncerError)[] = [];
+    private _historicalChanges: CycleProgress[] = [];
     /** The current cycle of sync changes. */
-    private _currentCycleChanges: (SyncProgress | SyncerError)[] = [];
-    /** File Id to progress. */
-    private _mapOfCurrentCycleChanges = new Map<string, SyncProgress>();
+    private _currentCycleChanges: CycleProgress[] = [];
+    /** Syncer Id to progress. */
+    private _mapSyncerCycleToCurrentProgress = new Map<string, CycleProgress>();
     /** The header element. */
     private _headerElement: HTMLHeadingElement;
     private _syncerDiv: HTMLDivElement;
@@ -55,7 +83,7 @@ export class SyncProgressView extends ItemView {
         });
 
         this._syncerDiv = container.createEl("div", "syncer-statuses");
-        this._progressDiv = container.createEl("div", "progress-div");
+        this._progressContainer = container.createEl("div", "progress-div");
         this._historicalDiv = container.createEl("div", "hsitorical-div");
         this.updateProgressView();
     }
@@ -68,10 +96,27 @@ export class SyncProgressView extends ItemView {
         return "Sync Progress View";
     }
 
+    public resetView() {
+        this._historicalChanges.unshift(...this._currentCycleChanges);
+        this._historicalChanges.sort((a, b) => b.lastUpdate - a.lastUpdate);
+        this._historicalChanges = this._historicalChanges.slice(0, MAX_NUMBER_OF_CYCLES);
+        this._currentCycleChanges = [];
+        this._mapSyncerCycleToCurrentProgress = new Map();
+        this._syncerConfigs = [];
+        this.updateProgressView();
+    }
+
     /** Set all the syncer configs to setup the view. */
     public setSyncers(configs: SyncerConfig[]) {
+        this._syncerDiv.empty();
         this._syncerConfigs = configs;
+        for (const config of this._syncerConfigs) {
+            this._syncerStatuses.set(config.syncerId, this._syncerDiv.createSpan());
+        }
         this.updateProgressView();
+        for (const config of this._syncerConfigs) {
+            this.setSyncerStatus(config.syncerId, "No data");
+        }
     }
 
     /** Set an individual syncer status text. */
@@ -87,21 +132,38 @@ export class SyncProgressView extends ItemView {
         }
     }
 
+    /** Set the status of the syncer plugin overall. */
     public setStatus(status: string) {
         this._headerElement.innerText = `Sync Progress View (${status})`;
     }
 
     /** Tell the progress viewer that a new syncer cycle has started. */
-    public newSyncerCycle() {
-        // If there are current cycle changes the progress view needs to be updated.
-        const hasCurrentCycle = this._currentCycleChanges.length > 0;
-        this._historicalChanges = [...this._currentCycleChanges, ...this._historicalChanges].slice(
-            0,
-            MAX_NUMBER_OF_CHANGES
-        );
-        this._currentCycleChanges = [];
-        this._mapOfCurrentCycleChanges = new Map<string, SyncProgress>();
-        if (hasCurrentCycle) {
+    public newSyncerCycle(syncerId: string, cycleId: string) {
+        const lastCycle = this._mapSyncerCycleToCurrentProgress.get(syncerId);
+        let hasChange = false;
+        if (lastCycle !== undefined && lastCycle.changesInCycle.length > 0) {
+            hasChange = true;
+            this._historicalChanges.unshift(lastCycle);
+            this._historicalChanges.sort((a, b) => b.lastUpdate - a.lastUpdate);
+            this._historicalChanges = this._historicalChanges.slice(0, MAX_NUMBER_OF_CYCLES);
+        }
+        this._currentCycleChanges = this._currentCycleChanges.filter((p) => p !== lastCycle);
+
+        const newCycle: CycleProgress = {
+            syncerId,
+            cycleId,
+            lastUpdate: Date.now(),
+            publishedEntry: None,
+            changesInCycle: [],
+            mapOfCurrentCycleChanges: new Map(),
+            listDiv: undefined,
+            progressContainerDiv: undefined
+        };
+        this._mapSyncerCycleToCurrentProgress.set(syncerId, newCycle);
+        this._currentCycleChanges.push(newCycle);
+        this._historicalChanges.sort((a, b) => b.lastUpdate - a.lastUpdate);
+        newCycle.lastUpdate = Date.now();
+        if (hasChange) {
             this.updateProgressView();
         }
     }
@@ -111,42 +173,46 @@ export class SyncProgressView extends ItemView {
      * @param numOfUpdates number of updates that took place in the cycle.
      * @param updateTime the total number of MS that the update took.
      */
-    public publishSyncerCycleDone(numOfUpdates: number, updateTime: number) {
-        this._historicalChanges = [
-            new SyncerPublishedCycle(numOfUpdates, updateTime),
-            ...this._currentCycleChanges,
-            ...this._historicalChanges
-        ].slice(0, MAX_NUMBER_OF_CHANGES);
-        this._currentCycleChanges = [];
-        this._mapOfCurrentCycleChanges = new Map<string, SyncProgress>();
+    public publishSyncerCycleDone(syncerId: string, numOfUpdates: number, updateTime: number) {
+        const cycle = this._mapSyncerCycleToCurrentProgress.get(syncerId);
+        if (cycle === undefined) {
+            return;
+        }
+        cycle.publishedEntry = Some(new SyncerPublishedCycle(numOfUpdates, updateTime));
+        cycle.lastUpdate = Date.now();
         this.updateProgressView();
     }
 
     /** Publishes a syncer error to the progress view. */
-    public publishSyncerError(error: StatusError) {
-        this._historicalChanges = [
-            new SyncerError(error),
-            ...this._currentCycleChanges,
-            ...this._historicalChanges
-        ].slice(0, MAX_NUMBER_OF_CHANGES);
-        this._currentCycleChanges = [];
-        this._mapOfCurrentCycleChanges = new Map<string, SyncProgress>();
+    public publishSyncerError(syncerId: string, error: StatusError) {
+        const cycle = this._mapSyncerCycleToCurrentProgress.get(syncerId);
+        if (cycle === undefined) {
+            return;
+        }
+        cycle.changesInCycle.push(new SyncerError(error));
+        cycle.lastUpdate = Date.now();
         this.updateProgressView();
     }
 
     /**
      * Adds a progress entry to the view.
+     * @param syncerId the syncer id
      * @param fileId the file id
      * @param initalFileName the initial file path if it differs
      * @param finalFileName the final file path
      * @param actionTaken the action that is taken to converge
      */
     public addEntry(
+        syncerId: string,
         fileId: string,
         initalFileName: Option<string>,
         finalFileName: string,
-        actionTaken: ConvergenceAction
+        actionTaken: Exclude<ConvergenceAction, ConvergenceAction.NULL_UPDATE>
     ) {
+        const cycle = this._mapSyncerCycleToCurrentProgress.get(syncerId);
+        if (cycle === undefined) {
+            return;
+        }
         const syncProgress: SyncProgress = {
             fileId,
             initalFileName,
@@ -154,10 +220,16 @@ export class SyncProgressView extends ItemView {
             actionTaken,
             progress: 0
         };
-        this._currentCycleChanges.unshift(syncProgress);
-        this._mapOfCurrentCycleChanges.set(fileId, syncProgress);
+        cycle.changesInCycle.unshift(syncProgress);
+        cycle.mapOfCurrentCycleChanges.set(syncProgress.fileId, syncProgress);
+        cycle.lastUpdate = Date.now();
 
-        this.createInProgressEntry(this._progressListDiv, syncProgress);
+        const listDiv = cycle.listDiv;
+        if (listDiv === undefined) {
+            this.updateProgressView();
+            return;
+        }
+        this.createInProgressEntry(listDiv, syncProgress);
     }
 
     /**
@@ -165,42 +237,48 @@ export class SyncProgressView extends ItemView {
      * @param fileId the file id of the entry
      * @param progress the progress [0, 1] to set it to.
      */
-    public setEntryProgress(fileId: string, progress: number) {
-        const entry = this._mapOfCurrentCycleChanges.get(fileId);
-        if (entry === undefined) {
+    public setEntryProgress(syncerId: string, fileId: string, progress: number) {
+        const cycle = this._mapSyncerCycleToCurrentProgress.get(syncerId);
+        if (cycle === undefined) {
             return;
         }
-        if (progress === -1) {
-            entry.progress = -1;
-        }
-        if (entry.progress === -1) {
+        const progressEntry = cycle.mapOfCurrentCycleChanges.get(fileId);
+        if (progressEntry === undefined) {
             return;
         }
-        entry.progress = Math.max(entry.progress, Math.min(1, progress));
-        if (entry.updateProgress) {
-            entry.updateProgress(entry.progress);
+        progressEntry.progress = progress;
+        cycle.lastUpdate = Date.now();
+
+        // If the update progress function exists use that.
+        if (progressEntry.updateProgress !== undefined) {
+            progressEntry.updateProgress(progress);
+            return;
         }
+
+        // If not try to just re create the progress div.
+        const listDiv = cycle.listDiv;
+        if (listDiv === undefined) {
+            // Fail just update the whole panel.
+            this.updateProgressView();
+            return;
+        }
+        this.createInProgressEntry(listDiv, progressEntry);
     }
 
     /** Updates the progress viewer. */
     public updateProgressView() {
-        this._syncerDiv.empty();
-        for (const config of this._syncerConfigs) {
-            this._syncerStatuses.set(config.syncerId, this._syncerDiv.createSpan());
-        }
-
-        this._progressDiv.empty();
-        this._progressDiv.createEl("h4", { text: "In Progress Sync:" });
-        this._progressListDiv = this._progressDiv.createDiv("progress-list");
-        this._progressListDiv.style.display = "flex";
-        this._progressListDiv.style.flexDirection = "column";
+        this._progressContainer.empty();
+        this._progressContainer.createEl("h4", { text: "In Progress Sync:" });
+        this._progressListContainer = this._progressContainer.createDiv("progress-list");
+        this._progressListContainer.style.display = "flex";
+        this._progressListContainer.style.flexDirection = "column";
 
         for (const entry of this._currentCycleChanges) {
-            if (entry instanceof SyncerError) {
-                this.createErrorEntry(this._progressListDiv, entry);
+            if (entry.changesInCycle.length === 0) {
                 continue;
             }
-            this.createInProgressEntry(this._progressListDiv, entry);
+            const containerForProgressEntry = this._progressListContainer.createDiv(entry.cycleId);
+            this.createSyncBlock(containerForProgressEntry, entry);
         }
 
         this._historicalDiv.empty();
@@ -210,15 +288,8 @@ export class SyncProgressView extends ItemView {
         historicalContainer.style.flexDirection = "column";
 
         for (const entry of this._historicalChanges) {
-            if (entry instanceof SyncerPublishedCycle) {
-                this.createHistoricalCycleStats(historicalContainer, entry);
-                continue;
-            }
-            if (entry instanceof SyncerError) {
-                this.createErrorEntry(historicalContainer, entry);
-                continue;
-            }
-            this.createInProgressEntry(historicalContainer, entry);
+            const containerForProgressEntry = historicalContainer.createDiv(entry.cycleId);
+            this.createSyncBlock(containerForProgressEntry, entry);
         }
     }
 
@@ -227,10 +298,72 @@ export class SyncProgressView extends ItemView {
     }
 
     public async onClose() {
-        // Nothing to clean up.
+        CURRENT_PROGRESS_VIEW = None;
     }
 
-    private createHistoricalCycleStats(container: HTMLDivElement, cycle: SyncerPublishedCycle) {
+    /** Create a sync block information. */
+    private createSyncBlock(container: HTMLDivElement, cycle: CycleProgress) {
+        cycle.progressContainerDiv = container;
+        container.classList.add("syncer-group");
+
+        const header = container.createDiv("syncer-group-header");
+        this.createIcon(header, cycle.cycleId, IconName.FOLDER_SYNC);
+        const headerText = header.createDiv("group-header-text");
+        const syncerIdText = headerText.createEl("span");
+        syncerIdText.innerText = `syncer: ${cycle.syncerId}`;
+        const cycleId = headerText.createEl("span");
+        cycleId.innerText = `cycle: ${cycle.cycleId}`;
+
+        const body = container.createDiv("syncer-group-body");
+        body.createDiv("group-body-border");
+        cycle.listDiv = body.createDiv("group-body-list");
+
+        if (cycle.publishedEntry.some) {
+            this.createPublishStats(cycle.listDiv, cycle.publishedEntry.safeValue());
+        }
+        for (const entry of cycle.changesInCycle) {
+            if (entry instanceof SyncerError) {
+                this.createErrorEntry(cycle.listDiv, entry);
+                continue;
+            }
+            this.createInProgressEntry(cycle.listDiv, entry);
+        }
+    }
+
+    /** Create an icon span. */
+    private createIcon(container: Element, hoverToolTip: string, iconName: IconName) {
+        const iconSpan = createSpan({
+            cls: "progress-icons",
+            attr: {
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "aria-label": hoverToolTip,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "data-icon": iconName,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                "aria-hidden": "true"
+            }
+        });
+        switch (iconName) {
+            case IconName.FOLDER_SYNC:
+                iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-sync"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v.5"/><path d="M12 10v4h4"/><path d="m12 14 1.535-1.605a5 5 0 0 1 8 1.5"/><path d="M22 22v-4h-4"/><path d="m22 18-1.535 1.605a5 5 0 0 1-8-1.5"/></svg>`;
+                break;
+            case IconName.CLOUD_DOWNLOAD:
+                iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cloud-download"><path d="M12 13v8l-4-4"/><path d="m12 21 4-4"/><path d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"/></svg>`;
+                break;
+            case IconName.TRASH_2:
+                iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
+                break;
+            case IconName.HARD_DRIVE_UPLOAD:
+                iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hard-drive-upload"><path d="m16 6-4-4-4 4"/><path d="M12 2v8"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 18h.01"/><path d="M10 18h.01"/></svg>`;
+                break;
+            case IconName.ROUTE:
+                iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-route"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>`;
+                break;
+        }
+        container.appendChild(iconSpan);
+    }
+
+    private createPublishStats(container: HTMLDivElement, cycle: SyncerPublishedCycle) {
         const progressDiv = container.createDiv("progress-cycle");
         progressDiv.style.display = "flex";
         progressDiv.style.flexDirection = "row";
@@ -295,6 +428,7 @@ export class SyncProgressView extends ItemView {
         entryDiv.style.flexDirection = "row";
         let iconName = "file-question";
         switch (syncProgress.actionTaken) {
+            case ConvergenceAction.USE_LOCAL_DELETE_CLOUD:
             case ConvergenceAction.USE_CLOUD:
                 iconName = "cloud-download";
                 break;
@@ -318,6 +452,7 @@ export class SyncProgressView extends ItemView {
             }
         });
         switch (syncProgress.actionTaken) {
+            case ConvergenceAction.USE_LOCAL_DELETE_CLOUD:
             case ConvergenceAction.USE_CLOUD:
                 iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cloud-download"><path d="M12 13v8l-4-4"/><path d="m12 21 4-4"/><path d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"/></svg>`;
                 break;
@@ -327,6 +462,7 @@ export class SyncProgressView extends ItemView {
             case ConvergenceAction.USE_LOCAL:
             case ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID:
                 iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hard-drive-upload"><path d="m16 6-4-4-4 4"/><path d="M12 2v8"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 18h.01"/><path d="M10 18h.01"/></svg>`;
+                break;
         }
         entryDiv.appendChild(iconSpan);
 
@@ -355,6 +491,7 @@ export class SyncProgressView extends ItemView {
     }
 }
 
+let CURRENT_PROGRESS_VIEW: Option<WorkspaceLeaf> = None;
 /**
  * Get or creates the `SyncProgressView`.
  * @param app obsidian app
@@ -364,13 +501,21 @@ export async function GetOrCreateSyncProgressView(
     app: App,
     reveal = true
 ): Promise<SyncProgressView> {
+    const { workspace } = app;
+    if (CURRENT_PROGRESS_VIEW.some) {
+        if (reveal) {
+            // "Reveal" the leaf in case it is in a collapsed sidebar
+            workspace.revealLeaf(CURRENT_PROGRESS_VIEW.safeValue());
+        }
+        return CURRENT_PROGRESS_VIEW.safeValue().view as SyncProgressView;
+    }
+
     // Wait for layout ready.
     await new Promise<void>((resolve) => {
         app.workspace.onLayoutReady(() => {
             resolve();
         });
     });
-    const { workspace } = app;
 
     let leaf: WorkspaceLeaf | null = null;
     const leaves = workspace.getLeavesOfType(PROGRESS_VIEW_TYPE);
@@ -389,5 +534,6 @@ export async function GetOrCreateSyncProgressView(
         // "Reveal" the leaf in case it is in a collapsed sidebar
         workspace.revealLeaf(leaf);
     }
+    CURRENT_PROGRESS_VIEW = Some(leaf);
     return leaf.view as SyncProgressView;
 }

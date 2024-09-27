@@ -153,6 +153,8 @@ export default class FirestoreSyncPlugin extends Plugin {
         for (const syncer of this._syncers) {
             await syncer.teardown();
         }
+        const view = await GetOrCreateSyncProgressView(this.app, /*reveal=*/ false);
+        view.resetView();
     }
 
     /**
@@ -201,9 +203,13 @@ export default class FirestoreSyncPlugin extends Plugin {
             // Check if any of the syncers had an error.
             let tearDown = false;
             const results = await Promise.all(setupStatuses);
-            for (const result of results) {
+            for (let i = 0; i < setupStatuses.length; i++) {
+                const result = results[i] as StatusResult<StatusError>;
                 if (result.err) {
-                    view.publishSyncerError(result.val);
+                    const config = this.settings.syncers[i];
+                    if (config !== undefined) {
+                        view.publishSyncerError(config.syncerId, result.val);
+                    }
                     LogError(result.val);
                     tearDown = true;
                     break;

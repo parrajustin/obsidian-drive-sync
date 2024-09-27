@@ -1,0 +1,35 @@
+.syncer-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+}
+
+.syncer-group-header {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+}
+
+.group-header-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.syncer-group-body {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+}
+
+.group-body-border {
+    width: 2px;
+    background-color: whitesmoke;
+    margin-right: 4px;
+}
+
+.group-body-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}

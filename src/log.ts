@@ -10,6 +10,7 @@ export function LogError(e: Error | StatusError): void {
     const notice = new Notice("", 10000);
     if (e instanceof StatusError) {
         notice.noticeEl.innerHTML = `<b>Error</b>:<br/>${e.toString()}<br/>Check console for more information`;
+        // eslint-disable-next-line no-console
         console.error(`Logged Error:`, e.toString(), e);
     } else {
         notice.noticeEl.innerHTML = `<b>Logged Error</b>:<br/>${e.message}`;
