@@ -111,7 +111,7 @@ export function CreateOperationsToUpdateCloud(
                         )
                     );
                 }
-                const writeUid = await WriteUidToFile(app, file, fileId, {
+                const writeUid = await WriteUidToFile(app, syncConfig, file, fileId, {
                     mtime: update.cloudState.safeValue().mtime
                 });
                 if (writeUid.err) {

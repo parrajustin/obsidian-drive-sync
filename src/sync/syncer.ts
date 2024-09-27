@@ -50,6 +50,8 @@ export interface SyncerConfig {
     rawFileSyncQuery: string;
     /** Query to denote obsidian files to add to syncing. */
     obsidianFileSyncQuery: string;
+    /** Query where not to write file ids. */
+    fileIdFileQuery: string;
 }
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
@@ -90,7 +92,7 @@ export class FileSyncer {
 
         view.setSyncerStatus(config.syncerId, "Writing file uids...");
         // First I'm gonna make sure all markdown files have a fileId
-        const fileUidWrite = await WriteUidToAllFilesIfNecessary(plugin.app);
+        const fileUidWrite = await WriteUidToAllFilesIfNecessary(plugin.app, config);
         if (fileUidWrite.err) {
             return fileUidWrite;
         }

@@ -33,3 +33,7 @@
     gap: 4px;
     width: 100%;
 }
+
+.progress-entry {
+    gap: 4px;
+}

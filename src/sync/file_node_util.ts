@@ -27,13 +27,14 @@ export type FileMapOfNodes<TypeOfData extends Option<string> = Option<string>> =
 /** Gets the obsidian file node. */
 async function GetObsidianNode(
     app: App,
+    config: SyncerConfig,
     fileName: string
 ): Promise<Result<Option<FileNode<Option<string>>>, StatusError>> {
     const file = app.vault.fileMap[fileName] as TAbstractFile;
     if (!(file instanceof TFile)) {
         return Ok(None);
     }
-    const fileIdResult = await GetFileUidFromFrontmatter(app, file);
+    const fileIdResult = await GetFileUidFromFrontmatter(app, config, file);
     if (fileIdResult.err) {
         return fileIdResult;
     }
@@ -108,7 +109,7 @@ export async function UpdateFileMapWithChanges(
         }
         const newNodeResult = await (dataType.safeValue().type === "RAW"
             ? GetRawNode(app, node.fullPath)
-            : GetObsidianNode(app, node.fullPath));
+            : GetObsidianNode(app, config, node.fullPath));
         if (newNodeResult.err) {
             return newNodeResult;
         }
@@ -136,7 +137,7 @@ export async function UpdateFileMapWithChanges(
             continue;
         }
         if (IsObsidianFile(path, config)) {
-            const fileResult = await GetObsidianNode(app, path);
+            const fileResult = await GetObsidianNode(app, config, path);
             if (fileResult.err) {
                 return fileResult;
             }
@@ -205,7 +206,7 @@ export async function GetAllFileNodes(
                 continue;
             }
             if (IsObsidianFile(fullPath, config)) {
-                const fileResult = await GetObsidianNode(app, fullPath);
+                const fileResult = await GetObsidianNode(app, config, fullPath);
                 if (fileResult.err) {
                     return fileResult;
                 }

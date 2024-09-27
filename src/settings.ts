@@ -13,14 +13,27 @@ export interface FolderTemplate {
     template: string;
 }
 
+function CreateAllFileConfig(): SyncerConfig {
+    return {
+        type: RootSyncType.ROOT_SYNCER,
+        syncerId: uuidv7(),
+        dataStorageEncrypted: false,
+        syncQuery: "*",
+        rawFileSyncQuery: "f:^.obsidian",
+        obsidianFileSyncQuery: "-f:^.obsidian",
+        fileIdFileQuery: "-f:template"
+    };
+}
+
 function CreateDefaultSyncConfig(): SyncerConfig {
     return {
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
         syncQuery: "*",
-        rawFileSyncQuery: "f:^.obsidian.*.json$",
-        obsidianFileSyncQuery: "-f:^.obsidian"
+        rawFileSyncQuery: "f:^.obsidian.*.(json|css)$ -f:obsidian-drive-sync/data.json",
+        obsidianFileSyncQuery: "-f:^.obsidian",
+        fileIdFileQuery: "-f:template"
     };
 }
 
@@ -42,14 +55,18 @@ export interface Settings {
 
 /** The firebase sync settings. */
 export class FirebaseSyncSettingTab extends PluginSettingTab {
+    private _settings: Settings;
+
     constructor(
         app: App,
         private _plugin: TemplaterPlugin
     ) {
         super(app, _plugin);
+        this._settings = structuredClone(this._plugin.settings);
     }
 
     public override display(): void {
+        this._settings = structuredClone(this._plugin.settings);
         this.containerEl.empty();
 
         this.addIdentifiers();
@@ -58,6 +75,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
     }
 
     public override async hide() {
+        this._plugin.settings = this._settings;
         await this._plugin.saveSettings();
         await this._plugin.loginForSettings();
     }
@@ -71,11 +89,11 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
             .setName("Device ID")
             .setDesc("Used to identify changes to the device (should be unique).")
             .addText((cb) => {
-                if (this._plugin.settings.clientId !== undefined) {
-                    cb.setValue(this._plugin.settings.clientId);
+                if (this._settings.clientId !== undefined) {
+                    cb.setValue(this._settings.clientId);
                 }
                 cb.onChange((value) => {
-                    this._plugin.settings.clientId = value;
+                    this._settings.clientId = value;
                 });
             });
     }
@@ -89,11 +107,11 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
             .setName("Firebase sync email")
             .setDesc("The email account used for the firebase sync.")
             .addText((cb) => {
-                if (this._plugin.settings.email !== undefined) {
-                    cb.setValue(this._plugin.settings.email);
+                if (this._settings.email !== undefined) {
+                    cb.setValue(this._settings.email);
                 }
                 cb.onChange((value) => {
-                    this._plugin.settings.email = value;
+                    this._settings.email = value;
                 });
             });
 
@@ -101,11 +119,11 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
             .setName("Firebase sync password")
             .setDesc("The password account used for the firebase sync.")
             .addText((cb) => {
-                if (this._plugin.settings.password !== undefined) {
-                    cb.setValue(this._plugin.settings.password);
+                if (this._settings.password !== undefined) {
+                    cb.setValue(this._settings.password);
                 }
                 cb.onChange((value) => {
-                    this._plugin.settings.password = value;
+                    this._settings.password = value;
                 });
             });
     }
@@ -117,7 +135,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
 
         new Setting(syncerSettingsContainer).setName("Add new Syncer Config").addButton((cb) => {
             cb.setIcon("plus").onClick(() => {
-                this._plugin.settings.syncers.push(CreateDefaultSyncConfig());
+                this._settings.syncers.push(CreateDefaultSyncConfig());
                 resetList();
             });
         });
@@ -132,7 +150,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
 
                 new Setting(liContainer).setName("Remove Syncer").addButton((cb) => {
                     cb.setIcon("x").onClick(() => {
-                        this._plugin.settings.syncers = this._plugin.settings.syncers.filter(
+                        this._settings.syncers = this._settings.syncers.filter(
                             (config) => config !== elem
                         );
                         resetList();
@@ -214,7 +232,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     });
                 new Setting(liContainer).setName("Edit raw file query").addButton((cb) => {
                     cb.setIcon("pencil").onClick(() => {
-                        void GetAllFileNodes(this.app, CreateDefaultSyncConfig()).then((nodes) => {
+                        void GetAllFileNodes(this.app, CreateAllFileConfig()).then((nodes) => {
                             if (nodes.err) {
                                 LogError(nodes.val);
                                 return;
@@ -247,7 +265,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     });
                 new Setting(liContainer).setName("Edit obsidian file query").addButton((cb) => {
                     cb.setIcon("pencil").onClick(() => {
-                        void GetAllFileNodes(this.app, CreateDefaultSyncConfig()).then((nodes) => {
+                        void GetAllFileNodes(this.app, CreateAllFileConfig()).then((nodes) => {
                             if (nodes.err) {
                                 LogError(nodes.val);
                                 return;
@@ -266,8 +284,43 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                         });
                     });
                 });
+
+                let setFileIdFilter: (data: string) => void = () => {};
+                new Setting(liContainer)
+                    .setName("File Id Auto write Filter")
+                    .setDesc("Can be used to specify where file ids should be auto written to.")
+                    .addText((cb) => {
+                        cb.disabled = true;
+                        cb.setValue(elem.fileIdFileQuery);
+                        setFileIdFilter = (data: string) => {
+                            cb.setValue(data);
+                        };
+                    });
+                new Setting(liContainer)
+                    .setName("Edit auto file id filter query")
+                    .addButton((cb) => {
+                        cb.setIcon("pencil").onClick(() => {
+                            void GetAllFileNodes(this.app, CreateAllFileConfig()).then((nodes) => {
+                                if (nodes.err) {
+                                    LogError(nodes.val);
+                                    return;
+                                }
+                                const searchStringChecker = new SearchStringFuzzySearch(
+                                    this.app,
+                                    nodes.safeUnwrap(),
+                                    elem.fileIdFileQuery,
+                                    (str) => {
+                                        elem.fileIdFileQuery = str;
+                                        setFileIdFilter(str);
+                                    }
+                                );
+                                searchStringChecker.open();
+                                return;
+                            });
+                        });
+                    });
             };
-            for (const setting of this._plugin.settings.syncers) {
+            for (const setting of this._settings.syncers) {
                 createElement(setting);
             }
         };

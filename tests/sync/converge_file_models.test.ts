@@ -19,6 +19,54 @@ jest.mock(
 );
 
 describe("ConvergeMapsToUpdateStates", () => {
+    test("Returns null updates for same node without id.", async () => {
+        const localNodes: FileNode<Option<string>>[] = [
+            new FileNode<Option<string>>({
+                fullPath: "folder/file_1.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: None,
+                userId: Some("User1"),
+                deleted: false,
+                localDataType: None
+            })
+        ];
+        const cloudNodes: FileNode<Some<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.md",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "md",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: false,
+                localDataType: None
+            })
+        ];
+
+        const localMapRep = ConvertArrayOfNodesToMap(localNodes);
+        expect(localMapRep.ok).toBeTruthy();
+        const cloudMapRep = ConvertArrayOfNodesToMap(cloudNodes);
+        expect(cloudMapRep.ok).toBeTruthy();
+        const result = await ConvergeMapsToUpdateStates({
+            localMapRep: localMapRep.unsafeUnwrap(),
+            cloudMapRep: cloudMapRep.unsafeUnwrap()
+        });
+        expect(result.ok).toBeTruthy();
+        expect(result.val).toStrictEqual([
+            {
+                action: "null_update",
+                localState: Some(localNodes[0]),
+                cloudState: Some(cloudNodes[0])
+            }
+        ]);
+    });
+
     test("Returns null updates for all nodes the same.", async () => {
         const nodes: FileNode<Some<string>>[] = [
             new FileNode({

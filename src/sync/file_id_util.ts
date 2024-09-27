@@ -13,6 +13,8 @@ import type { StatusError } from "../lib/status_error";
 import { UnknownError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import { uuidv7 } from "../lib/uuid";
+import type { SyncerConfig } from "./syncer";
+import { ShouldHaveFileId } from "./query_util";
 
 export const FILE_ID_FRONTMATTER_KEY = "File Id";
 
@@ -37,8 +39,12 @@ async function ReadFileIdWithoutCache(
 /** Get the file uid from frontmatter. */
 export async function GetFileUidFromFrontmatter(
     app: App,
+    config: SyncerConfig,
     file: TFile
 ): Promise<Result<Option<string>, StatusError>> {
+    if (!ShouldHaveFileId(file.path, config)) {
+        return Ok(None);
+    }
     // TODO: Need to look into the cache not being read sometimes.
     const cache = app.metadataCache.getFileCache(file);
     if (cache === null) {
@@ -59,14 +65,20 @@ export async function GetFileUidFromFrontmatter(
 }
 
 /** Writes the file uid to all files that don't have one. */
-export async function WriteUidToAllFilesIfNecessary(app: App): Promise<StatusResult<StatusError>> {
+export async function WriteUidToAllFilesIfNecessary(
+    app: App,
+    config: SyncerConfig
+): Promise<StatusResult<StatusError>> {
     for (const fileName in app.vault.fileMap) {
+        if (!ShouldHaveFileId(fileName, config)) {
+            continue;
+        }
         const entry = app.vault.fileMap[fileName] as TAbstractFile;
         if (!(entry instanceof TFile)) {
             continue;
         }
 
-        const fileUidResult = await GetFileUidFromFrontmatter(app, entry);
+        const fileUidResult = await GetFileUidFromFrontmatter(app, config, entry);
         if (fileUidResult.err) {
             return fileUidResult;
         }
@@ -74,7 +86,7 @@ export async function WriteUidToAllFilesIfNecessary(app: App): Promise<StatusRes
             continue;
         }
 
-        const writeUidResult = await WriteUidToFile(app, entry, uuidv7());
+        const writeUidResult = await WriteUidToFile(app, config, entry, uuidv7());
         if (writeUidResult.err) {
             return writeUidResult;
         }
@@ -85,10 +97,14 @@ export async function WriteUidToAllFilesIfNecessary(app: App): Promise<StatusRes
 /** Write the uid to the file. If no supported frontmatter returns Ok(). */
 export async function WriteUidToFile(
     app: App,
+    config: SyncerConfig,
     file: TFile,
     uid: string,
     dataWriteOptions?: DataWriteOptions
 ): Promise<StatusResult<StatusError>> {
+    if (!ShouldHaveFileId(file.path, config)) {
+        return Ok();
+    }
     const processFrontmatter = await WrapPromise(
         app.fileManager.processFrontMatter(
             file,

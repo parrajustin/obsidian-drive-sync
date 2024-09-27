@@ -44,6 +44,12 @@ export function ChecksPassedFilter(data: string, searchString: SearchString): bo
     return false;
 }
 
+/** Checks if the file should have a file id. */
+export function ShouldHaveFileId(filePath: string, config: SyncerConfig): boolean {
+    const searchString = GetQueryString(config.fileIdFileQuery);
+    return ChecksPassedFilter(filePath, searchString);
+}
+
 /** Checks if the file path leads  */
 export function IsAcceptablePath(filePath: string, config: SyncerConfig): boolean {
     const searchString = GetQueryString(config.syncQuery);

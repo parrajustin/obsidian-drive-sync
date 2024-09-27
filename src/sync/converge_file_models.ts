@@ -266,6 +266,29 @@ export function CompareNodesAndGetUpdate(
         return Ok(Some(action));
     }
 
+    // Case where everything is the same but local file doesn't have a file id.
+    if (
+        lNode.mtime === cNode.mtime &&
+        lNode.fullPath === cNode.fullPath &&
+        lNode.deleted === cNode.deleted &&
+        lNode.fileId.none &&
+        lNode.size === cNode.size
+    ) {
+        // No update needed, everything is the same.
+        localVisisted.add(lNode);
+        cloudVisitedByFileId.add(cNode.fileId.safeValue());
+        const pathResult = EnsureReservedPathValidity(reservedFullPath, cNode);
+        if (pathResult.err) {
+            return pathResult;
+        }
+        const action: ConvergenceUpdate = {
+            action: ConvergenceAction.NULL_UPDATE,
+            localState: localNode,
+            cloudState: cloudNode
+        };
+        return Ok(Some(action));
+    }
+
     // Case where the local node has been marked for deletion. Only happens when file is watched, as
     // local deletion means the file is gone.
     if (
