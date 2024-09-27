@@ -130,6 +130,7 @@ export class SyncProgressView extends ItemView {
         if (color !== undefined) {
             statusDiv.style.color = color;
         }
+        this.updateProgressView();
     }
 
     /** Set the status of the syncer plugin overall. */

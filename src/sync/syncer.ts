@@ -64,6 +64,8 @@ export class FileSyncer {
     private _unsubWatchHandler: Option<UnsubFunc> = None;
     /** timeid to kill the tick function. */
     private _timeoutId: Option<number> = None;
+    /** Syncer should die. */
+    private _isDead = false;
 
     private constructor(
         private _plugin: FirestoreSyncPlugin,
@@ -132,6 +134,7 @@ export class FileSyncer {
                 // Build the firebase syncer and init it.
                 const buildFirebaseSyncer = await FirebaseSyncer.buildFirebaseSyncer(
                     this._firebaseApp,
+                    this._config,
                     creds
                 );
                 if (buildFirebaseSyncer.err) {
@@ -154,6 +157,7 @@ export class FileSyncer {
     }
 
     public async teardown() {
+        this._isDead = true;
         if (this._firebaseSyncer.some) {
             this._firebaseSyncer.safeValue().teardown();
         }
@@ -268,10 +272,15 @@ export class FileSyncer {
             return;
         }
 
+        if (this._isDead) {
+            return;
+        }
         this._timeoutId = Some(
             window.setTimeout(
                 () => {
-                    void this.fileSyncerTick();
+                    if (!this._isDead) {
+                        void this.fileSyncerTick();
+                    }
                 },
                 Math.max(500 - tickResult.safeUnwrap(), 0)
             )
