@@ -140,8 +140,7 @@ export function CreateOperationsToUpdateCloud(
                         ConvertToUnknownError(`Failed to read binary string`)
                     );
                 }
-                const buffer = Buffer.from(readDataResult.safeUnwrap());
-                const dataCompresssed = await WrapPromise(compress(buffer));
+                const dataCompresssed = await WrapPromise(compress(readDataResult.safeUnwrap()));
                 view.setEntryProgress(fileId, 0.4);
                 if (dataCompresssed.err) {
                     return dataCompresssed.mapErr(ConvertToUnknownError("Failed to compress data"));
@@ -160,6 +159,7 @@ export function CreateOperationsToUpdateCloud(
                 if (uploadCloudStoreResult.err) {
                     return uploadCloudStoreResult;
                 }
+                node.fileStorageRef = uploadCloudStoreResult.safeUnwrap();
             }
 
             // Upload the data to firestore.
