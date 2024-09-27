@@ -11,7 +11,7 @@ interface LocalRawFile {
 
 export type LocalDataType = LocalObsidianFile | LocalRawFile;
 
-interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
+export interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
     fullPath: string;
     ctime: number;
     mtime: number;

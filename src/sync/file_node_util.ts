@@ -8,7 +8,7 @@ import { None, Some, type Option } from "../lib/option";
 import { GetFileUidFromFrontmatter } from "./file_id_util";
 import { WrapPromise } from "../lib/wrap_promise";
 import { ConvertToUnknownError } from "../util";
-import type { LocalDataType } from "./file_node";
+import type { FileNodeParams, LocalDataType } from "./file_node";
 import { FileNode } from "./file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
 import type { SyncerConfig } from "./syncer";
@@ -23,6 +23,61 @@ export type FileMapOfNodes<TypeOfData extends Option<string> = Option<string>> =
     FileMapOfNodes<TypeOfData> | FileNodeArray<TypeOfData>
 >;
 
+/** Gets the obsidian file node. */
+async function GetObsidianNode(
+    app: App,
+    fileName: string
+): Promise<Result<Option<FileNode<Option<string>>>, StatusError>> {
+    const file = app.vault.fileMap[fileName] as TAbstractFile;
+    if (!(file instanceof TFile)) {
+        return Ok(None);
+    }
+    const fileIdResult = await GetFileUidFromFrontmatter(app, file);
+    if (fileIdResult.err) {
+        return fileIdResult;
+    }
+
+    const node = FileNode.constructFromTFile(fileName, file, fileIdResult.safeUnwrap());
+    return Ok(Some(node));
+}
+
+/** Gets the raw file ndoe. */
+async function GetRawNode(
+    app: App,
+    fileName: string
+): Promise<Result<Option<FileNode<Option<string>>>, StatusError>> {
+    const fileStat = await WrapPromise(app.vault.adapter.stat(fileName));
+    if (fileStat.err) {
+        return fileStat.mapErr(ConvertToUnknownError(`Failed to stat ${fileName}`));
+    }
+    const stat = fileStat.safeUnwrap();
+    if (stat === null) {
+        return Ok(None);
+    }
+    if (stat.type === "folder") {
+        return Ok(None);
+    }
+
+    const path = fileName.split("/");
+    const file = path.pop() as string;
+    const [baseName, extension] = file.split(".") as [string, string | undefined];
+    const dataType: LocalDataType = { type: "RAW" };
+    const config: FileNodeParams<None> = {
+        fullPath: fileName,
+        ctime: stat.ctime,
+        mtime: stat.mtime,
+        size: stat.size,
+        baseName,
+        extension: extension ?? "",
+        fileId: None,
+        userId: None,
+        localDataType: Some(dataType),
+        deleted: false
+    };
+    const node = new FileNode(config);
+    return Ok(Some(node));
+}
+
 /** Gets all the file nodes from the filesystem. */
 export async function GetAllFileNodes(
     app: App,
@@ -30,81 +85,50 @@ export async function GetAllFileNodes(
 ): Promise<Result<FileNode[], StatusError>> {
     const files: FileNode[] = [];
 
-    // First get all the files from the filemap.
-    for (const fileName in app.vault.fileMap) {
-        if (!IsAcceptablePath(fileName, config) || !IsObsidianFile(fileName, config)) {
-            continue;
+    const iterateFiles = async (path: string): Promise<StatusResult<StatusError>> => {
+        const fileNamesResult = await WrapPromise(app.vault.adapter.list(path));
+        if (fileNamesResult.err) {
+            return fileNamesResult.mapErr(ConvertToUnknownError(`Failed to list(${path})`));
         }
 
-        const file = app.vault.fileMap[fileName] as TAbstractFile;
-        if (!(file instanceof TFile)) {
-            continue;
-        }
-        const fileIdResult = await GetFileUidFromFrontmatter(app, file);
-        if (fileIdResult.err) {
-            return fileIdResult;
-        }
-
-        const node = FileNode.constructFromTFile(fileName, file, fileIdResult.safeUnwrap());
-        files.push(node);
-    }
-
-    const recursivelyCheckFiles = async (path: string): Promise<StatusResult<StatusError>> => {
-        const rootDirResult = (
-            await WrapPromise(
-                app.vault.adapter.fsPromises.readdir(`${app.vault.adapter.basePath}/${path}`)
-            )
-        ).mapErr(ConvertToUnknownError(`readdir ${path}`));
-        if (rootDirResult.err) {
-            return rootDirResult;
-        }
-        for (const segment of rootDirResult.safeUnwrap()) {
-            const splitSegment = segment.split(".");
-            const baseName = splitSegment[0] as string;
-            const extension = splitSegment[1] ?? "";
-            const vaultPath = `${path}/${segment}`;
-            if (!IsAcceptablePath(vaultPath, config) || !IsLocalFileRaw(vaultPath, config)) {
+        for (const fullPath of fileNamesResult.safeUnwrap().files) {
+            if (!IsAcceptablePath(fullPath, config)) {
                 continue;
             }
-            const filePath = `${app.vault.adapter.basePath}/${vaultPath}`;
-            const statResult = (
-                await WrapPromise(app.vault.adapter.fsPromises.stat(filePath))
-            ).mapErr(ConvertToUnknownError(`stat ${filePath}`));
-            if (statResult.err) {
-                return statResult;
-            }
-
-            if (statResult.safeUnwrap().isDirectory()) {
-                const recursiveCheckResult = await recursivelyCheckFiles(vaultPath);
-                if (recursiveCheckResult.err) {
-                    return recursiveCheckResult;
+            if (IsObsidianFile(fullPath, config)) {
+                const fileResult = await GetObsidianNode(app, fullPath);
+                if (fileResult.err) {
+                    return fileResult;
                 }
-                continue;
+                const optFile = fileResult.safeUnwrap();
+                if (optFile.some) {
+                    files.push(optFile.safeValue());
+                }
             }
-            if (!statResult.safeUnwrap().isFile()) {
-                continue;
+            if (IsLocalFileRaw(fullPath, config)) {
+                const fileResult = await GetRawNode(app, fullPath);
+                if (fileResult.err) {
+                    return fileResult;
+                }
+                const optFile = fileResult.safeUnwrap();
+                if (optFile.some) {
+                    files.push(optFile.safeValue());
+                }
             }
+        }
 
-            const fileNode = new FileNode<None>({
-                fullPath: vaultPath,
-                ctime: statResult.safeUnwrap().birthtimeMs,
-                mtime: statResult.safeUnwrap().mtimeMs,
-                size: statResult.safeUnwrap().size,
-                baseName: baseName,
-                extension: extension,
-                fileId: None,
-                userId: None,
-                deleted: false,
-                localDataType: Some<LocalDataType>({ type: "RAW" })
-            });
-            files.push(fileNode);
+        for (const folderName of fileNamesResult.safeUnwrap().folders) {
+            const folderIterResult = await iterateFiles(folderName);
+            if (folderIterResult.err) {
+                return folderIterResult;
+            }
         }
 
         return Ok();
     };
-    const checkResult = await recursivelyCheckFiles(".obsidian");
-    if (checkResult.err) {
-        return checkResult;
+    const iterateResult = await iterateFiles("");
+    if (iterateResult.err) {
+        return iterateResult;
     }
 
     return Ok(files);

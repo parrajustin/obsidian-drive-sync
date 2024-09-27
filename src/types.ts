@@ -1,26 +1,29 @@
-import type { FSWatcher } from "fs";
-import type { readdir, stat, readFile, writeFile, rm } from "fs/promises";
+import type { DataWriteOptions, TAbstractFile } from "obsidian";
+
+export type OpType =
+    | "folder-created"
+    | "file-created"
+    | "modified"
+    | "file-removed"
+    | "renamed"
+    | "closed"
+    | "raw";
+
+export type HandlerFunc = (
+    type: OpType,
+    path: string,
+    oldPath: string | undefined,
+    info: { ctime: number; mtime: number; size: number }
+) => unknown;
 
 declare module "obsidian" {
-    interface DataAdapterWathcer {
-        resolvedPath: string;
-        watcher: FSWatcher;
-    }
-
     interface DataAdapter {
         /** Base path of the vault. */
         basePath: string;
-        watchers: { [key: string]: DataAdapterWathcer };
         /** Returns the full system path to the file. */
         getFullPath: (path: string) => string;
         applyWriteOptions: (path: string, opts: DataWriteOptions) => Promise<void>;
-        fsPromises: {
-            readdir: typeof readdir;
-            stat: typeof stat;
-            readFile: typeof readFile;
-            writeFile: typeof writeFile;
-            rm: typeof rm;
-        };
+        handler: HandlerFunc;
     }
 
     interface EventRef {

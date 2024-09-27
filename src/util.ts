@@ -1,4 +1,4 @@
-import type { StatusError } from "./lib/status_error";
+import { StatusError } from "./lib/status_error";
 import { UnknownError } from "./lib/status_error";
 
 /**
@@ -18,6 +18,16 @@ export function AsyncForEach<InputType, OutputType>(
 
 /** Converts unknown data to an unknown error. */
 export function ConvertToUnknownError(errorStr: string): (err: unknown) => StatusError {
-    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-    return (err: unknown) => UnknownError(`${errorStr}. "${err}"`);
+    return (err: unknown) => {
+        if (err instanceof Error) {
+            return UnknownError(`${errorStr}. "${err.message}" "${err.stack}"`);
+        }
+
+        if (err instanceof StatusError) {
+            return err;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        return UnknownError(`${errorStr}. "${err}"`);
+    };
 }
