@@ -6,6 +6,7 @@ import type { FirebaseApp } from "firebase/app";
 import type { FileNode } from "./file_node";
 import {
     ConvertArrayOfNodesToMap,
+    FilterFileNodes,
     FlattenFileNodes,
     MapByFileId,
     type FileMapOfNodes
@@ -46,6 +47,7 @@ export class FirebaseSyncer {
     private _isValid = false;
 
     private constructor(
+        private _config: SyncerConfig,
         private _creds: UserCredential,
         private _db: Firestore,
         private _cloudNodes: FileMapOfNodes<Some<string>>
@@ -54,6 +56,7 @@ export class FirebaseSyncer {
     /** Build the firebase syncer. */
     public static async buildFirebaseSyncer(
         firebaseApp: FirebaseApp,
+        config: SyncerConfig,
         creds: UserCredential
     ): Promise<Result<FirebaseSyncer, StatusError>> {
         const db = getFirestore(firebaseApp);
@@ -76,12 +79,12 @@ export class FirebaseSyncer {
         querySnapshotResult.safeUnwrap().forEach((document) => {
             fileNodes.push(document.data() as FileNode<Some<string>>);
         });
-        const fileMap = ConvertArrayOfNodesToMap(fileNodes);
+        const fileMap = ConvertArrayOfNodesToMap(FilterFileNodes(config, fileNodes));
         if (fileMap.err) {
             return fileMap;
         }
 
-        return Ok(new FirebaseSyncer(creds, db, fileMap.safeUnwrap()));
+        return Ok(new FirebaseSyncer(config, creds, db, fileMap.safeUnwrap()));
     }
 
     /** Initializes the real time subscription on firestore data. */
@@ -117,7 +120,9 @@ export class FirebaseSyncer {
                         localRep.userId = node.userId;
                     }
                 });
-                const convertToNodesResult = ConvertArrayOfNodesToMap<Some<string>>(flatFiles);
+                const convertToNodesResult = ConvertArrayOfNodesToMap<Some<string>>(
+                    FilterFileNodes(this._config, flatFiles)
+                );
                 if (convertToNodesResult.err) {
                     LogError(convertToNodesResult.val);
                     this._isValid = false;

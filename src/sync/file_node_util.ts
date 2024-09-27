@@ -175,6 +175,18 @@ export async function UpdateFileMapWithChanges(
     return ConvertArrayOfNodesToMap(flatNodes);
 }
 
+/** Filters file nodes to make sure they should be kept. */
+export function FilterFileNodes<TypeOfData extends Option<string> = Option<string>>(
+    config: SyncerConfig,
+    nodes: FileNode<TypeOfData>[]
+): FileNode<TypeOfData>[] {
+    return nodes.filter(
+        (n) =>
+            IsAcceptablePath(n.fullPath, config) &&
+            (IsObsidianFile(n.fullPath, config) || IsLocalFileRaw(n.fullPath, config))
+    );
+}
+
 /** Gets all the file nodes from the filesystem. */
 export async function GetAllFileNodes(
     app: App,
