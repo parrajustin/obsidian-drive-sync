@@ -46,7 +46,7 @@ function CreateDefaultSyncConfig(): SyncerConfig {
 
 export const DEFAULT_SETTINGS: Settings = {
     clientId: uuidv7(),
-    syncers: [CreateDefaultSyncConfig()]
+    syncers: []
 };
 
 export interface Settings {
@@ -144,6 +144,49 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                 }
                 cb.onChange((value) => {
                     this._settings.password = value;
+                });
+            });
+
+        const loginStatusContainer = this.containerEl.createDiv("login-status");
+        loginStatusContainer.createEl("span", "", (el) => {
+            el.innerText = "Login Status: ";
+        });
+        const statusSpan = loginStatusContainer.createEl("span", "", (el) => {
+            if (this._plugin.userCreds.some) {
+                el.innerText = "Logged in!";
+                el.style.color = "green";
+            } else {
+                el.innerText = "not logged in";
+                el.style.color = "white";
+            }
+        });
+        new Setting(this.containerEl)
+            .setName("Try to login")
+            .setDesc(
+                "Click this button to check if your credentials are correct. Warning! clicking this can start any file syncers if you have any defined."
+            )
+            .addButton((cb) => {
+                cb.setIcon("key").onClick(async () => {
+                    if (this._plugin.userCreds.some) {
+                        return;
+                    }
+
+                    this._plugin.settings = this._settings;
+                    const loginAttempt = await this._plugin.tryLogin();
+                    if (loginAttempt.err) {
+                        statusSpan.innerText = `Error: ${loginAttempt.val.toString()}`;
+                        statusSpan.style.color = "red";
+                        return;
+                    }
+
+                    const possibleCreds = loginAttempt.safeUnwrap();
+                    if (possibleCreds.none) {
+                        statusSpan.innerText = `Failed to login`;
+                        statusSpan.style.color = "red";
+                        return;
+                    }
+                    statusSpan.innerText = "Logged in!";
+                    statusSpan.style.color = "green";
                 });
             });
     }

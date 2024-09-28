@@ -70,13 +70,6 @@ export default class FirestoreSyncPlugin extends Plugin {
         const tryLoginResult = await this.tryLogin();
         if (tryLoginResult.err) {
             LogError(tryLoginResult.val);
-        } else {
-            this.userCreds = tryLoginResult.val;
-
-            // If there are actually any user creds resolve the promise.
-            if (this.userCreds.some) {
-                SetFileSchemaConverter(this, this.userCreds.safeValue());
-            }
         }
 
         this.addSettingTab(new FirebaseSyncSettingTab(this.app, this));
@@ -108,7 +101,6 @@ export default class FirestoreSyncPlugin extends Plugin {
         }
         this.userCreds = cred.safeUnwrap();
         if (this.userCreds.some) {
-            SetFileSchemaConverter(this, this.userCreds.safeValue());
             this.loggedInResolve(this.userCreds.safeValue());
         }
         return Ok();
@@ -141,12 +133,13 @@ export default class FirestoreSyncPlugin extends Plugin {
 
         const creds = loginResult.safeUnwrap();
         this.userCreds = Some(creds);
+        SetFileSchemaConverter(this, creds);
         this.loggedInResolve(creds);
         return loginResult;
     }
 
     /** Attempts to login to the firebase infra. */
-    private async tryLogin(): Promise<Result<Option<UserCredential>, StatusError>> {
+    public async tryLogin(): Promise<Result<Option<UserCredential>, StatusError>> {
         if (this.settings.email === undefined || this.settings.password === undefined) {
             return Ok(None);
         }
