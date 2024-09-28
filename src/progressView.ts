@@ -20,6 +20,7 @@ interface SyncProgress {
 class SyncerPublishedCycle {
     constructor(
         public numOfUpdates: number,
+        public leftOverUpdates: number,
         public updateTime: number
     ) {}
 }
@@ -174,12 +175,19 @@ export class SyncProgressView extends ItemView {
      * @param numOfUpdates number of updates that took place in the cycle.
      * @param updateTime the total number of MS that the update took.
      */
-    public publishSyncerCycleDone(syncerId: string, numOfUpdates: number, updateTime: number) {
+    public publishSyncerCycleDone(
+        syncerId: string,
+        numOfUpdates: number,
+        leftOverUpdates: number,
+        updateTime: number
+    ) {
         const cycle = this._mapSyncerCycleToCurrentProgress.get(syncerId);
         if (cycle === undefined) {
             return;
         }
-        cycle.publishedEntry = Some(new SyncerPublishedCycle(numOfUpdates, updateTime));
+        cycle.publishedEntry = Some(
+            new SyncerPublishedCycle(numOfUpdates, leftOverUpdates, updateTime)
+        );
         cycle.lastUpdate = Date.now();
         this.updateProgressView();
     }
@@ -390,6 +398,9 @@ export class SyncProgressView extends ItemView {
 
         cycleStats.createEl("span").innerText = `#updates: ${cycle.numOfUpdates}`;
         cycleStats.createEl("span").innerText = `#Seconds: ${cycle.updateTime / 1000}`;
+        if (cycle.leftOverUpdates > 0) {
+            cycleStats.createEl("span").innerText = `#updatesleft: ${cycle.leftOverUpdates}`;
+        }
     }
 
     private createErrorEntry(container: HTMLDivElement, error: SyncerError) {

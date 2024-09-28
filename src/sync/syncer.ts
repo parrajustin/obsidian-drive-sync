@@ -372,7 +372,7 @@ export class FileSyncer {
         const cleanUpResult = await CleanUpLeftOverLocalFiles(
             this._plugin.app,
             this._config,
-            filteredUpdates,
+            limitUpdates,
             this._mapOfFileNodes
         );
         if (cleanUpResult.err) {
@@ -382,7 +382,8 @@ export class FileSyncer {
         const endTime = window.performance.now();
         view.publishSyncerCycleDone(
             this._config.syncerId,
-            filteredUpdates.length,
+            limitUpdates.length,
+            /*leftOverUpdates=*/ filteredUpdates.length - limitUpdates.length,
             endTime - startTime
         );
         return Ok(endTime - startTime);
