@@ -25,33 +25,30 @@ jobs:
           release-type: node
 
       - uses: actions/checkout@v3
-        if: ${{ steps.release.outputs.release_created }}
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
           version: 9
           run_install: false
-        if: ${{ steps.release.outputs.release_created }}
 
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '21.x'
           cache: 'pnpm'
-        if: ${{ steps.release.outputs.release_created }}
 
       - name: Install dependencies
         run: pnpm install
-        if: ${{ steps.release.outputs.release_created }}
+
+      - name: Lint
+        run: npm run lint
 
       - name: Build plugin
         run: npm run build
-        if: ${{ steps.release.outputs.release_created }}
 
       - name: Update versions
         run: npm run version
-        if: ${{ steps.release.outputs.release_created }}
 
       - name: Upload Release Artifact
         env:
