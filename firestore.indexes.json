@@ -11,6 +11,10 @@
         {
           "fieldPath": "deleted",
           "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "mTime",
+          "order": "ASCENDING"
         }
       ]
     }

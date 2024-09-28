@@ -88,7 +88,8 @@ async function GetRawNode(
         data: None,
         fileStorageRef: None,
         deviceId: None,
-        syncerConfigId: config.syncerId
+        syncerConfigId: config.syncerId,
+        isFromCloudCache: false
     };
     const node = new FileNode(nodeParams);
     return Ok(Some(node));

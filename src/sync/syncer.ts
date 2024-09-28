@@ -30,6 +30,7 @@ import type { FileNode } from "./file_node";
 import type { ConvergenceUpdate, NullUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { uuidv7 } from "../lib/uuid";
+import type { FirebaseStoredData } from "./firebase_cache";
 
 export enum RootSyncType {
     ROOT_SYNCER = "root",
@@ -56,6 +57,8 @@ export interface SyncerConfig {
     obsidianFileSyncQuery: string;
     /** Query where not to write file ids. */
     fileIdFileQuery: string;
+    /** Firebase cache. */
+    storedFirebaseCache: FirebaseStoredData;
 }
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
@@ -139,6 +142,7 @@ export class FileSyncer {
                 view.setSyncerStatus(this._config.syncerId, "building firebase syncer");
                 // Build the firebase syncer and init it.
                 const buildFirebaseSyncer = await FirebaseSyncer.buildFirebaseSyncer(
+                    this._plugin,
                     this._firebaseApp,
                     this._config,
                     creds
@@ -146,6 +150,9 @@ export class FileSyncer {
                 if (buildFirebaseSyncer.err) {
                     return buildFirebaseSyncer;
                 }
+                // Save the cache for firebase.
+                await this._plugin.saveSettings(/*startupSyncer=*/ false);
+
                 // Now initalize firebase.
                 const firebaseSyncer = buildFirebaseSyncer.safeUnwrap();
                 this._firebaseSyncer = Some(firebaseSyncer);

@@ -4,7 +4,7 @@
  */
 
 import type { Firestore } from "firebase/firestore";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
 import type { Option } from "../lib/option";
@@ -139,7 +139,8 @@ export function CreateOperationsToUpdateCloud(
                 fileStorageRef: None,
                 localDataType: None,
                 deviceId: None,
-                syncerConfigId: syncConfig.syncerId
+                syncerConfigId: syncConfig.syncerId,
+                isFromCloudCache: false
             };
 
             const initalFileName: Option<string> = update.cloudState.andThen<string>(
@@ -234,6 +235,8 @@ export function CreateOperationsToUpdateCloud(
 
 /** Does the update by downloading the cloud file to local files. */
 async function DownloadCloudUpdate(
+    db: Firestore,
+    userId: string,
     ids: Identifiers,
     app: App,
     syncConfig: SyncerConfig,
@@ -242,6 +245,28 @@ async function DownloadCloudUpdate(
     fileId: string
 ): Promise<StatusResult<StatusError>> {
     let dataToWrite: Option<Uint8Array> = None;
+
+    if (
+        update.cloudState.safeValue().data.isFromCloudCache &&
+        update.cloudState.safeValue().data.fileStorageRef.none
+    ) {
+        // The cloud state if from the cloud cache and has no file storage so we need to fetch the
+        // data.
+        const documentRef = doc(
+            db,
+            `${userId}/${update.cloudState.safeValue().data.fileId.safeValue()}`
+        ).withConverter(GetFileSchemaConverter());
+
+        const fetchResult = await WrapPromise(
+            getDoc(documentRef),
+            /*textForUnknown=*/ `Failed to get cached doc ${update.cloudState.safeValue().data.fileId.safeValue()}`
+        );
+        if (fetchResult.err) {
+            return fetchResult;
+        }
+        const fileNode = fetchResult.safeUnwrap().data() as FileNode<Some<string>>;
+        update.cloudState.safeValue().overwrite(fileNode);
+    }
 
     // First check the easy path. The file was small enough to fit into firestore.
     const textData = update.cloudState.safeValue().data.data;
@@ -320,6 +345,8 @@ async function DownloadCloudUpdate(
  * @returns the array of operations taking place.
  */
 export function CreateOperationsToUpdateLocal(
+    db: Firestore,
+    userId: string,
     ids: Identifiers,
     cloudUpdates: (CloudConvergenceUpdate | CloudDeleteLocalConvergenceUpdate)[],
     app: App,
@@ -347,6 +374,8 @@ export function CreateOperationsToUpdateLocal(
         // Do the convergence operation.
         if (update.action === ConvergenceAction.USE_CLOUD) {
             const downloadResult = await DownloadCloudUpdate(
+                db,
+                userId,
                 ids,
                 app,
                 syncConfig,

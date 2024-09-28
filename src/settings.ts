@@ -24,7 +24,8 @@ function CreateAllFileConfig(): SyncerConfig {
         fileIdFileQuery: "-f:template",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         vaultName: ((window as any).app as App).vault.getName() ?? "",
-        maxUpdatePerSyncer: 50
+        maxUpdatePerSyncer: 50,
+        storedFirebaseCache: { lastUpdate: 0, cache: [] }
     };
 }
 
@@ -40,7 +41,8 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         fileIdFileQuery: "-f:template -f:templator",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         vaultName: ((window as any).app as App).vault.getName() ?? "",
-        maxUpdatePerSyncer: 50
+        maxUpdatePerSyncer: 50,
+        storedFirebaseCache: { lastUpdate: 0, cache: [] }
     };
 }
 
@@ -401,6 +403,17 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                                 searchStringChecker.open();
                                 return;
                             });
+                        });
+                    });
+                const cacheSize = liContainer.createEl("span");
+                cacheSize.innerText = `Cache size: ${elem.storedFirebaseCache.cache.length}`;
+                new Setting(liContainer)
+                    .setName("Clear firestore cache")
+                    .setDesc("Clear the cache of firestore entries")
+                    .addButton((cb) => {
+                        cb.setIcon("eraser").onClick(() => {
+                            elem.storedFirebaseCache = { lastUpdate: 0, cache: [] };
+                            cacheSize.innerText = `Cache size: ${elem.storedFirebaseCache.cache.length}`;
                         });
                     });
             };

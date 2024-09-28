@@ -90,7 +90,8 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             fileStorageRef: data.fileStorageRef !== null ? Some(data.fileStorageRef) : None,
             localDataType: None,
             deviceId: Some(data.deviceId),
-            syncerConfigId: data.syncerConfigId
+            syncerConfigId: data.syncerConfigId,
+            isFromCloudCache: false
         };
 
         return new FileNode(params);

@@ -42,6 +42,8 @@ export interface FileNodeParams<TypeOfData extends Option<string> = Option<strin
     deviceId: Option<string>;
     /** The syncer config id that pushed the update. */
     syncerConfigId: string;
+    /** If this file node is vitual and just represents an entry from cache.  */
+    isFromCloudCache: boolean;
 }
 
 /** File node for book keeping. */
@@ -74,7 +76,8 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
             fileStorageRef: None,
             localDataType: Some(backingdata),
             deviceId: None,
-            syncerConfigId: syncerConfigId
+            syncerConfigId: syncerConfigId,
+            isFromCloudCache: false
         });
     }
 
@@ -96,6 +99,9 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
         // this.data.vaultName = other.data.vaultName;
         this.data.deviceId = other.data.deviceId;
         this.data.syncerConfigId = other.data.syncerConfigId;
+        if (this.data.localDataType.none) {
+            this.data.isFromCloudCache = other.data.isFromCloudCache;
+        }
     }
 
     /** Overwrite metadata from the cloud. */

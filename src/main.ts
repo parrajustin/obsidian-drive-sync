@@ -79,9 +79,11 @@ export default class FirestoreSyncPlugin extends Plugin {
         await this.teardownSyncers();
     }
 
-    public async saveSettings(): Promise<void> {
+    public async saveSettings(startupSyncer = true): Promise<void> {
         await this.saveData(this.settings);
-        await this.startupSyncers();
+        if (startupSyncer) {
+            await this.startupSyncers();
+        }
     }
 
     public async loadSettings(): Promise<void> {
