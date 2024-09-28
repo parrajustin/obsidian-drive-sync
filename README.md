@@ -1,5 +1,14 @@
 # A cloud file syncer for Obsidian.
 
+## How to commit
+
+- Write commit messages according to https://www.conventionalcommits.org/en/v1.0.0/
+- commit release
+
+```bash
+git commit --allow-empty -m "chore: release 2.0.0" -m "Release-As: 2.0.0"
+```
+
 ## Known bugs
 
 - If there are multiple files with overlapping file paths then it is a race to see who reads and writes first.
