@@ -502,6 +502,13 @@ export async function GetOrCreateSyncProgressView(
     app: App,
     reveal = true
 ): Promise<SyncProgressView> {
+    // Wait for layout ready.
+    await new Promise<void>((resolve) => {
+        app.workspace.onLayoutReady(() => {
+            resolve();
+        });
+    });
+
     const { workspace } = app;
     if (CURRENT_PROGRESS_VIEW.some) {
         if (reveal) {
@@ -510,13 +517,6 @@ export async function GetOrCreateSyncProgressView(
         }
         return CURRENT_PROGRESS_VIEW.safeValue().view as SyncProgressView;
     }
-
-    // Wait for layout ready.
-    await new Promise<void>((resolve) => {
-        app.workspace.onLayoutReady(() => {
-            resolve();
-        });
-    });
 
     let leaf: WorkspaceLeaf | null = null;
     const leaves = workspace.getLeavesOfType(PROGRESS_VIEW_TYPE);

@@ -14,7 +14,7 @@ import {
     debugErrorMap
 } from "firebase/auth";
 import type { StatusError } from "./lib/status_error";
-import { InternalError, InvalidArgumentError, UnknownError } from "./lib/status_error";
+import { InternalError, InvalidArgumentError } from "./lib/status_error";
 import type { Result, StatusResult } from "./lib/result";
 import { Err, Ok } from "./lib/result";
 import { WrapPromise } from "./lib/wrap_promise";
@@ -23,6 +23,7 @@ import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
 import { GetOrCreateSyncProgressView, PROGRESS_VIEW_TYPE, SyncProgressView } from "./progressView";
 import { SetFileSchemaConverter } from "./sync/firestore_schema";
+import { ConvertToUnknownError } from "./util";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -76,7 +77,6 @@ export default class FirestoreSyncPlugin extends Plugin {
             // If there are actually any user creds resolve the promise.
             if (this.userCreds.some) {
                 SetFileSchemaConverter(this, this.userCreds.safeValue());
-                this.loggedInResolve(this.userCreds.safeValue());
             }
         }
 
@@ -135,10 +135,14 @@ export default class FirestoreSyncPlugin extends Plugin {
         const loginResult = await WrapPromise<UserCredential, unknown>(
             signInWithEmailAndPassword(auth, email, password)
         );
-        return loginResult.mapErr((err) => {
-            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-            return UnknownError(`Unknown Error "${err}"`);
-        });
+        if (loginResult.err) {
+            return loginResult.mapErr(ConvertToUnknownError("Unknown signInWithEmailAndPassword"));
+        }
+
+        const creds = loginResult.safeUnwrap();
+        this.userCreds = Some(creds);
+        this.loggedInResolve(creds);
+        return loginResult;
     }
 
     /** Attempts to login to the firebase infra. */
