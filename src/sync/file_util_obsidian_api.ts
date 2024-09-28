@@ -3,7 +3,7 @@
  */
 
 import type { App, DataWriteOptions } from "obsidian";
-import { TFile } from "obsidian";
+import { normalizePath, TFile } from "obsidian";
 import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
@@ -44,6 +44,17 @@ export async function WriteToObsidianFile(
 ): Promise<StatusResult<StatusError>> {
     const file = app.vault.getAbstractFileByPath(filePath);
     if (file === null) {
+        // Create folders if we have to.
+        const pathSplit = filePath.split("/");
+        // Remove the final filename.
+        pathSplit.pop();
+        const mkdirs = await WrapPromise(
+            app.vault.adapter.mkdir(normalizePath(pathSplit.join("/"))),
+            /*textForUnknown=*/ `Failed to mkdir "${filePath}"`
+        );
+        if (mkdirs.err) {
+            return mkdirs;
+        }
         // Route if there is no file pre existing.
         const createResult = await WrapPromise(
             app.vault.createBinary(filePath, data, opts),
