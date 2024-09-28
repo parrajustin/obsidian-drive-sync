@@ -45,7 +45,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
         for (const item of this.getItems()) {
             let excluded = false;
             for (const filter of fileExcludeFilters) {
-                if (item.fullPath.match(filter)) {
+                if (item.data.fullPath.match(filter)) {
                     nodes.push({
                         item,
                         match: {
@@ -75,7 +75,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
 
             let included = false;
             for (const filter of fileIncludeFilter) {
-                if (item.fullPath.match(filter)) {
+                if (item.data.fullPath.match(filter)) {
                     included = true;
                     break;
                 }
@@ -106,7 +106,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
      */
     public override renderSuggestion(item: FuzzyMatch<FileNode>, el: HTMLElement): void {
         const text = el.createEl("span");
-        text.innerText = item.item.fullPath;
+        text.innerText = item.item.data.fullPath;
 
         if (item.match.score < 0) {
             text.style.backgroundColor = "coral";
@@ -127,7 +127,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
      * @public
      */
     public override getItemText(item: FileNode): string {
-        return item.fullPath;
+        return item.data.fullPath;
     }
     /**
      * @public
