@@ -1,7 +1,7 @@
 {
   "indexes": [
     {
-      "collectionGroup": "file",
+      "collectionGroup": "GJC32RdD0VU7TMgl2hikR3bZZKF2",
       "queryScope": "COLLECTION",
       "fields": [
         {
@@ -9,7 +9,25 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "deleted",
+          "fieldPath": "vaultName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "mTime",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "lgppj2II6sYqwcLxCvjfIJLCS8Q2",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "vaultName",
           "order": "ASCENDING"
         },
         {
