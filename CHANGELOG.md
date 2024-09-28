@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.3](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.2.2...v1.2.3) (2024-09-28)
+
+
+### Bug Fixes
+
+* Fix mess up cleaning local files and display updates left ([094d8b0](https://github.com/parrajustin/obsidian-drive-sync/commit/094d8b036418d708deecdffa009f6c726bb863dc))
+
 ## [1.2.2](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.2.1...v1.2.2) (2024-09-28)
 
 
