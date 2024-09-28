@@ -18,52 +18,36 @@ jobs:
           # this assumes that you have created a personal access token
           # (PAT) and configured it as a GitHub action secret named
           # `MY_RELEASE_PLEASE_TOKEN` (this secret name is not important).
-          token: ${{ secrets.MY_RELEASE_PLEASE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           # this is a built-in strategy in release-please, see "Action Inputs"
           # for more options
-          release-type: simple
-    #   - uses: actions/checkout@v3
+          release-type: node
 
-    #   - uses: pnpm/action-setup@v4
-    #     name: Install pnpm
-    #     with:
-    #       version: 9
-    #       run_install: false
+      - uses: actions/checkout@v3
 
-    #   - name: Use Node.js
-    #     uses: actions/setup-node@v3
-    #     with:
-    #       node-version: '21.x'
-    #       cache: 'pnpm'
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          version: 9
+          run_install: false
 
-    #   - name: Install dependencies
-    #     run: pnpm install
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '21.x'
+          cache: 'pnpm'
 
-    #   - name: Build plugin
-    #     run: npm run build
+      - name: Install dependencies
+        run: pnpm install
 
-    #   - name: push plugin release
-    #     run: |
-    #       git config user.name github-actions[bot]
-    #       git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-    #       git remote add gh-token "https://${{ secrets.GITHUB_TOKEN}}@github.com/parrajustin/obsidian-drive-sync.git"
-    #       git checkout -b release
-    #       git add -f dist
-    #       git commit -a -m 'chore: ${{ steps.release.outputs.tag_name }} release'
-    #       git push origin
-    #       git tag -a ${{ steps.release.outputs.tag_name }} -m 'chore: ${{ steps.release.outputs.tag_name }} release'
-    #       git push origin ${{ steps.release.outputs.tag_name }}
-    #       gh release create "$tag" \
-    #         --title="$tag" \
-    #         dist/main.js manifest.json styles.css
-    #     if: ${{ steps.release.outputs.release_created }}
+      - name: Build plugin
+        run: npm run build
 
-    #   - name: Create release
-    #     env:
-    #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #     run: |
-    #       tag="${GITHUB_REF#refs/tags/}"
+      - name: Update versions
+        run: npm run version
 
-    #       gh release create "$tag" \
-    #         --title="$tag" \
-    #         dist/main.js manifest.json styles.css
+      - name: Upload Release Artifact
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ steps.release.outputs.tag_name }} dist/main.js manifest.json styles.css
