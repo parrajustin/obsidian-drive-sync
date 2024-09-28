@@ -19,7 +19,9 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
         this.setPlaceholder(_query);
         this._searchString = SearchString.parse(_query);
         this._originalQuery = _query;
-        this.limit = 1000;
+        this.emptyStateText = _query;
+        this.inputEl.value = this._query;
+        this.limit = 5000;
     }
 
     /**
@@ -42,12 +44,16 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
             ...(parsedQuery.include["f"] ?? []),
             ...(parsedQuery.include["file"] ?? [])
         ];
-        const nodes: FuzzyMatch<FileNode>[] = [];
+
+        // Create list of nodes.
+        const includedNodes: FuzzyMatch<FileNode>[] = [];
+        const excludedNodes: FuzzyMatch<FileNode>[] = [];
+        const restNodes: FuzzyMatch<FileNode>[] = [];
         for (const item of this.getItems()) {
             let excluded = false;
             for (const filter of fileExcludeFilters) {
                 if (item.data.fullPath.match(filter)) {
-                    nodes.push({
+                    excludedNodes.push({
                         item,
                         match: {
                             score: -1,
@@ -64,7 +70,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
 
             // If there are no include filters all are included.
             if (fileIncludeFilter.length === 0) {
-                nodes.push({
+                includedNodes.push({
                     item,
                     match: {
                         score: 1,
@@ -82,7 +88,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
                 }
             }
             if (included) {
-                nodes.push({
+                includedNodes.push({
                     item,
                     match: {
                         score: 1,
@@ -90,7 +96,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
                     }
                 });
             } else {
-                nodes.push({
+                restNodes.push({
                     item,
                     match: {
                         score: 0,
@@ -99,7 +105,12 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
                 });
             }
         }
-        return nodes;
+
+        includedNodes.sort((a, b) => a.item.data.fullPath.localeCompare(b.item.data.fullPath));
+        excludedNodes.sort((a, b) => a.item.data.fullPath.localeCompare(b.item.data.fullPath));
+        restNodes.sort((a, b) => a.item.data.fullPath.localeCompare(b.item.data.fullPath));
+
+        return [...includedNodes, ...excludedNodes, ...restNodes];
     }
 
     /**
