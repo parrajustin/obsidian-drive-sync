@@ -42,6 +42,8 @@ export interface SyncerConfig {
     vaultName: string;
     /** Sync config identifier. */
     syncerId: string;
+    /** Max syncs per file update. */
+    maxUpdatePerSyncer: number;
     /** If data storage encryption is enabled. Only encrypts the data. */
     dataStorageEncrypted: boolean;
     /** The password for encryption, all locations must have the same. */
@@ -335,6 +337,8 @@ export class FileSyncer {
             return Ok(0);
         }
 
+        const limitUpdates = filteredUpdates.slice(0, this._config.maxUpdatePerSyncer);
+
         // Build the operations necessary to sync.
         const buildConvergenceOperations = this._firebaseSyncer
             .safeValue()
@@ -342,7 +346,7 @@ export class FileSyncer {
                 { syncerId: this._config.syncerId, cycleId },
                 this._plugin.app,
                 this._config,
-                filteredUpdates
+                limitUpdates
             );
         if (buildConvergenceOperations.err) {
             return buildConvergenceOperations;

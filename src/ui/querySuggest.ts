@@ -19,6 +19,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
         this.setPlaceholder(_query);
         this._searchString = SearchString.parse(_query);
         this._originalQuery = _query;
+        this.limit = 1000;
     }
 
     /**

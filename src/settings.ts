@@ -23,7 +23,8 @@ function CreateAllFileConfig(): SyncerConfig {
         obsidianFileSyncQuery: "-f:^.obsidian",
         fileIdFileQuery: "-f:template",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        vaultName: ((window as any).app as App).vault.getName() ?? ""
+        vaultName: ((window as any).app as App).vault.getName() ?? "",
+        maxUpdatePerSyncer: 50
     };
 }
 
@@ -38,7 +39,8 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         obsidianFileSyncQuery: "-f:^.obsidian",
         fileIdFileQuery: "-f:template -f:templator",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        vaultName: ((window as any).app as App).vault.getName() ?? ""
+        vaultName: ((window as any).app as App).vault.getName() ?? "",
+        maxUpdatePerSyncer: 50
     };
 }
 
@@ -188,6 +190,19 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     .addText((cb) => {
                         cb.setValue(elem.vaultName).onChange((val) => {
                             elem.vaultName = val;
+                        });
+                    });
+                new Setting(liContainer)
+                    .setName("Max updates per cycle")
+                    .setDesc(
+                        "The maximum updates per a sync cycle, a number too high will cause obsidian crashes."
+                    )
+                    .addText((cb) => {
+                        cb.setValue(`${elem.maxUpdatePerSyncer}`).onChange((val) => {
+                            const parsedVal = Number.parseInt(val);
+                            if (!Number.isNaN(parsedVal)) {
+                                elem.maxUpdatePerSyncer = Math.max(1, elem.maxUpdatePerSyncer);
+                            }
                         });
                     });
                 new Setting(liContainer)
