@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.2](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.0.1...v1.0.2) (2024-09-28)
+
+
+### Bug Fixes
+
+* attempt to fix release please workflow ([f3fda16](https://github.com/parrajustin/obsidian-drive-sync/commit/f3fda16ad4ef3671cbae8841ae37e298d5b423fc))
+* if protect release please and remove deprecated workflow ([6e498d4](https://github.com/parrajustin/obsidian-drive-sync/commit/6e498d441dc6a5ac0b7af2fd3cda030208102cbf))
+* Update release please ([d26a64c](https://github.com/parrajustin/obsidian-drive-sync/commit/d26a64c926d5bde8abe4ffc5b2aa2ae0521a0fa8))
+
 ## [1.0.1](https://github.com/parrajustin/obsidian-drive-sync/compare/1.0.0...v1.0.1) (2024-09-28)
 
 
