@@ -49,6 +49,18 @@ jobs:
 
       - name: Update versions
         run: npm run version
+        if: ${{ steps.release.outputs.release_created }}
+
+      - name: push change release
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git remote add gh-token "https://${{ secrets.GITHUB_TOKEN}}@github.com/parrajustin/obsidian-drive-sync.git"
+          git add -f manifest.json
+          git add -f versions.json
+          git commit -a -m 'ci: ${{ steps.release.outputs.tag_name }} update versions'
+          git push origin
+        if: ${{ steps.release.outputs.release_created }}
 
       - name: Upload Release Artifact
         env:
