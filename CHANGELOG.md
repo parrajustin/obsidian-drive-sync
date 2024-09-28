@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.4](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.0.3...v1.0.4) (2024-09-28)
+
+
+### Bug Fixes
+
+* experiment with committing version update files ([a59ddd9](https://github.com/parrajustin/obsidian-drive-sync/commit/a59ddd912818c7dd687cd8b9b4cf2c865d4a0911))
+* trying to remove the if from the workflow ([db089c0](https://github.com/parrajustin/obsidian-drive-sync/commit/db089c0fb809e1dd633d93c7e015259d08325b58))
+* update version bump build script ([da815ae](https://github.com/parrajustin/obsidian-drive-sync/commit/da815ae4ee51b0d86ffb7bea596a195667ff7cf6))
+
 ## [1.0.3](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.0.2...v1.0.3) (2024-09-28)
 
 
