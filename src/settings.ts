@@ -77,12 +77,25 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
         this.addIdentifiers();
         this.addUserCredentials();
         this.addSyncerSettings();
+        this.resetSettings();
     }
 
     public override async hide() {
         this._plugin.settings = this._settings;
         await this._plugin.saveSettings();
         await this._plugin.loginForSettings();
+    }
+
+    /* Adds button to reset the settings. */
+    private resetSettings(): void {
+        const heading = this.containerEl.createEl("h2");
+        heading.innerText = "Reset Settings";
+        new Setting(this.containerEl).setName("click to reset settings").addButton((cb) => {
+            cb.setIcon("list-restart").onClick(() => {
+                this._plugin.settings = structuredClone(DEFAULT_SETTINGS);
+                this.display();
+            });
+        });
     }
 
     /** Add the device identifier. */
