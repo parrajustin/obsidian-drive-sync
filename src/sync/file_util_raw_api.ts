@@ -28,6 +28,14 @@ export async function WriteToRawFile(
     data: Uint8Array,
     opts?: DataWriteOptions
 ): Promise<StatusResult<StatusError>> {
+    const pathSplit = filePath.split("/");
+    // Remove the final filename.
+    pathSplit.pop();
+    const mkdirs = await WrapPromise(app.vault.adapter.mkdir(normalizePath(pathSplit.join("/"))));
+    if (mkdirs.err) {
+        return mkdirs.mapErr(ConvertToUnknownError(`Failed to mkdir "${filePath}"`));
+    }
+
     const writeResult = await WrapPromise(
         app.vault.adapter.writeBinary(normalizePath(filePath), data, opts)
     );
