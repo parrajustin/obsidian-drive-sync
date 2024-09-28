@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.1.0...v1.2.0) (2024-09-28)
+
+
+### Features
+
+* Add capability to limit max uploads ([c0e338e](https://github.com/parrajustin/obsidian-drive-sync/commit/c0e338e08caa8b89fc760367f54759d1e92f9ea3))
+
+
+### Bug Fixes
+
+* Add sorting of suggestions ([1abbb2b](https://github.com/parrajustin/obsidian-drive-sync/commit/1abbb2b8d081725ff3119289be9e108b8c81a756))
+* Fixes first use flow ([0cc10f2](https://github.com/parrajustin/obsidian-drive-sync/commit/0cc10f2c673dd2891c0a37b073f9b95ff8cd8d10))
+* increase limit of files in fuzzy suggest modal ([c0e338e](https://github.com/parrajustin/obsidian-drive-sync/commit/c0e338e08caa8b89fc760367f54759d1e92f9ea3))
+* remove brotli compression ([aa9b87f](https://github.com/parrajustin/obsidian-drive-sync/commit/aa9b87f7044dec4fbcaf2af575de979c2af3fa35))
+* Update api for WrapPromise ([aa9b87f](https://github.com/parrajustin/obsidian-drive-sync/commit/aa9b87f7044dec4fbcaf2af575de979c2af3fa35))
+
 ## [1.1.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.0.4...v1.1.0) (2024-09-28)
 
 
