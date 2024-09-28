@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.2.3...v1.3.0) (2024-09-28)
+
+
+### Features
+
+* Add caching for firebase syncer ([a5d518e](https://github.com/parrajustin/obsidian-drive-sync/commit/a5d518e740ed080403ee1ed4b4043f35392961c9))
+
+
+### Bug Fixes
+
+* Add missing firestore indexes ([75cf13d](https://github.com/parrajustin/obsidian-drive-sync/commit/75cf13de36411394fbd9f4192ac1c4d2a6d4902a))
+
 ## [1.2.3](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.2.2...v1.2.3) (2024-09-28)
 
 
