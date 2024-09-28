@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           # this assumes that you have created a personal access token
           # (PAT) and configured it as a GitHub action secret named
@@ -27,33 +28,33 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
 
       - uses: pnpm/action-setup@v4
-        if: ${{ steps.release.outputs.release_created }}
         name: Install pnpm
         with:
           version: 9
           run_install: false
+        if: ${{ steps.release.outputs.release_created }}
 
       - name: Use Node.js
-        if: ${{ steps.release.outputs.release_created }}
         uses: actions/setup-node@v3
         with:
           node-version: '21.x'
           cache: 'pnpm'
+        if: ${{ steps.release.outputs.release_created }}
 
       - name: Install dependencies
-        if: ${{ steps.release.outputs.release_created }}
         run: pnpm install
+        if: ${{ steps.release.outputs.release_created }}
 
       - name: Build plugin
-        if: ${{ steps.release.outputs.release_created }}
         run: npm run build
+        if: ${{ steps.release.outputs.release_created }}
 
       - name: Update versions
-        if: ${{ steps.release.outputs.release_created }}
         run: npm run version
+        if: ${{ steps.release.outputs.release_created }}
 
       - name: Upload Release Artifact
-        if: ${{ steps.release.outputs.release_created }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload ${{ steps.release.outputs.tag_name }} dist/main.js manifest.json styles.css
+        if: ${{ steps.release.outputs.release_created }}
