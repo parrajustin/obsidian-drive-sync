@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.2.1...v1.2.2) (2024-09-28)
+
+
+### Bug Fixes
+
+* fix obsidian folders don't exist ([3ec9875](https://github.com/parrajustin/obsidian-drive-sync/commit/3ec987530ce82d58448119844ef4c5c6ae240a16))
+
 ## [1.2.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.2.0...v1.2.1) (2024-09-28)
 
 
