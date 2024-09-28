@@ -24,26 +24,32 @@ jobs:
           release-type: node
 
       - uses: actions/checkout@v3
+        if: ${{ steps.release.outputs.release_created }}
 
       - uses: pnpm/action-setup@v4
+        if: ${{ steps.release.outputs.release_created }}
         name: Install pnpm
         with:
           version: 9
           run_install: false
 
       - name: Use Node.js
+        if: ${{ steps.release.outputs.release_created }}
         uses: actions/setup-node@v3
         with:
           node-version: '21.x'
           cache: 'pnpm'
 
       - name: Install dependencies
+        if: ${{ steps.release.outputs.release_created }}
         run: pnpm install
 
       - name: Build plugin
+        if: ${{ steps.release.outputs.release_created }}
         run: npm run build
 
       - name: Update versions
+        if: ${{ steps.release.outputs.release_created }}
         run: npm run version
 
       - name: Upload Release Artifact
