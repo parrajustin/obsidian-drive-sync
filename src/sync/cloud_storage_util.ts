@@ -24,7 +24,7 @@ export async function UploadFileToStorage(
     fileId: string
 ): Promise<Result<string, StatusError>> {
     const storage = getStorage();
-    const storageRef = ref(storage, `${userCreds.user.uid}/${fileId}`);
+    const storageRef = ref(storage, `${userCreds.user.uid}/${syncConfig.vaultName}/${fileId}`);
     const readResult = await ReadFile(
         app,
         filePath,
