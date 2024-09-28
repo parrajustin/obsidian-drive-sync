@@ -7,16 +7,18 @@ import type { Result, StatusResult } from "../lib/result";
 import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
-import { ConvertToUnknownError } from "../util";
 
 /** Reads a file through the raw apis. */
 export async function ReadRawFile(
     app: App,
     filePath: string
 ): Promise<Result<Uint8Array, StatusError>> {
-    const readDataResult = await WrapPromise(app.vault.adapter.readBinary(normalizePath(filePath)));
+    const readDataResult = await WrapPromise(
+        app.vault.adapter.readBinary(normalizePath(filePath)),
+        /*textForUnknown=*/ `Failed to fs read from "${filePath}"`
+    );
     if (readDataResult.err) {
-        return readDataResult.mapErr(ConvertToUnknownError(`Failed to fs read from "${filePath}"`));
+        return readDataResult;
     }
     return Ok(new Uint8Array(readDataResult.safeUnwrap()));
 }
@@ -31,16 +33,20 @@ export async function WriteToRawFile(
     const pathSplit = filePath.split("/");
     // Remove the final filename.
     pathSplit.pop();
-    const mkdirs = await WrapPromise(app.vault.adapter.mkdir(normalizePath(pathSplit.join("/"))));
+    const mkdirs = await WrapPromise(
+        app.vault.adapter.mkdir(normalizePath(pathSplit.join("/"))),
+        /*textForUnknown=*/ `Failed to mkdir "${filePath}"`
+    );
     if (mkdirs.err) {
-        return mkdirs.mapErr(ConvertToUnknownError(`Failed to mkdir "${filePath}"`));
+        return mkdirs;
     }
 
     const writeResult = await WrapPromise(
-        app.vault.adapter.writeBinary(normalizePath(filePath), data, opts)
+        app.vault.adapter.writeBinary(normalizePath(filePath), data, opts),
+        /*textForUnknown=*/ `Failed to write fs file "${filePath}"`
     );
     if (writeResult.err) {
-        return writeResult.mapErr(ConvertToUnknownError(`Failed to write fs file "${filePath}"`));
+        return writeResult;
     }
     return Ok();
 }
@@ -51,23 +57,21 @@ export async function DeleteRawFile(
     filePath: string
 ): Promise<StatusResult<StatusError>> {
     const trashSystemResult = await WrapPromise(
-        app.vault.adapter.trashSystem(normalizePath(filePath))
+        app.vault.adapter.trashSystem(normalizePath(filePath)),
+        /*textForUnknown=*/ `Failed to trash system "${filePath}"`
     );
     if (trashSystemResult.err) {
-        return trashSystemResult.mapErr(
-            ConvertToUnknownError(`Failed to trash system "${filePath}"`)
-        );
+        return trashSystemResult;
     }
     if (trashSystemResult.safeUnwrap()) {
         return Ok();
     }
     const trashLocalResult = await WrapPromise(
-        app.vault.adapter.trashLocal(app.vault.adapter.getFullPath(filePath))
+        app.vault.adapter.trashLocal(app.vault.adapter.getFullPath(filePath)),
+        /*textForUnknown=*/ `Failed to trash local "${filePath}"`
     );
     if (trashLocalResult.err) {
-        return trashLocalResult.mapErr(
-            ConvertToUnknownError(`Failed to trash local "${filePath}"`)
-        );
+        return trashLocalResult;
     }
     return Ok();
 }

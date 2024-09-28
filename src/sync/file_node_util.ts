@@ -8,7 +8,6 @@ import { InternalError, InvalidArgumentError } from "../lib/status_error";
 import { None, Some, type Option } from "../lib/option";
 import { GetFileUidFromFrontmatter } from "./file_id_util";
 import { WrapPromise } from "../lib/wrap_promise";
-import { ConvertToUnknownError } from "../util";
 import type { FileNodeParams, LocalDataType } from "./file_node";
 import { FileNode } from "./file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
@@ -55,9 +54,12 @@ async function GetRawNode(
     config: SyncerConfig,
     fileName: string
 ): Promise<Result<Option<FileNode<Option<string>>>, StatusError>> {
-    const fileStat = await WrapPromise(app.vault.adapter.stat(fileName));
+    const fileStat = await WrapPromise(
+        app.vault.adapter.stat(fileName),
+        /*textForUnknown=*/ `Failed to stat ${fileName}`
+    );
     if (fileStat.err) {
-        return fileStat.mapErr(ConvertToUnknownError(`Failed to stat ${fileName}`));
+        return fileStat;
     }
     const stat = fileStat.safeUnwrap();
     if (stat === null) {
@@ -209,9 +211,12 @@ export async function GetAllFileNodes(
     const files: FileNode[] = [];
 
     const iterateFiles = async (path: string): Promise<StatusResult<StatusError>> => {
-        const fileNamesResult = await WrapPromise(app.vault.adapter.list(path));
+        const fileNamesResult = await WrapPromise(
+            app.vault.adapter.list(path),
+            /*textForUnknown=*/ `Failed to list(${path})`
+        );
         if (fileNamesResult.err) {
-            return fileNamesResult.mapErr(ConvertToUnknownError(`Failed to list(${path})`));
+            return fileNamesResult;
         }
 
         for (const fullPath of fileNamesResult.safeUnwrap().files) {

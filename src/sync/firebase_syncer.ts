@@ -16,7 +16,7 @@ import { collection, getDocs, getFirestore, onSnapshot, query, where } from "fir
 import type { UserCredential } from "firebase/auth";
 import type { Result } from "../lib/result";
 import { Err, Ok, type StatusResult } from "../lib/result";
-import { InternalError, UnknownError, type StatusError } from "../lib/status_error";
+import { InternalError, type StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import { GetFileSchemaConverter } from "./firestore_schema";
@@ -67,12 +67,12 @@ export class FirebaseSyncer {
             where("userId", "==", creds.user.uid),
             where("vaultName", "==", config.vaultName)
         ).withConverter(GetFileSchemaConverter());
-        const querySnapshotResult = await WrapPromise(getDocs(queryOfFiles));
+        const querySnapshotResult = await WrapPromise(
+            getDocs(queryOfFiles),
+            /*textForUnknown=*/ `failed queryOfFiles getDocs Firebase syncer`
+        );
         if (querySnapshotResult.err) {
-            return querySnapshotResult.mapErr((err) =>
-                // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-                UnknownError(`getDocs Firebase syncer "${err}"`)
-            );
+            return querySnapshotResult;
         }
 
         // Convert the docs to `FileNode`.

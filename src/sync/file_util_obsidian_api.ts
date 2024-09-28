@@ -25,7 +25,10 @@ export async function ReadObsidianFile(
     if (!(file instanceof TFile)) {
         return Err(InvalidArgumentError(`Path leads to a non file type "${filePath}"`));
     }
-    const readDataResult = await WrapPromise(app.vault.readBinary(file));
+    const readDataResult = await WrapPromise(
+        app.vault.readBinary(file),
+        /*textForUnknown=*/ `Failed to read binary string`
+    );
     if (readDataResult.err) {
         return readDataResult.mapErr(ConvertToUnknownError(`Failed to read binary string`));
     }
@@ -42,19 +45,21 @@ export async function WriteToObsidianFile(
     const file = app.vault.getAbstractFileByPath(filePath);
     if (file === null) {
         // Route if there is no file pre existing.
-        const createResult = await WrapPromise(app.vault.createBinary(filePath, data, opts));
+        const createResult = await WrapPromise(
+            app.vault.createBinary(filePath, data, opts),
+            /*textForUnknown=*/ `Failed to create file for "${filePath}"`
+        );
         if (createResult.err) {
-            return createResult.mapErr(
-                ConvertToUnknownError(`Failed to create file for "${filePath}"`)
-            );
+            return createResult;
         }
     } else if (file instanceof TFile) {
         // Route if there is an existing file.
-        const modifyResult = await WrapPromise(app.vault.modifyBinary(file, data, opts));
+        const modifyResult = await WrapPromise(
+            app.vault.modifyBinary(file, data, opts),
+            /*textForUnknown=*/ `Failed to modify file for "${filePath}"`
+        );
         if (modifyResult.err) {
-            return modifyResult.mapErr(
-                ConvertToUnknownError(`Failed to modify file for "${filePath}"`)
-            );
+            return modifyResult;
         }
     } else {
         // Route if the path leads to a folder.
@@ -80,7 +85,10 @@ export async function DeleteObsidianFile(
     }
 
     // Now sent the file to trash.
-    const trashResult = await WrapPromise(app.vault.trash(file, /*system=*/ true));
+    const trashResult = await WrapPromise(
+        app.vault.trash(file, /*system=*/ true),
+        /*textForUnknown=*/ `Failed to send to trash local file ${filePath}`
+    );
     if (trashResult.err) {
         return trashResult.mapErr(
             ConvertToUnknownError(`Failed to send to trash local file ${filePath}`)

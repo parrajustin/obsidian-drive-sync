@@ -3,7 +3,6 @@
  * firestore or cloud storgae and keeping the progress viewer up to date.
  */
 
-import { compress, decompress } from "brotli-compress";
 import type { Firestore } from "firebase/firestore";
 import { doc, setDoc } from "firebase/firestore";
 import type { App } from "obsidian";
@@ -16,7 +15,7 @@ import type { StatusError } from "../lib/status_error";
 import { ErrorCode, InternalError, UnknownError } from "../lib/status_error";
 import { uuidv7 } from "../lib/uuid";
 import { WrapPromise } from "../lib/wrap_promise";
-import { AsyncForEach, ConvertToUnknownError } from "../util";
+import { AsyncForEach } from "../util";
 import { DownloadFileFromStorage, UploadFileToStorage } from "./cloud_storage_util";
 import type {
     CloudConvergenceUpdate,
@@ -59,10 +58,12 @@ async function UploadFileToFirestore(
     node: FileNode,
     fileId: string
 ): Promise<StatusResult<StatusError>> {
-    const documentRef = doc(db, `file/${fileId}`).withConverter(GetFileSchemaConverter());
+    const entry = `file/${fileId}`;
+    const documentRef = doc(db, entry).withConverter(GetFileSchemaConverter());
 
-    const setResult = (await WrapPromise(setDoc(documentRef, node))).mapErr(
-        ConvertToUnknownError(`Unknown setDoc Error`)
+    const setResult = await WrapPromise(
+        setDoc(documentRef, node),
+        /*textForUnknown=*/ `Failed to setDoc for ${entry}`
     );
     if (setResult.err) {
         return setResult;
@@ -166,17 +167,36 @@ export function CreateOperationsToUpdateCloud(
                 );
                 view.setEntryProgress(ids.syncerId, fileId, 0.2);
                 if (readDataResult.err) {
-                    return readDataResult.mapErr(
-                        ConvertToUnknownError(`Failed to read binary string`)
-                    );
+                    return readDataResult;
                 }
-                const dataCompresssed = await WrapPromise(compress(readDataResult.safeUnwrap()));
-                view.setEntryProgress(ids.syncerId, fileId, 0.4);
-                if (dataCompresssed.err) {
-                    return dataCompresssed.mapErr(ConvertToUnknownError("Failed to compress data"));
+                // Create the read stream and compress the data.
+                const compressedReadableStream = await WrapPromise(
+                    Promise.resolve(
+                        new ReadableStream({
+                            start(controller) {
+                                controller.enqueue(readDataResult.safeUnwrap());
+                                controller.close();
+                            }
+                        }).pipeThrough(new CompressionStream("gzip"))
+                    ),
+                    /*textForUnknown=*/ `Failed to create stream and compress ${localState.data.fullPath}`
+                );
+                if (compressedReadableStream.err) {
+                    return compressedReadableStream;
                 }
 
-                node.data = Some(dataCompresssed.safeUnwrap());
+                // Convert data to uint8array.
+                const wrappedResponse = new Response(compressedReadableStream.safeUnwrap());
+                const dataCompresssed = await WrapPromise(
+                    wrappedResponse.arrayBuffer(),
+                    /*textForUnknown=*/ `Failed to convert to array buffer`
+                );
+                view.setEntryProgress(ids.syncerId, fileId, 0.4);
+                if (dataCompresssed.err) {
+                    return dataCompresssed;
+                }
+
+                node.data = Some(new Uint8Array(dataCompresssed.safeUnwrap()));
             } else if (writeData) {
                 const uploadCloudStoreResult = await UploadFileToStorage(
                     app,
@@ -224,12 +244,33 @@ async function DownloadCloudUpdate(
     // First check the easy path. The file was small enough to fit into firestore.
     const textData = update.cloudState.safeValue().data.data;
     if (textData.some) {
-        const dataCompresssed = await WrapPromise(decompress(textData.safeValue()));
-        view.setEntryProgress(ids.syncerId, fileId, 0.5);
-        if (dataCompresssed.err) {
-            return dataCompresssed.mapErr(ConvertToUnknownError(`Failed to compress data`));
+        // Create the read stream and decompress the data.
+        const compressedReadableStream = await WrapPromise(
+            Promise.resolve(
+                new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(textData.safeValue());
+                        controller.close();
+                    }
+                }).pipeThrough(new DecompressionStream("gzip"))
+            ),
+            /*textForUnknown=*/ `Failed to decompress ${update.cloudState.safeValue().data.fullPath} from data field`
+        );
+        if (compressedReadableStream.err) {
+            return compressedReadableStream;
         }
-        dataToWrite = Some(dataCompresssed.safeUnwrap());
+
+        // Convert data to uint8array.
+        const wrappedResponse = new Response(compressedReadableStream.safeUnwrap());
+        const dataDecompressed = await WrapPromise(
+            wrappedResponse.arrayBuffer(),
+            /*textForUnknown=*/ `Failed to convert to array buffer`
+        );
+        view.setEntryProgress(ids.syncerId, fileId, 0.5);
+        if (dataDecompressed.err) {
+            return dataDecompressed;
+        }
+        dataToWrite = Some(new Uint8Array(dataDecompressed.safeUnwrap()));
     }
     // Now check if the file was uploaded to cloud storage.
     const cloudStorageRef = update.cloudState.safeValue().data.fileStorageRef;

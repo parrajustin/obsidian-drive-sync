@@ -8,9 +8,8 @@ import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import { TypeGuard } from "../lib/type_guard";
 import type { Result, StatusResult } from "../lib/result";
-import { Err, Ok } from "../lib/result";
+import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
-import { UnknownError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import { uuidv7 } from "../lib/uuid";
 import type { SyncerConfig } from "./syncer";
@@ -28,10 +27,11 @@ async function ReadFileIdWithoutCache(
             if (frontmatter[FILE_ID_FRONTMATTER_KEY] !== undefined) {
                 fileId = Some(frontmatter[FILE_ID_FRONTMATTER_KEY]);
             }
-        })
+        }),
+        /*textForUnknown=*/ `Failed to read frontmatter from "${file.path}".`
     );
     if (processFrontmatter.err) {
-        return Err(UnknownError(`Failed to read frontmatter from "${file.path}".`));
+        return processFrontmatter;
     }
     return Ok(fileId);
 }
@@ -112,10 +112,11 @@ export async function WriteUidToFile(
                 frontmatter[FILE_ID_FRONTMATTER_KEY] = uid;
             },
             dataWriteOptions
-        )
+        ),
+        /*textForUnknown=*/ `Failed to write frontmatter to "${uid}"`
     );
     if (processFrontmatter.err) {
-        return Err(UnknownError(`Failed to write frontmatter to "${uid}".`));
+        return processFrontmatter;
     }
     return Ok();
 }

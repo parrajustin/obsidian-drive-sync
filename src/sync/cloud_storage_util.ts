@@ -8,10 +8,8 @@ import type { App } from "obsidian";
 import type { Result } from "../lib/result";
 import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
-import { UnknownError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import { ReadFile } from "./file_util";
-import { ConvertToUnknownError } from "../util";
 import { ConvertFilePathToLocalDataType } from "./query_util";
 import type { SyncerConfig } from "./syncer";
 
@@ -24,7 +22,8 @@ export async function UploadFileToStorage(
     fileId: string
 ): Promise<Result<string, StatusError>> {
     const storage = getStorage();
-    const storageRef = ref(storage, `${userCreds.user.uid}/${syncConfig.vaultName}/${fileId}`);
+    const outputPath = `${userCreds.user.uid}/${syncConfig.vaultName}/${fileId}`;
+    const storageRef = ref(storage, outputPath);
     const readResult = await ReadFile(
         app,
         filePath,
@@ -34,9 +33,12 @@ export async function UploadFileToStorage(
         return readResult;
     }
 
-    const uploadBytesResult = await WrapPromise(uploadBytes(storageRef, readResult.safeUnwrap()));
+    const uploadBytesResult = await WrapPromise(
+        uploadBytes(storageRef, readResult.safeUnwrap()),
+        /*textForUnknown=*/ `Failed to upload cloud storage bytes for ${outputPath}`
+    );
     if (uploadBytesResult.err) {
-        return uploadBytesResult.mapErr(ConvertToUnknownError("Failed to upload bytes"));
+        return uploadBytesResult;
     }
 
     return Ok(storageRef.fullPath);
@@ -48,12 +50,12 @@ export async function DownloadFileFromStorage(
 ): Promise<Result<ArrayBuffer, StatusError>> {
     const storage = getStorage();
     const storageRef = ref(storage, fileStorageRef);
-    const byteDataResult = await WrapPromise(getBytes(storageRef));
+    const byteDataResult = await WrapPromise(
+        getBytes(storageRef),
+        /*textForUnknown=*/ `Failed to download cloud storage bytes for ${fileStorageRef}`
+    );
     if (byteDataResult.err) {
-        return byteDataResult.mapErr((err) =>
-            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-            UnknownError(`[DownloadFileFromStorage] failed to get bytes. "${err}"`)
-        );
+        return byteDataResult;
     }
 
     return Ok(byteDataResult.safeUnwrap());

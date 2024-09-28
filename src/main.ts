@@ -23,7 +23,6 @@ import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
 import { GetOrCreateSyncProgressView, PROGRESS_VIEW_TYPE, SyncProgressView } from "./progressView";
 import { SetFileSchemaConverter } from "./sync/firestore_schema";
-import { ConvertToUnknownError } from "./util";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -132,11 +131,12 @@ export default class FirestoreSyncPlugin extends Plugin {
         if (email === undefined || password === undefined) {
             return Err(InvalidArgumentError("Email and password must be defined."));
         }
-        const loginResult = await WrapPromise<UserCredential, unknown>(
-            signInWithEmailAndPassword(auth, email, password)
+        const loginResult = await WrapPromise<UserCredential>(
+            signInWithEmailAndPassword(auth, email, password),
+            /*textForUnknown=*/ "Unknown signInWithEmailAndPassword"
         );
         if (loginResult.err) {
-            return loginResult.mapErr(ConvertToUnknownError("Unknown signInWithEmailAndPassword"));
+            return loginResult;
         }
 
         const creds = loginResult.safeUnwrap();

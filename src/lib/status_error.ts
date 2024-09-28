@@ -45,9 +45,10 @@ export class StatusError {
         /* The status error code. */
         public errorCode: ErrorCode,
         /* The attached message for the error. */
-        public message: string
+        public message: string,
+        error?: Error
     ) {
-        const stackLines = new Error().stack!.split("\n").slice(2);
+        const stackLines = (error !== undefined ? error : new Error()).stack!.split("\n").slice(2);
         if (stackLines.length > 0 && (stackLines[0] as string).includes("StatusError")) {
             stackLines.shift();
         }
