@@ -162,10 +162,18 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                 });
                 new Setting(liContainer)
                     .setName("Syncer Id")
-                    .setDesc("Id for the change to identify file change origin.")
+                    .setDesc("Id for the change to identify sycner config origin.")
                     .addText((cb) => {
                         cb.setValue(elem.syncerId).onChange((val) => {
                             elem.syncerId = val;
+                        });
+                    });
+                new Setting(liContainer)
+                    .setName("Vault Name")
+                    .setDesc("Syncing remote devices is done through vault name.")
+                    .addText((cb) => {
+                        cb.setValue(elem.vaultName).onChange((val) => {
+                            elem.vaultName = val;
                         });
                     });
                 new Setting(liContainer)
