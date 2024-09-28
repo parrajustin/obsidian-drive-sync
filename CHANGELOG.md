@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.0.2...v1.0.3) (2024-09-28)
+
+
+### Bug Fixes
+
+* fix release build statements ([6f4ecaf](https://github.com/parrajustin/obsidian-drive-sync/commit/6f4ecaf5bf35ffce58e91c1267c33c4bbd4aa362))
+
 ## [1.0.2](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.0.1...v1.0.2) (2024-09-28)
 
 
