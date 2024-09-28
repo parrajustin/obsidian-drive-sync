@@ -56,9 +56,10 @@ export interface Identifiers {
 async function UploadFileToFirestore(
     db: Firestore,
     node: FileNode,
+    userId: string,
     fileId: string
 ): Promise<StatusResult<StatusError>> {
-    const entry = `file/${fileId}`;
+    const entry = `${userId}/${fileId}`;
     const documentRef = doc(db, entry).withConverter(GetFileSchemaConverter());
 
     const setResult = await WrapPromise(
@@ -80,6 +81,7 @@ async function UploadFileToFirestore(
  * @returns the array of operations taking place.
  */
 export function CreateOperationsToUpdateCloud(
+    userId: string,
     ids: Identifiers,
     db: Firestore,
     localUpdates: (
@@ -214,7 +216,7 @@ export function CreateOperationsToUpdateCloud(
 
             // Upload the data to firestore.
             const uploadNode = new FileNode<Some<string>>(node);
-            const uploadCloudState = await UploadFileToFirestore(db, uploadNode, fileId);
+            const uploadCloudState = await UploadFileToFirestore(db, uploadNode, userId, fileId);
             view.setEntryProgress(ids.syncerId, fileId, 0.7);
             if (uploadCloudState.err) {
                 return uploadCloudState;

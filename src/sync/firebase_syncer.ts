@@ -63,7 +63,7 @@ export class FirebaseSyncer {
 
         // Get the file metadata from firestore.
         const queryOfFiles = query(
-            collection(db, "file"),
+            collection(db, creds.user.uid),
             where("userId", "==", creds.user.uid),
             where("vaultName", "==", config.vaultName)
         ).withConverter(GetFileSchemaConverter());
@@ -91,7 +91,7 @@ export class FirebaseSyncer {
     /** Initializes the real time subscription on firestore data. */
     public async initailizeRealTimeUpdates() {
         const queryOfFiles = query(
-            collection(this._db, "file"),
+            collection(this._db, this._creds.user.uid),
             where("userId", "==", this._creds.user.uid),
             where("vaultName", "==", this._config.vaultName)
         ).withConverter(GetFileSchemaConverter());
@@ -185,6 +185,7 @@ export class FirebaseSyncer {
         return Ok([
             ...CreateOperationsToUpdateLocal(ids, cloudUpdates, app, syncConfig),
             ...CreateOperationsToUpdateCloud(
+                this._creds.user.uid,
                 ids,
                 this._db,
                 localUpdates,
