@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.2.0...v1.2.1) (2024-09-28)
+
+
+### Bug Fixes
+
+* change upload path to include the user id ([4410a14](https://github.com/parrajustin/obsidian-drive-sync/commit/4410a14aa28f0a012ea516a316f4029715514cd6))
+* fix firestore rules ([bc06c41](https://github.com/parrajustin/obsidian-drive-sync/commit/bc06c41120aa90661845860b28f41f25a5bd91de))
+
 ## [1.2.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.1.0...v1.2.0) (2024-09-28)
 
 
