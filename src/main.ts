@@ -22,6 +22,7 @@ import { LogError } from "./log";
 import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
 import { GetOrCreateSyncProgressView, PROGRESS_VIEW_TYPE, SyncProgressView } from "./progressView";
+import { SetFileSchemaConverter } from "./sync/firestore_schema";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -74,6 +75,7 @@ export default class FirestoreSyncPlugin extends Plugin {
 
             // If there are actually any user creds resolve the promise.
             if (this.userCreds.some) {
+                SetFileSchemaConverter(this, this.userCreds.safeValue());
                 this.loggedInResolve(this.userCreds.safeValue());
             }
         }
@@ -107,6 +109,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         }
         this.userCreds = cred.safeUnwrap();
         if (this.userCreds.some) {
+            SetFileSchemaConverter(this, this.userCreds.safeValue());
             this.loggedInResolve(this.userCreds.safeValue());
         }
         return Ok();

@@ -21,7 +21,9 @@ function CreateAllFileConfig(): SyncerConfig {
         syncQuery: "*",
         rawFileSyncQuery: "f:^.obsidian",
         obsidianFileSyncQuery: "-f:^.obsidian",
-        fileIdFileQuery: "-f:template"
+        fileIdFileQuery: "-f:template",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        vaultName: ((window as any).app as App).vault.getName() ?? ""
     };
 }
 
@@ -33,7 +35,9 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         syncQuery: "*",
         rawFileSyncQuery: "f:^.obsidian.*.(json|css)$ -f:obsidian-drive-sync/data.json",
         obsidianFileSyncQuery: "-f:^.obsidian",
-        fileIdFileQuery: "-f:template"
+        fileIdFileQuery: "-f:template",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        vaultName: ((window as any).app as App).vault.getName() ?? ""
     };
 }
 

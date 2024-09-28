@@ -38,6 +38,8 @@ export enum RootSyncType {
 
 export interface SyncerConfig {
     type: RootSyncType;
+    /** The name of the vault, to connect remote syncers. */
+    vaultName: string;
     /** Sync config identifier. */
     syncerId: string;
     /** If data storage encryption is enabled. Only encrypts the data. */
@@ -227,7 +229,7 @@ export class FileSyncer {
             this._touchedFilepaths.add(path);
             return;
         }
-        optNode.safeValue().deleted = true;
+        optNode.safeValue().data.deleted = true;
     }
 
     /** Handle the renaming of files. */
@@ -258,9 +260,9 @@ export class FileSyncer {
         const pathSplit = path.split("/");
         const fileName = pathSplit.pop() as string;
         const [baseName, extension] = fileName.split(".") as [string, string | undefined];
-        node.baseName = baseName;
-        node.extension = extension ?? "";
-        node.fullPath = path;
+        node.data.baseName = baseName;
+        node.data.extension = extension ?? "";
+        node.data.fullPath = path;
     }
 
     /** Execute a filesyncer tick. */
@@ -397,8 +399,10 @@ export class FileSyncer {
                     results.push(update);
                     break;
                 case ConvergenceAction.NULL_UPDATE:
-                    update.localState.safeValue().fileId = update.cloudState.safeValue().fileId;
-                    update.localState.safeValue().userId = update.cloudState.safeValue().userId;
+                    update.localState.safeValue().data.fileId =
+                        update.cloudState.safeValue().data.fileId;
+                    update.localState.safeValue().data.userId =
+                        update.cloudState.safeValue().data.userId;
             }
         }
         return results;

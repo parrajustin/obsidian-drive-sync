@@ -12,64 +12,50 @@ interface LocalRawFile {
 export type LocalDataType = LocalObsidianFile | LocalRawFile;
 
 export interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
+    /** Full filepath. */
     fullPath: string;
+    /** The creation time. */
     ctime: number;
+    /** The modification time. */
     mtime: number;
+    /** Size of the file in bytes. */
     size: number;
+    /** Filename without the extension. */
     baseName: string;
+    /** File extension (example ".md"). */
     extension: string;
+    /** Uid of the file. */
     fileId: TypeOfData;
+    /** The user id of the authenticated user who made this file. */
     userId: TypeOfData;
+    /** Only set by the firestore. */
     deleted: boolean;
-    data?: Uint8Array;
-    fileStorageRef?: string;
+    /** Name of the vault this belongs to. */
+    vaultName: string;
+    /** Data from the cloud storage compress with brotli encoded in uint8. */
+    data: Option<Uint8Array>;
+    /** Storage path on cloud storage if any. */
+    fileStorageRef: Option<string>;
+    /** If this is a local file this denotes where the data is. */
     localDataType: Option<LocalDataType>;
+    /** The id of the device. */
+    deviceId: Option<string>;
+    /** The syncer config id that pushed the update. */
+    syncerConfigId: string;
 }
 
 /** File node for book keeping. */
 export class FileNode<TypeOfData extends Option<string> = Option<string>> {
-    /** Full filepath. */
-    public fullPath: string;
-    /** The creation time. */
-    public ctime: number;
-    /** The modification time. */
-    public mtime: number;
-    /** Size of the file in bytes. */
-    public size: number;
-    /** Filename without the extension. */
-    public baseName: string;
-    /** File extension (example ".md"). */
-    public extension: string;
-    /** Uid of the file. */
-    public fileId: TypeOfData;
-    /** The user id of the authenticated user who made this file. */
-    public userId: TypeOfData;
-    /** Only set by the firestore. */
-    public deleted: boolean;
-    /** Data from the cloud storage compress with brotli encoded in uint8. */
-    public data?: Uint8Array;
-    /** Storage path on cloud storage if any. */
-    public fileStorageRef?: string;
-    /** If this is a local file this denotes where the data is. */
-    public localDataType: Option<LocalDataType>;
-
-    constructor(config: FileNodeParams<TypeOfData>) {
-        this.fullPath = config.fullPath;
-        this.ctime = config.ctime;
-        this.mtime = config.mtime;
-        this.size = config.size;
-        this.baseName = config.baseName;
-        this.extension = config.extension;
-        this.fileId = config.fileId;
-        this.userId = config.userId;
-        this.deleted = config.deleted;
-        this.data = config.data;
-        this.fileStorageRef = config.fileStorageRef;
-        this.localDataType = config.localDataType;
-    }
+    constructor(public data: FileNodeParams<TypeOfData>) {}
 
     /** Constructs the FileNode from TFiles. */
-    public static constructFromTFile(fullPath: string, file: TFile, fileId: Option<string>) {
+    public static constructFromTFile(
+        vaultName: string,
+        syncerConfigId: string,
+        fullPath: string,
+        file: TFile,
+        fileId: Option<string>
+    ) {
         const backingdata: LocalDataType = {
             type: "OBSIDIAN"
         };
@@ -83,25 +69,48 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
             fileId: fileId,
             userId: None,
             deleted: false,
-            localDataType: Some(backingdata)
-        } as FileNodeParams);
+            vaultName,
+            data: None,
+            fileStorageRef: None,
+            localDataType: Some(backingdata),
+            deviceId: None,
+            syncerConfigId: syncerConfigId
+        });
     }
 
+    /** Overwrite most entries except `localDataType`. */
     public overwrite(other: FileNode<TypeOfData>) {
-        this.fullPath = other.fullPath;
-        this.ctime = other.ctime;
-        this.mtime = other.mtime;
-        this.size = other.size;
-        this.baseName = other.baseName;
-        this.extension = other.extension;
-        this.fileId = other.fileId;
-        this.userId = other.userId;
-        this.deleted = other.deleted;
-        this.data = other.data;
-        this.fileStorageRef = other.fileStorageRef;
+        this.data.fullPath = other.data.fullPath;
+        this.data.ctime = other.data.ctime;
+        this.data.mtime = other.data.mtime;
+        this.data.size = other.data.size;
+        this.data.baseName = other.data.baseName;
+        this.data.extension = other.data.extension;
+        this.data.fileId = other.data.fileId;
+        this.data.userId = other.data.userId;
+        this.data.deleted = other.data.deleted;
+        this.data.data = other.data.data;
+        this.data.fileStorageRef = other.data.fileStorageRef;
+        // localDataType not overwritten.
+        // vault name should not change so no need to overwrite it.
+        // this.data.vaultName = other.data.vaultName;
+        this.data.deviceId = other.data.deviceId;
+        this.data.syncerConfigId = other.data.syncerConfigId;
+    }
+
+    /** Overwrite metadata from the cloud. */
+    public overwriteMetadata(other: FileNode<TypeOfData>) {
+        this.data.fileId = other.data.fileId;
+        this.data.userId = other.data.userId;
+        // Vault name is fixed.
+        // this.data.vaultName = other.data.vaultName;
+        // Device id is set from config.
+        // this.data.deviceId = other.data.deviceId;
+        // Syncer config should be set at creation.
+        // this.data.syncerConfigId = other.data.syncerConfigId;
     }
 
     public toString() {
-        return this.fullPath;
+        return this.data.fullPath;
     }
 }

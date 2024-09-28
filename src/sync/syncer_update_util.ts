@@ -5,7 +5,7 @@
 
 import { compress, decompress } from "brotli-compress";
 import type { Firestore } from "firebase/firestore";
-import { Bytes, doc, setDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
 import type { Option } from "../lib/option";
@@ -28,7 +28,7 @@ import type {
 } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { WriteUidToFile } from "./file_id_util";
-import type { FileDbModel } from "./firestore_schema";
+import { GetFileSchemaConverter } from "./firestore_schema";
 import type { UserCredential } from "firebase/auth";
 import type { SyncProgressView } from "../progressView";
 import { GetOrCreateSyncProgressView } from "../progressView";
@@ -41,7 +41,8 @@ import {
     ConvertFilePathToLocalDataType,
     IsLocalFileRaw
 } from "./query_util";
-import type { LocalDataType } from "./file_node";
+import type { FileNodeParams, LocalDataType } from "./file_node";
+import { FileNode } from "./file_node";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
@@ -55,10 +56,10 @@ export interface Identifiers {
 /** Upload the file to firestore. */
 async function UploadFileToFirestore(
     db: Firestore,
-    node: FileDbModel,
+    node: FileNode,
     fileId: string
 ): Promise<StatusResult<StatusError>> {
-    const documentRef = doc(db, `file/${fileId}`);
+    const documentRef = doc(db, `file/${fileId}`).withConverter(GetFileSchemaConverter());
 
     const setResult = (await WrapPromise(setDoc(documentRef, node))).mapErr(
         ConvertToUnknownError(`Unknown setDoc Error`)
@@ -95,50 +96,64 @@ export function CreateOperationsToUpdateCloud(
             const view = await GetOrCreateSyncProgressView(app, /*reveal=*/ false);
             // Get the file id.
             const fileId = update.cloudState.some
-                ? update.cloudState.safeValue().fileId.safeValue()
-                : update.localState.safeValue().fileId.valueOr(uuidv7());
+                ? update.cloudState.safeValue().data.fileId.safeValue()
+                : update.localState.safeValue().data.fileId.valueOr(uuidv7());
             const localState = update.localState.safeValue();
-            const tooBigForFirestore = localState.size > ONE_HUNDRED_KB_IN_BYTES;
+            const tooBigForFirestore = localState.data.size > ONE_HUNDRED_KB_IN_BYTES;
             const writeData = update.action !== ConvergenceAction.USE_LOCAL_DELETE_CLOUD;
 
             // For times we have to replace id do that first.
             if (update.action === ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID) {
-                const file = app.vault.getAbstractFileByPath(localState.fullPath);
+                const file = app.vault.getAbstractFileByPath(localState.data.fullPath);
                 if (file === null || !(file instanceof TFile)) {
                     return Err(
                         InternalError(
-                            `USE_LOCAL_BUT_REPLACE_ID expect "${localState.fullPath}" to be obsidian file`
+                            `USE_LOCAL_BUT_REPLACE_ID expect "${localState.data.fullPath}" to be obsidian file`
                         )
                     );
                 }
                 const writeUid = await WriteUidToFile(app, syncConfig, file, fileId, {
-                    mtime: update.cloudState.safeValue().mtime
+                    mtime: update.cloudState.safeValue().data.mtime
                 });
                 if (writeUid.err) {
                     return writeUid;
                 }
             }
 
-            const node: FileDbModel = {
-                path: localState.fullPath,
-                cTime: localState.ctime,
-                mTime: localState.mtime,
-                size: localState.size,
-                baseName: localState.baseName,
-                ext: localState.extension,
-                userId: creds.user.uid,
-                deleted: update.localState.safeValue().deleted
+            const node: FileNodeParams<Some<string>> = {
+                fullPath: localState.data.fullPath,
+                ctime: localState.data.ctime,
+                mtime: localState.data.mtime,
+                size: localState.data.size,
+                baseName: localState.data.baseName,
+                extension: localState.data.extension,
+                fileId: Some(fileId),
+                userId: Some(creds.user.uid),
+                deleted: update.localState.safeValue().data.deleted,
+                vaultName: syncConfig.vaultName,
+                // Metadata.
+                data: None,
+                fileStorageRef: None,
+                localDataType: None,
+                deviceId: None,
+                syncerConfigId: syncConfig.syncerId
             };
 
             const initalFileName: Option<string> = update.cloudState.andThen<string>(
                 (cloudStateNode) => {
-                    if (cloudStateNode.fullPath !== localState.fullPath) {
-                        return Some(cloudStateNode.fullPath);
+                    if (cloudStateNode.data.fullPath !== localState.data.fullPath) {
+                        return Some(cloudStateNode.data.fullPath);
                     }
                     return None;
                 }
             );
-            view.addEntry(ids.syncerId, fileId, initalFileName, localState.fullPath, update.action);
+            view.addEntry(
+                ids.syncerId,
+                fileId,
+                initalFileName,
+                localState.data.fullPath,
+                update.action
+            );
             view.setEntryProgress(ids.syncerId, fileId, 0.1);
 
             // Handle how the data is stored.
@@ -146,7 +161,7 @@ export function CreateOperationsToUpdateCloud(
                 // When the data is small enough compress it and upload to
                 const readDataResult = await ReadFile(
                     app,
-                    localState.fullPath,
+                    localState.data.fullPath,
                     ConvertFileNodeToLocalDataType(update.localState.safeValue(), syncConfig)
                 );
                 view.setEntryProgress(ids.syncerId, fileId, 0.2);
@@ -161,12 +176,12 @@ export function CreateOperationsToUpdateCloud(
                     return dataCompresssed.mapErr(ConvertToUnknownError("Failed to compress data"));
                 }
 
-                node.data = Bytes.fromUint8Array(dataCompresssed.safeUnwrap());
+                node.data = Some(dataCompresssed.safeUnwrap());
             } else if (writeData) {
                 const uploadCloudStoreResult = await UploadFileToStorage(
                     app,
                     syncConfig,
-                    localState.fullPath,
+                    localState.data.fullPath,
                     creds,
                     fileId
                 );
@@ -174,19 +189,19 @@ export function CreateOperationsToUpdateCloud(
                 if (uploadCloudStoreResult.err) {
                     return uploadCloudStoreResult;
                 }
-                node.fileStorageRef = uploadCloudStoreResult.safeUnwrap();
+                node.fileStorageRef = Some(uploadCloudStoreResult.safeUnwrap());
             }
 
             // Upload the data to firestore.
-            const uploadCloudState = await UploadFileToFirestore(db, node, fileId);
+            const uploadNode = new FileNode<Some<string>>(node);
+            const uploadCloudState = await UploadFileToFirestore(db, uploadNode, fileId);
             view.setEntryProgress(ids.syncerId, fileId, 0.7);
             if (uploadCloudState.err) {
                 return uploadCloudState;
             }
 
             // Update the local file node.
-            update.localState.safeValue().fileId = Some(fileId);
-            update.localState.safeValue().userId = Some(creds.user.uid);
+            update.localState.safeValue().overwriteMetadata(uploadNode);
 
             view.setEntryProgress(ids.syncerId, fileId, 1.0);
             return Ok();
@@ -207,9 +222,9 @@ async function DownloadCloudUpdate(
     let dataToWrite: Option<Uint8Array> = None;
 
     // First check the easy path. The file was small enough to fit into firestore.
-    const textData = update.cloudState.safeValue().data;
-    if (textData !== undefined) {
-        const dataCompresssed = await WrapPromise(decompress(textData));
+    const textData = update.cloudState.safeValue().data.data;
+    if (textData.some) {
+        const dataCompresssed = await WrapPromise(decompress(textData.safeValue()));
         view.setEntryProgress(ids.syncerId, fileId, 0.5);
         if (dataCompresssed.err) {
             return dataCompresssed.mapErr(ConvertToUnknownError(`Failed to compress data`));
@@ -217,9 +232,9 @@ async function DownloadCloudUpdate(
         dataToWrite = Some(dataCompresssed.safeUnwrap());
     }
     // Now check if the file was uploaded to cloud storage.
-    const cloudStorageRef = update.cloudState.safeValue().fileStorageRef;
-    if (cloudStorageRef !== undefined) {
-        const getDataResult = await DownloadFileFromStorage(cloudStorageRef);
+    const cloudStorageRef = update.cloudState.safeValue().data.fileStorageRef;
+    if (cloudStorageRef.some) {
+        const getDataResult = await DownloadFileFromStorage(cloudStorageRef.safeValue());
         view.setEntryProgress(ids.syncerId, fileId, 0.5);
         if (getDataResult.err) {
             return getDataResult;
@@ -233,17 +248,17 @@ async function DownloadCloudUpdate(
     view.setEntryProgress(ids.syncerId, fileId, 0.5);
 
     const localDataType: LocalDataType = ConvertFilePathToLocalDataType(
-        update.cloudState.safeValue().fullPath,
+        update.cloudState.safeValue().data.fullPath,
         syncConfig
     );
     const writeResult = await WriteFile(
         app,
-        update.cloudState.safeValue().fullPath,
+        update.cloudState.safeValue().data.fullPath,
         dataToWrite.safeValue(),
         localDataType,
         {
-            ctime: update.cloudState.safeValue().ctime,
-            mtime: update.cloudState.safeValue().mtime
+            ctime: update.cloudState.safeValue().data.ctime,
+            mtime: update.cloudState.safeValue().data.mtime
         }
     );
     view.setEntryProgress(ids.syncerId, fileId, 0.75);
@@ -269,11 +284,11 @@ export function CreateOperationsToUpdateLocal(
 ): Promise<StatusResult<StatusError>>[] {
     const ops = AsyncForEach(cloudUpdates, async (update): Promise<StatusResult<StatusError>> => {
         const view = await GetOrCreateSyncProgressView(app, /*reveal=*/ false);
-        const fileId = update.cloudState.safeValue().fileId.safeValue();
+        const fileId = update.cloudState.safeValue().data.fileId.safeValue();
 
         const initalFileName: Option<string> = update.localState.andThen<string>((localState) => {
-            if (localState.fullPath !== update.cloudState.safeValue().fullPath) {
-                return Some(localState.fullPath);
+            if (localState.data.fullPath !== update.cloudState.safeValue().data.fullPath) {
+                return Some(localState.data.fullPath);
             }
             return None;
         });
@@ -282,7 +297,7 @@ export function CreateOperationsToUpdateLocal(
             ids.syncerId,
             fileId,
             initalFileName,
-            update.cloudState.safeValue().fullPath,
+            update.cloudState.safeValue().data.fullPath,
             update.action
         );
 
@@ -301,7 +316,7 @@ export function CreateOperationsToUpdateLocal(
             }
         } else if (update.action === ConvergenceAction.USE_CLOUD_DELETE_LOCAL) {
             // For `USE_CLOUD_DELETE_LOCAL` update leave it to the delete left over file system.
-            update.leftOverLocalFile = Some(update.cloudState.safeValue().fullPath);
+            update.leftOverLocalFile = Some(update.cloudState.safeValue().data.fullPath);
             view.setEntryProgress(ids.syncerId, fileId, 0.5);
         }
 

@@ -39,13 +39,20 @@ async function GetObsidianNode(
         return fileIdResult;
     }
 
-    const node = FileNode.constructFromTFile(fileName, file, fileIdResult.safeUnwrap());
+    const node = FileNode.constructFromTFile(
+        config.vaultName,
+        config.syncerId,
+        fileName,
+        file,
+        fileIdResult.safeUnwrap()
+    );
     return Ok(Some(node));
 }
 
 /** Gets the raw file ndoe. */
 async function GetRawNode(
     app: App,
+    config: SyncerConfig,
     fileName: string
 ): Promise<Result<Option<FileNode<Option<string>>>, StatusError>> {
     const fileStat = await WrapPromise(app.vault.adapter.stat(fileName));
@@ -64,7 +71,7 @@ async function GetRawNode(
     const file = path.pop() as string;
     const [baseName, extension] = file.split(".") as [string, string | undefined];
     const dataType: LocalDataType = { type: "RAW" };
-    const config: FileNodeParams<None> = {
+    const nodeParams: FileNodeParams<None> = {
         fullPath: fileName,
         ctime: stat.ctime,
         mtime: stat.mtime,
@@ -74,9 +81,14 @@ async function GetRawNode(
         fileId: None,
         userId: None,
         localDataType: Some(dataType),
-        deleted: false
+        deleted: false,
+        vaultName: config.vaultName,
+        data: None,
+        fileStorageRef: None,
+        deviceId: None,
+        syncerConfigId: config.syncerId
     };
-    const node = new FileNode(config);
+    const node = new FileNode(nodeParams);
     return Ok(Some(node));
 }
 
@@ -100,22 +112,22 @@ export async function UpdateFileMapWithChanges(
     let flatNodes = FlattenFileNodes(fileMap);
 
     for (const node of changedNodes) {
-        checkedPaths.add(node.fullPath);
-        const dataType = node.localDataType;
+        checkedPaths.add(node.data.fullPath);
+        const dataType = node.data.localDataType;
         if (dataType.none) {
             return Err(
-                UnknownError(`Somehow trying to update a cloud node for "${node.fullPath}"`)
+                UnknownError(`Somehow trying to update a cloud node for "${node.data.fullPath}"`)
             );
         }
         const newNodeResult = await (dataType.safeValue().type === "RAW"
-            ? GetRawNode(app, node.fullPath)
-            : GetObsidianNode(app, config, node.fullPath));
+            ? GetRawNode(app, config, node.data.fullPath)
+            : GetObsidianNode(app, config, node.data.fullPath));
         if (newNodeResult.err) {
             return newNodeResult;
         }
         const optNode = newNodeResult.safeUnwrap();
         if (optNode.none) {
-            return Err(UnknownError(`No node found! "${node.fullPath}"`));
+            return Err(UnknownError(`No node found! "${node.data.fullPath}"`));
         }
         node.overwrite(optNode.safeValue());
     }
@@ -144,7 +156,7 @@ export async function UpdateFileMapWithChanges(
             newNode = fileResult.safeUnwrap();
         }
         if (IsLocalFileRaw(path, config)) {
-            const fileResult = await GetRawNode(app, path);
+            const fileResult = await GetRawNode(app, config, path);
             if (fileResult.err) {
                 return fileResult;
             }
@@ -162,7 +174,8 @@ export async function UpdateFileMapWithChanges(
         } else if (origNode.some && newNode.some) {
             // Both file nodes exist, merge information.
             const fileIdsAreTheSame =
-                origNode.safeValue().fileId.valueOr("") === newNode.safeValue().fileId.valueOr("");
+                origNode.safeValue().data.fileId.valueOr("") ===
+                newNode.safeValue().data.fileId.valueOr("");
             if (!fileIdsAreTheSame) {
                 // Filter out the original node.
                 flatNodes = flatNodes.filter((node) => node !== origNode.safeValue());
@@ -183,8 +196,8 @@ export function FilterFileNodes<TypeOfData extends Option<string> = Option<strin
 ): FileNode<TypeOfData>[] {
     return nodes.filter(
         (n) =>
-            IsAcceptablePath(n.fullPath, config) &&
-            (IsObsidianFile(n.fullPath, config) || IsLocalFileRaw(n.fullPath, config))
+            IsAcceptablePath(n.data.fullPath, config) &&
+            (IsObsidianFile(n.data.fullPath, config) || IsLocalFileRaw(n.data.fullPath, config))
     );
 }
 
@@ -216,7 +229,7 @@ export async function GetAllFileNodes(
                 }
             }
             if (IsLocalFileRaw(fullPath, config)) {
-                const fileResult = await GetRawNode(app, fullPath);
+                const fileResult = await GetRawNode(app, config, fullPath);
                 if (fileResult.err) {
                     return fileResult;
                 }
@@ -254,9 +267,9 @@ export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Opt
     const mapOfNodes: FileMapOfNodes<TypeOfData> = new Map();
 
     for (const node of arry) {
-        const pathSplit = node.fullPath.split("/");
+        const pathSplit = node.data.fullPath.split("/");
         if (pathSplit.length === 0) {
-            return Err(InternalError(`No path nodes found. "${node.fullPath}"`));
+            return Err(InternalError(`No path nodes found. "${node.data.fullPath}"`));
         }
         // Remove the last element which is the filename itself.
         const finalFileName = pathSplit.pop() as string;
@@ -271,13 +284,15 @@ export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Opt
             const selectedFolderNode = folderNode.get(path);
             if (selectedFolderNode === undefined) {
                 return Err(
-                    InternalError(`GetFileMapOfNodes path "${node.fullPath}" somehow undefined!`)
+                    InternalError(
+                        `GetFileMapOfNodes path "${node.data.fullPath}" somehow undefined!`
+                    )
                 );
             }
             if (selectedFolderNode instanceof FileNodeArray) {
                 return Err(
                     InternalError(
-                        `GetFileMapOfNodes found a file array when expecting a folder "${node.fullPath}".`
+                        `GetFileMapOfNodes found a file array when expecting a folder "${node.data.fullPath}".`
                     )
                 );
             }
@@ -292,17 +307,17 @@ export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Opt
             // Validate to make sure there aren't more than 1 not deleted file at a file path.
             let countNonDeleted = 0;
             for (const deletedCheckNode of folderArray.nodes) {
-                if (!deletedCheckNode.deleted) {
+                if (!deletedCheckNode.data.deleted) {
                     countNonDeleted++;
                 }
             }
             if (countNonDeleted > 1) {
                 return Err(
-                    InternalError(`Found multiple not deleted files at "${node.fullPath}".`)
+                    InternalError(`Found multiple not deleted files at "${node.data.fullPath}".`)
                 );
             }
         } else {
-            return Err(InternalError(`Found a folder at final path for "${node.fullPath}".`));
+            return Err(InternalError(`Found a folder at final path for "${node.data.fullPath}".`));
         }
     }
 
@@ -346,11 +361,11 @@ export function MapByFileId<TypeOfData extends Option<string> = Option<string>>(
 ): Map<string, FileNode<TypeOfData>> {
     const map = new Map<string, FileNode<TypeOfData>>();
     for (const node of arry) {
-        if (node.fileId.none) {
+        if (node.data.fileId.none) {
             continue;
         }
 
-        map.set(node.fileId.safeValue(), node);
+        map.set(node.data.fileId.safeValue(), node);
     }
     return map;
 }
@@ -385,7 +400,7 @@ export function GetNonDeletedByFilePath<TypeOfData extends Option<string> = Opti
         return Err(InvalidArgumentError(`path "${filePath}" does not lead to a leaf node.`));
     }
     // Ensure there is only a single not deleted node.
-    const nonDeletedNodes = expectingNodeArry.nodes.filter((node) => !node.deleted);
+    const nonDeletedNodes = expectingNodeArry.nodes.filter((node) => !node.data.deleted);
     if (nonDeletedNodes.length > 1) {
         return Err(InternalError(`path "${filePath}" leads to several non deleted nodes!`));
     } else if (nonDeletedNodes.length === 0) {

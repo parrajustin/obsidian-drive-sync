@@ -19,7 +19,7 @@ import { Err, Ok, type StatusResult } from "../lib/result";
 import { InternalError, UnknownError, type StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
-import { FileSchemaConverter } from "./firestore_schema";
+import { GetFileSchemaConverter } from "./firestore_schema";
 import { WrapPromise } from "../lib/wrap_promise";
 import type {
     CloudConvergenceUpdate,
@@ -65,7 +65,7 @@ export class FirebaseSyncer {
         const queryOfFiles = query(
             collection(db, "file"),
             where("userId", "==", creds.user.uid)
-        ).withConverter(new FileSchemaConverter(creds));
+        ).withConverter(GetFileSchemaConverter());
         const querySnapshotResult = await WrapPromise(getDocs(queryOfFiles));
         if (querySnapshotResult.err) {
             return querySnapshotResult.mapErr((err) =>
@@ -92,7 +92,7 @@ export class FirebaseSyncer {
         const queryOfFiles = query(
             collection(this._db, "file"),
             where("userId", "==", this._creds.user.uid)
-        ).withConverter(new FileSchemaConverter(this._creds));
+        ).withConverter(GetFileSchemaConverter());
 
         this._unsubscribe = Some(
             onSnapshot(queryOfFiles, (querySnapshot) => {
@@ -103,21 +103,11 @@ export class FirebaseSyncer {
                         return;
                     }
                     const node = doc.data() as FileNode<Some<string>>;
-                    const localRep = mapOfFiles.get(node.fileId.safeValue());
+                    const localRep = mapOfFiles.get(node.data.fileId.safeValue());
                     if (localRep === undefined) {
                         flatFiles.push(node);
                     } else {
-                        localRep.baseName = node.baseName;
-                        localRep.ctime = node.ctime;
-                        localRep.data = node.data;
-                        localRep.deleted = node.deleted;
-                        localRep.extension = node.extension;
-                        localRep.fileId = node.fileId;
-                        localRep.fileStorageRef = node.fileStorageRef;
-                        localRep.fullPath = node.fullPath;
-                        localRep.mtime = node.mtime;
-                        localRep.size = node.size;
-                        localRep.userId = node.userId;
+                        localRep.overwrite(node);
                     }
                 });
                 const convertToNodesResult = ConvertArrayOfNodesToMap<Some<string>>(

@@ -81,7 +81,7 @@ export function ConvertFileNodeToLocalDataType(
     node: FileNode,
     config: SyncerConfig
 ): LocalDataType {
-    return node.localDataType.valueOr<LocalDataType>(
-        ConvertFilePathToLocalDataType(node.fullPath, config)
+    return node.data.localDataType.valueOr<LocalDataType>(
+        ConvertFilePathToLocalDataType(node.data.fullPath, config)
     );
 }
