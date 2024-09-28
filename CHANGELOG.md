@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.0.4...v1.1.0) (2024-09-28)
+
+
+### Features
+
+* Add ability to reset settings ([b59a081](https://github.com/parrajustin/obsidian-drive-sync/commit/b59a081967c7bf65f839f0f076067528055d2dd8))
+
+
+### Bug Fixes
+
+* add templator as a default filtered out file path for file ids ([9b96bb8](https://github.com/parrajustin/obsidian-drive-sync/commit/9b96bb854c87158eb64f6311da15ddf7aa431383))
+* fix bug with duplicate progress views being created ([35986ba](https://github.com/parrajustin/obsidian-drive-sync/commit/35986ba763426c5f2adea8b611ecddc23bc4d4c7))
+* fix version bump js ([0a11a3b](https://github.com/parrajustin/obsidian-drive-sync/commit/0a11a3bfa74a68d38ecd2c26334c87e8b712da41))
+* move cloud storage files to a new dir ([93bef01](https://github.com/parrajustin/obsidian-drive-sync/commit/93bef01ac8b4fda68897d14adda1fdf62401d3a7))
+
 ## [1.0.4](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.0.3...v1.0.4) (2024-09-28)
 
 
