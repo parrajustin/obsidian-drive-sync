@@ -6,7 +6,6 @@ import type { App, DataWriteOptions, TAbstractFile } from "obsidian";
 import { TFile } from "obsidian";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
-import { TypeGuard } from "../lib/type_guard";
 import type { Result, StatusResult } from "../lib/result";
 import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
