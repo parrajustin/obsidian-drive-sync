@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.4](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.3...v1.3.4) (2024-09-29)
+
+
+### Bug Fixes
+
+* Fix bug where when renaming a file the old file node wouldn't be updated ([f77590c](https://github.com/parrajustin/obsidian-drive-sync/commit/f77590cbe6bc9f3a190b1dd0b612cc7ddd24e8d5))
+
 ## [1.3.3](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.2...v1.3.3) (2024-09-29)
 
 
