@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.3](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.2...v1.3.3) (2024-09-29)
+
+
+### Bug Fixes
+
+* fix issues with plugins being synced ([4af3b73](https://github.com/parrajustin/obsidian-drive-sync/commit/4af3b73ff0f5b1b53b2ddfad81f9839d979df64b))
+* If there is local data just use it instead of trying to download data ([7fc3442](https://github.com/parrajustin/obsidian-drive-sync/commit/7fc34421f8491f0b26d0f5dd73451887ba367e82))
+
 ## [1.3.2](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.1...v1.3.2) (2024-09-29)
 
 
