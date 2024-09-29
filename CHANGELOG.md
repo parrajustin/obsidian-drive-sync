@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.5](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.4...v1.3.5) (2024-09-29)
+
+
+### Bug Fixes
+
+* Remove ctime and cache file id ([957486c](https://github.com/parrajustin/obsidian-drive-sync/commit/957486cc216279d0c48ef11638bd6be15ef86169))
+* Remove unused import ([1da38a2](https://github.com/parrajustin/obsidian-drive-sync/commit/1da38a242a59f35894881d937c7bad1e36ecacb8))
+
 ## [1.3.4](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.3...v1.3.4) (2024-09-29)
 
 
