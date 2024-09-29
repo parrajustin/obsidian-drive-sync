@@ -89,7 +89,9 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>> {
         this.data.size = other.data.size;
         this.data.baseName = other.data.baseName;
         this.data.extension = other.data.extension;
-        this.data.fileId = other.data.fileId;
+        if (other.data.fileId.some) {
+            this.data.fileId = other.data.fileId;
+        }
         this.data.userId = other.data.userId;
         this.data.deleted = other.data.deleted;
         this.data.data = other.data.data;

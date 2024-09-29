@@ -176,25 +176,16 @@ export async function UpdateFileMapWithChanges(
         }
 
         if (origNode.none && newNode.none) {
+            // Perfect no nodes!
             continue;
         } else if (origNode.some && newNode.none) {
-            // Couldn't get new file information, maybe the file is gone? just delete the file node.
+            // Couldn't get new file information, maybe the file is gone? just remove the file node.
             flatNodes = flatNodes.filter((node) => node !== origNode.safeValue());
         } else if (origNode.none && newNode.some) {
             // Only found the new file.
             flatNodes.push(newNode.safeValue());
         } else if (origNode.some && newNode.some) {
-            // Both file nodes exist, merge information.
-            const fileIdsAreTheSame =
-                origNode.safeValue().data.fileId.valueOr("") ===
-                newNode.safeValue().data.fileId.valueOr("");
-            if (!fileIdsAreTheSame) {
-                // Filter out the original node.
-                flatNodes = flatNodes.filter((node) => node !== origNode.safeValue());
-                flatNodes.push(newNode.safeValue());
-            } else {
-                origNode.safeValue().overwrite(newNode.safeValue());
-            }
+            origNode.safeValue().overwrite(newNode.safeValue());
         }
     }
 
