@@ -69,6 +69,8 @@ export class FileSyncer {
     private _touchedFilepaths = new Set<string>();
     /** Files that have been changed in some way. */
     private _touchedFileNodes = new Set<FileNode>();
+    /** The following files need to be re read, ex: a file was renamed. */
+    private _needToOverrideSyncToUseLocal = new Set<FileNode>();
     /** Function to handle unsubing the watch func. */
     private _unsubWatchHandler: Option<UnsubFunc> = None;
     /** timeid to kill the tick function. */
@@ -272,6 +274,7 @@ export class FileSyncer {
         node.data.baseName = baseName;
         node.data.extension = extension ?? "";
         node.data.fullPath = path;
+        this._needToOverrideSyncToUseLocal.add(node);
     }
 
     /** Execute a filesyncer tick. */
@@ -333,7 +336,7 @@ export class FileSyncer {
         // Get the updates necessary.
         const convergenceUpdates = this._firebaseSyncer
             .safeValue()
-            .getConvergenceUpdates(this._mapOfFileNodes);
+            .getConvergenceUpdates(this._mapOfFileNodes, this._needToOverrideSyncToUseLocal);
         if (convergenceUpdates.err) {
             return convergenceUpdates;
         }

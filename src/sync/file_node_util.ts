@@ -102,6 +102,7 @@ async function GetRawNode(
  * @param fileMap the preexisting file node tree map
  * @param changedNodes file nodes that have been modified
  * @param changedPath paths that have been changed.
+ * @param fileIdsToBeReRead The file ids that should be reread.
  */
 export async function UpdateFileMapWithChanges(
     app: App,
@@ -110,6 +111,9 @@ export async function UpdateFileMapWithChanges(
     changedNodes: Set<FileNode<Option<string>>>,
     changedPath: Set<string>
 ): Promise<Result<FileMapOfNodes<Option<string>>, StatusError>> {
+    if (changedNodes.size === 0 && changedPath.size === 0) {
+        return Ok(fileMap);
+    }
     // These are all paths that have been checked.
     const checkedPaths = new Set<string>();
     let flatNodes = FlattenFileNodes(fileMap);
@@ -135,12 +139,17 @@ export async function UpdateFileMapWithChanges(
         node.overwrite(optNode.safeValue());
     }
 
+    const updatedFileMap = ConvertArrayOfNodesToMap(flatNodes);
+    if (updatedFileMap.err) {
+        return updatedFileMap;
+    }
+
     for (const path of changedPath) {
         if (checkedPaths.has(path)) {
             continue;
         }
         checkedPaths.add(path);
-        const foundNode = GetNonDeletedByFilePath(fileMap, path);
+        const foundNode = GetNonDeletedByFilePath(updatedFileMap.safeUnwrap(), path);
         if (foundNode.err) {
             // We don't care about errors here. all errors are just bout not files found.
             continue;

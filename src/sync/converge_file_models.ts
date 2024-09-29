@@ -178,6 +178,7 @@ function CreateConvergenceForOnlyCloudNode(
  * @param cloudVisitedByFileId set of visited cloud nodes
  * @param localVisisted set of visited local nodes
  * @param reservedFullPath set of the paths used by an update or existing files
+ * @param overrideUseLocalIfSame an option to use the local file if the only change is the fullpath.
  * @returns Result of a possible update if necessary or error
  */
 export function CompareNodesAndGetUpdate(
@@ -185,7 +186,8 @@ export function CompareNodesAndGetUpdate(
     cloudNode: Option<FileNode<Some<string>>>,
     cloudVisitedByFileId: Set<string>,
     localVisisted: Set<FileNode>,
-    reservedFullPath: Set<string>
+    reservedFullPath: Set<string>,
+    overrideUseLocalIfSame: boolean
 ): Result<Option<ConvergenceUpdate>, StatusError> {
     if (localNode.none && cloudNode.none) {
         // Both nodes empty.
@@ -246,6 +248,7 @@ export function CompareNodesAndGetUpdate(
     // Case where everything is the same.
     if (
         lNode.data.mtime === cNode.data.mtime &&
+        lNode.data.ctime === cNode.data.ctime &&
         lNode.data.fullPath === cNode.data.fullPath &&
         lNode.data.deleted === cNode.data.deleted &&
         (lNode.data.fileId.valueOr("") === cNode.data.fileId.safeValue() || notMarkdownFile) &&
@@ -266,9 +269,35 @@ export function CompareNodesAndGetUpdate(
         return Ok(Some(action));
     }
 
+    // Case where everything is the same but full path but we have overrideUseLocalIfSame. An
+    // example of this would be renaming the files, the mtime and ctime are the same.
+    if (
+        lNode.data.mtime === cNode.data.mtime &&
+        lNode.data.ctime === cNode.data.ctime &&
+        overrideUseLocalIfSame &&
+        lNode.data.deleted === cNode.data.deleted &&
+        (lNode.data.fileId.valueOr("") === cNode.data.fileId.safeValue() || notMarkdownFile) &&
+        lNode.data.size === cNode.data.size
+    ) {
+        // No update needed, everything is the same.
+        localVisisted.add(lNode);
+        cloudVisitedByFileId.add(cNode.data.fileId.safeValue());
+        const pathResult = EnsureReservedPathValidity(reservedFullPath, cNode);
+        if (pathResult.err) {
+            return pathResult;
+        }
+        const action: ConvergenceUpdate = {
+            action: ConvergenceAction.USE_LOCAL,
+            localState: localNode,
+            cloudState: cloudNode
+        };
+        return Ok(Some(action));
+    }
+
     // Case where everything is the same but local file doesn't have a file id.
     if (
         lNode.data.mtime === cNode.data.mtime &&
+        lNode.data.ctime === cNode.data.ctime &&
         lNode.data.fullPath === cNode.data.fullPath &&
         lNode.data.deleted === cNode.data.deleted &&
         lNode.data.fileId.none &&
@@ -292,7 +321,6 @@ export function CompareNodesAndGetUpdate(
     // Case where the local node has been marked for deletion. Only happens when file is watched, as
     // local deletion means the file is gone.
     if (
-        lNode.data.mtime >= cNode.data.mtime &&
         (lNode.data.fileId.valueOr("") === cNode.data.fileId.safeValue() || notMarkdownFile) &&
         lNode.data.deleted &&
         lNode.data.deleted !== cNode.data.deleted
@@ -311,7 +339,7 @@ export function CompareNodesAndGetUpdate(
     // Checks if both have a file id and they are different.
     const bothHaveDifferentFileIds =
         lNode.data.fileId.some && lNode.data.fileId.safeValue() !== cNode.data.fileId.safeValue();
-    if (lNode.data.mtime > cNode.data.mtime) {
+    if (lNode.data.mtime > cNode.data.mtime || lNode.data.ctime > cNode.data.ctime) {
         // The local node is newer, so replace the cloud one.
         localVisisted.add(lNode);
         cloudVisitedByFileId.add(cNode.data.fileId.safeValue());
@@ -359,6 +387,12 @@ export function CompareNodesAndGetUpdate(
     return Ok(Some(action));
 }
 
+export interface ConvergeMapsToUpdateStatesOpts {
+    cloudMapRep: FileMapOfNodes<Some<string>>;
+    localMapRep: FileMapOfNodes;
+    overrideUseLocal: Set<FileNode>;
+}
+
 /**
  * Converges the two (local,cloud) FileNode maps and returns the updates necesary to make them the
  * same.
@@ -366,11 +400,9 @@ export function CompareNodesAndGetUpdate(
  */
 export function ConvergeMapsToUpdateStates({
     cloudMapRep,
-    localMapRep
-}: {
-    cloudMapRep: FileMapOfNodes<Some<string>>;
-    localMapRep: FileMapOfNodes;
-}): Result<ConvergenceUpdate[], StatusError> {
+    localMapRep,
+    overrideUseLocal
+}: ConvergeMapsToUpdateStatesOpts): Result<ConvergenceUpdate[], StatusError> {
     const cloudFlatNodes = FlattenFileNodes(cloudMapRep);
     const localFlatNodes = FlattenFileNodes(localMapRep);
     const localMapOfFileId = MapByFileId(localFlatNodes);
@@ -401,12 +433,14 @@ export function ConvergeMapsToUpdateStates({
         if (localNode === undefined) {
             continue;
         }
+        const shouldUseLocalIfSame = overrideUseLocal.has(localNode);
         const compareResult = CompareNodesAndGetUpdate(
             Some(localNode),
             Some(cloudNode),
             cloudVisitedByFileId,
             localVisisted,
-            reservedFullPath
+            reservedFullPath,
+            shouldUseLocalIfSame
         );
         if (compareResult.err) {
             return compareResult;
@@ -458,12 +492,16 @@ export function ConvergeMapsToUpdateStates({
         }
         const localNode = localPathNodeResult.safeUnwrap();
 
+        const shouldUseLocalIfSame = localNode
+            .andThen((node) => overrideUseLocal.has(node))
+            .valueOr(false);
         const compareResult = CompareNodesAndGetUpdate(
             localNode,
             cloudNode,
             cloudVisitedByFileId,
             localVisisted,
-            reservedFullPath
+            reservedFullPath,
+            shouldUseLocalIfSame
         );
         if (compareResult.err) {
             return compareResult;

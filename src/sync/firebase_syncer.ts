@@ -169,14 +169,16 @@ export class FirebaseSyncer {
 
     /** Gets the convergence updates necessary to sync states. */
     public getConvergenceUpdates(
-        localNodes: FileMapOfNodes
+        localNodes: FileMapOfNodes,
+        localNodeOverwrites: Set<FileNode>
     ): Result<ConvergenceUpdate[], StatusError> {
         if (!this._isValid) {
             return Err(InternalError(`Firebase syncer not in valid state.`));
         }
         return ConvergeMapsToUpdateStates({
             localMapRep: localNodes,
-            cloudMapRep: this._cloudNodes
+            cloudMapRep: this._cloudNodes,
+            overrideUseLocal: localNodeOverwrites
         });
     }
 

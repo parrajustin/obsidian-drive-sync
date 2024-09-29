@@ -69,7 +69,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -148,7 +149,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -239,7 +241,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -345,7 +348,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -413,7 +417,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -495,7 +500,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -581,7 +587,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -648,7 +655,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -729,7 +737,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeFalsy();
         expect(result.val.toString()).toContain(
@@ -825,7 +834,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeFalsy();
         expect(result.val.toString()).toContain(
@@ -883,7 +893,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -945,7 +956,8 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
@@ -957,7 +969,7 @@ describe("ConvergeMapsToUpdateStates", () => {
         ]);
     });
 
-    test("returns no change update for matched nodes", async () => {
+    test("returns use_local for case of file rename", async () => {
         const cloudNodes: FileNode<Some<string>>[] = [
             new FileNode({
                 fullPath: "folder/file_1.png",
@@ -982,13 +994,13 @@ describe("ConvergeMapsToUpdateStates", () => {
         const localNodes: FileNode<Option<string>>[] = [
             new FileNode({
                 fullPath: "folder/file_1.png",
-                ctime: 1000,
+                ctime: 2000,
                 mtime: 1001,
                 size: 1,
                 baseName: "file_1",
                 extension: "png",
-                fileId: None,
-                userId: None,
+                fileId: Some("ID1"),
+                userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
 
@@ -1007,12 +1019,76 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(cloudMapRep.ok).toBeTruthy();
         const result = await ConvergeMapsToUpdateStates({
             localMapRep: localMapRep.unsafeUnwrap(),
-            cloudMapRep: cloudMapRep.unsafeUnwrap()
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set()
         });
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
             {
-                action: "null_update",
+                action: "using_local",
+                localState: Some(localNodes[0]),
+                cloudState: Some(cloudNodes[0])
+            }
+        ]);
+    });
+
+    test("all same but full path should use local", async () => {
+        const cloudNodes: FileNode<Some<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.png",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "png",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: false,
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
+            })
+        ];
+        const localNodes: FileNode<Option<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_2.png",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_2",
+                extension: "png",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: false,
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
+            })
+        ];
+
+        const localMapRep = ConvertArrayOfNodesToMap(localNodes);
+        expect(localMapRep.ok).toBeTruthy();
+        const cloudMapRep = ConvertArrayOfNodesToMap(cloudNodes);
+        expect(cloudMapRep.ok).toBeTruthy();
+        const result = await ConvergeMapsToUpdateStates({
+            localMapRep: localMapRep.unsafeUnwrap(),
+            cloudMapRep: cloudMapRep.unsafeUnwrap(),
+            overrideUseLocal: new Set([localNodes[0] as FileNode])
+        });
+        expect(result.ok).toBeTruthy();
+        expect(result.val).toStrictEqual([
+            {
+                action: "using_local",
                 localState: Some(localNodes[0]),
                 cloudState: Some(cloudNodes[0])
             }
