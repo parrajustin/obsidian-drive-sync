@@ -248,7 +248,8 @@ async function DownloadCloudUpdate(
 
     if (
         update.cloudState.safeValue().data.isFromCloudCache &&
-        update.cloudState.safeValue().data.fileStorageRef.none
+        update.cloudState.safeValue().data.fileStorageRef.none &&
+        update.cloudState.safeValue().data.data.none
     ) {
         // The cloud state if from the cloud cache and has no file storage so we need to fetch the
         // data.
