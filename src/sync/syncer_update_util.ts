@@ -388,7 +388,7 @@ export function CreateOperationsToUpdateLocal(
             }
         } else if (update.action === ConvergenceAction.USE_CLOUD_DELETE_LOCAL) {
             // For `USE_CLOUD_DELETE_LOCAL` update leave it to the delete left over file system.
-            update.leftOverLocalFile = Some(update.cloudState.safeValue().data.fullPath);
+            update.leftOverLocalFile = Some(update.localState.safeValue().data.fullPath);
             view.setEntryProgress(ids.syncerId, fileId, 0.5);
         }
 

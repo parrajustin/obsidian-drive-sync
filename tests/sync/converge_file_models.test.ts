@@ -31,7 +31,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: None,
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -45,7 +52,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -79,7 +93,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -91,7 +112,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "file_2.md",
@@ -103,7 +131,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID3"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -147,7 +182,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -159,7 +201,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const localNodes: FileNode<Some<string>>[] = [
@@ -173,7 +222,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -213,7 +269,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -225,7 +288,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const localNodes: FileNode<Some<string>>[] = [
@@ -239,7 +309,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "file_1.md",
@@ -251,7 +328,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -291,7 +375,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: true,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const localNodes: FileNode<Option<string>>[] = [
@@ -305,7 +396,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: None,
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -340,7 +438,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -352,7 +457,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -366,7 +478,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -405,7 +524,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -417,7 +543,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -431,7 +564,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -470,7 +610,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -484,7 +631,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -518,7 +672,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -530,7 +691,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -544,7 +712,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -574,7 +749,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "folder/file_1/file_2.md",
@@ -586,7 +768,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const cloudNodes: FileNode<Some<string>>[] = [
@@ -600,7 +789,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             }),
             new FileNode({
                 fullPath: "folder/file_1.md",
@@ -612,7 +808,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID2"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -642,7 +845,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const localNodes: FileNode<Some<string>>[] = [
@@ -656,7 +866,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: true,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
@@ -690,7 +907,14 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: Some("ID1"),
                 userId: Some("User1"),
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
         const localNodes: FileNode<Option<string>>[] = [
@@ -704,7 +928,76 @@ describe("ConvergeMapsToUpdateStates", () => {
                 fileId: None,
                 userId: None,
                 deleted: false,
-                localDataType: None
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
+            })
+        ];
+
+        const localMapRep = ConvertArrayOfNodesToMap(localNodes);
+        expect(localMapRep.ok).toBeTruthy();
+        const cloudMapRep = ConvertArrayOfNodesToMap(cloudNodes);
+        expect(cloudMapRep.ok).toBeTruthy();
+        const result = await ConvergeMapsToUpdateStates({
+            localMapRep: localMapRep.unsafeUnwrap(),
+            cloudMapRep: cloudMapRep.unsafeUnwrap()
+        });
+        expect(result.ok).toBeTruthy();
+        expect(result.val).toStrictEqual([
+            {
+                action: "null_update",
+                localState: Some(localNodes[0]),
+                cloudState: Some(cloudNodes[0])
+            }
+        ]);
+    });
+
+    test("returns no change update for matched nodes", async () => {
+        const cloudNodes: FileNode<Some<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.png",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "png",
+                fileId: Some("ID1"),
+                userId: Some("User1"),
+                deleted: false,
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
+            })
+        ];
+        const localNodes: FileNode<Option<string>>[] = [
+            new FileNode({
+                fullPath: "folder/file_1.png",
+                ctime: 1000,
+                mtime: 1001,
+                size: 1,
+                baseName: "file_1",
+                extension: "png",
+                fileId: None,
+                userId: None,
+                deleted: false,
+                localDataType: None,
+
+                fileStorageRef: None,
+                vaultName: "",
+                deviceId: None,
+                data: None,
+                syncerConfigId: "",
+                isFromCloudCache: false
             })
         ];
 
