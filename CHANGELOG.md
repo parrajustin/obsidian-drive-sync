@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.0...v1.3.1) (2024-09-29)
+
+
+### Bug Fixes
+
+* Fix tests and bug with moving files ([babd672](https://github.com/parrajustin/obsidian-drive-sync/commit/babd6722f2c59f21eeb550aa5d191f527d9cdc0d))
+
 ## [1.3.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.2.3...v1.3.0) (2024-09-28)
 
 
