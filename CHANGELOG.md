@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.1...v1.3.2) (2024-09-29)
+
+
+### Bug Fixes
+
+* Fix issue with renaming files ([bbcebfb](https://github.com/parrajustin/obsidian-drive-sync/commit/bbcebfb71115773b86e4230857dbe95acf296d44))
+
 ## [1.3.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.0...v1.3.1) (2024-09-29)
 
 
