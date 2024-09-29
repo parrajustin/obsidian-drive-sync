@@ -35,8 +35,7 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
         syncQuery: "*",
-        rawFileSyncQuery:
-            "f:^.obsidian.*.(json)$ f:^.obsidian/plugins/.*.(js|css)$ -f:obsidian-firebase-sync/data.json ",
+        rawFileSyncQuery: "f:^.obsidian.*.(json)$ -f:^.obsidian/plugins/.*",
         obsidianFileSyncQuery: "-f:^.obsidian",
         fileIdFileQuery: "-f:template -f:templator",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

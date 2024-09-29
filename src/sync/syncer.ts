@@ -321,6 +321,8 @@ export class FileSyncer {
         this._touchedFilepaths = new Set();
         const touchedFileNode = this._touchedFileNodes;
         this._touchedFileNodes = new Set();
+        const needToOverrideSyncToUseLocal = this._needToOverrideSyncToUseLocal;
+        this._needToOverrideSyncToUseLocal = new Set();
         const mergeResult = await UpdateFileMapWithChanges(
             this._plugin.app,
             this._config,
@@ -336,7 +338,7 @@ export class FileSyncer {
         // Get the updates necessary.
         const convergenceUpdates = this._firebaseSyncer
             .safeValue()
-            .getConvergenceUpdates(this._mapOfFileNodes, this._needToOverrideSyncToUseLocal);
+            .getConvergenceUpdates(this._mapOfFileNodes, needToOverrideSyncToUseLocal);
         if (convergenceUpdates.err) {
             return convergenceUpdates;
         }
