@@ -248,7 +248,6 @@ export function CompareNodesAndGetUpdate(
     // Case where everything is the same.
     if (
         lNode.data.mtime === cNode.data.mtime &&
-        lNode.data.ctime === cNode.data.ctime &&
         lNode.data.fullPath === cNode.data.fullPath &&
         lNode.data.deleted === cNode.data.deleted &&
         (lNode.data.fileId.valueOr("") === cNode.data.fileId.safeValue() || notMarkdownFile) &&
@@ -273,7 +272,6 @@ export function CompareNodesAndGetUpdate(
     // example of this would be renaming the files, the mtime and ctime are the same.
     if (
         lNode.data.mtime === cNode.data.mtime &&
-        lNode.data.ctime === cNode.data.ctime &&
         overrideUseLocalIfSame &&
         lNode.data.deleted === cNode.data.deleted &&
         (lNode.data.fileId.valueOr("") === cNode.data.fileId.safeValue() || notMarkdownFile) &&
@@ -297,7 +295,6 @@ export function CompareNodesAndGetUpdate(
     // Case where everything is the same but local file doesn't have a file id.
     if (
         lNode.data.mtime === cNode.data.mtime &&
-        lNode.data.ctime === cNode.data.ctime &&
         lNode.data.fullPath === cNode.data.fullPath &&
         lNode.data.deleted === cNode.data.deleted &&
         lNode.data.fileId.none &&

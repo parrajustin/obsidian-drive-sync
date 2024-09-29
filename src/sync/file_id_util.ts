@@ -45,22 +45,6 @@ export async function GetFileUidFromFrontmatter(
     if (!ShouldHaveFileId(file.path, config)) {
         return Ok(None);
     }
-    // TODO: Need to look into the cache not being read sometimes.
-    const cache = app.metadataCache.getFileCache(file);
-    if (cache === null) {
-        return ReadFileIdWithoutCache(app, file);
-    }
-    const frontmatterCache = cache.frontmatter;
-    if (frontmatterCache === undefined) {
-        return ReadFileIdWithoutCache(app, file);
-    }
-    const uidValue = frontmatterCache[FILE_ID_FRONTMATTER_KEY];
-    if (uidValue === undefined) {
-        return ReadFileIdWithoutCache(app, file);
-    }
-    if (TypeGuard<string>(uidValue, typeof uidValue === "string" || uidValue instanceof String)) {
-        return Ok(Some(uidValue));
-    }
     return ReadFileIdWithoutCache(app, file);
 }
 
