@@ -77,6 +77,7 @@ export class SyncProgressView extends ItemView {
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
+        this.icon = "cloudy";
         const container = this.containerEl.children[1]!;
         container.empty();
         this._headerElement = container.createEl("h2", {
@@ -538,6 +539,9 @@ export async function GetOrCreateSyncProgressView(
     if (leaves.length > 0) {
         // A leaf with our view already exists, use that
         leaf = leaves[0]!;
+        for (let i = 1; i < leaves.length; i++) {
+            leaves[i]!.detach();
+        }
     } else {
         // Our view could not be found in the workspace, create a new leaf
         // in the right sidebar for it
