@@ -53,6 +53,10 @@ export async function WriteUidToAllFilesIfNecessary(
     app: App,
     config: SyncerConfig
 ): Promise<StatusResult<StatusError>> {
+    if (!config.enableFileIdWriting) {
+        return Ok();
+    }
+
     for (const fileName in app.vault.fileMap) {
         if (!ShouldHaveFileId(fileName, config)) {
             continue;
@@ -86,6 +90,9 @@ export async function WriteUidToFile(
     uid: string,
     dataWriteOptions?: DataWriteOptions
 ): Promise<StatusResult<StatusError>> {
+    if (!config.enableFileIdWriting) {
+        return Ok();
+    }
     if (!ShouldHaveFileId(file.path, config)) {
         return Ok();
     }

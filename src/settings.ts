@@ -368,6 +368,14 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     });
                 });
 
+                new Setting(liContainer)
+                    .setName("Enable File Id writing")
+                    .setDesc("The the file ids will be written")
+                    .addToggle((cb) => {
+                        cb.setValue(elem.enableFileIdWriting).onChange((val) => {
+                            elem.enableFileIdWriting = val;
+                        });
+                    });
                 // eslint-disable-next-line @typescript-eslint/no-empty-function
                 let setFileIdFilter: (data: string) => void = () => {};
                 new Setting(liContainer)
