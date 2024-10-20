@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.4.0...v1.4.1) (2024-10-20)
+
+
+### Bug Fixes
+
+* Add settings schema updaters ([47d6d20](https://github.com/parrajustin/obsidian-drive-sync/commit/47d6d20735b1062a332d32bb321d2bd67b545f4d))
+* Fix logic and icon of right leaf progress view ([0a8b4bc](https://github.com/parrajustin/obsidian-drive-sync/commit/0a8b4bc8142f595ff89e3b7c08b73f32a78f2fe9))
+
 ## [1.4.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.5...v1.4.0) (2024-10-20)
 
 
