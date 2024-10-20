@@ -3,7 +3,7 @@ import { ItemView } from "obsidian";
 import { ConvergenceAction } from "./sync/converge_file_models";
 import { None, Some, type Option } from "./lib/option";
 import { ErrorCode, type StatusError } from "./lib/status_error";
-import type { SyncerConfig } from "./sync/syncer";
+import type { SyncerConfig } from "./settings/syncer_config_data";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
 const MAX_NUMBER_OF_CYCLES = 50;

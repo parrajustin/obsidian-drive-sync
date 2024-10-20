@@ -3,7 +3,7 @@ import type { FirebaseApp } from "firebase/app";
 import { initializeApp } from "firebase/app";
 import type { Option } from "./lib/option";
 import { None, Some } from "./lib/option";
-import type { Settings } from "./settings";
+import type { Settings } from "./settings/settings_data";
 import { DEFAULT_SETTINGS, FirebaseSyncSettingTab } from "./settings";
 import type { UserCredential, Auth } from "firebase/auth";
 import {

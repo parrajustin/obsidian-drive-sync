@@ -34,7 +34,7 @@ import { GetOrCreateSyncProgressView } from "../progressView";
 import type { FileMapOfNodes } from "./file_node_util";
 import { GetNonDeletedByFilePath } from "./file_node_util";
 import { DeleteFile, ReadFile, WriteFile } from "./file_util";
-import type { SyncerConfig } from "./syncer";
+import type { SyncerConfig } from "../settings/syncer_config_data";
 import {
     ConvertFileNodeToLocalDataType,
     ConvertFilePathToLocalDataType,

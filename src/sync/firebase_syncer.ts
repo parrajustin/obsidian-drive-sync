@@ -35,7 +35,7 @@ import type { App } from "obsidian";
 import type { Identifiers } from "./syncer_update_util";
 import { CreateOperationsToUpdateCloud, CreateOperationsToUpdateLocal } from "./syncer_update_util";
 import { LogError } from "../log";
-import type { SyncerConfig } from "./syncer";
+import type { SyncerConfig } from "../settings/syncer_config_data";
 import { ConvertMapOfFileNodesToCache, GetFlatFileNodesFromCache } from "./firebase_cache";
 import type FirestoreSyncPlugin from "../main";
 import { ConvertToUnknownError } from "../util";

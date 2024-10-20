@@ -1,6 +1,6 @@
 import { SearchString } from "../lib/search_string_parser";
 import type { FileNode, LocalDataType } from "./file_node";
-import type { SyncerConfig } from "./syncer";
+import type { SyncerConfig } from "../settings/syncer_config_data";
 
 const SEARCH_STRING_CACHE = new Map<string, SearchString>();
 

@@ -11,7 +11,7 @@ import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import { uuidv7 } from "../lib/uuid";
-import type { SyncerConfig } from "./syncer";
+import type { SyncerConfig } from "../settings/syncer_config_data";
 import { ShouldHaveFileId } from "./query_util";
 
 export const FILE_ID_FRONTMATTER_KEY = "File Id";

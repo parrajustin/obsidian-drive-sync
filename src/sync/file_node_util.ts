@@ -11,7 +11,7 @@ import { WrapPromise } from "../lib/wrap_promise";
 import type { FileNodeParams, LocalDataType } from "./file_node";
 import { FileNode } from "./file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
-import type { SyncerConfig } from "./syncer";
+import type { SyncerConfig } from "../settings/syncer_config_data";
 
 /** Flat array of all nodes to a single file path. */
 export class FileNodeArray<TypeOfData extends Option<string> = Option<string>> {

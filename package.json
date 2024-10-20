@@ -7,13 +7,13 @@
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "deploy": "firebase deploy",
-        "prebuild": "eslint",
+        "prebuild": "eslint . --ignore-pattern \"**/*.js\"",
         "build": "node esbuild.config.mjs production",
         "version": "node version-bump.mjs",
         "githubaction": "node version-github-action.mjs",
         "test": "jest",
         "test-dev": "jest --silent=false --verbose=true",
-        "lint": "eslint"
+        "lint": "eslint . --ignore-pattern \"**/*.js\""
     },
     "keywords": [
         "obsidian",
@@ -39,6 +39,7 @@
         "jest-environment-jsdom": "29.7.0",
         "moment": "2.30.1",
         "obsidian": "1.6.6",
+        "pre-commit": "1.2.2",
         "prettier": "3.3.2",
         "ts-jest": "29.2.3",
         "ts-node": "10.9.2",
@@ -46,6 +47,11 @@
         "typescript": "5.6.2",
         "typescript-eslint": "7.15.0"
     },
+    "pre-commit": [
+        "lint",
+        "test",
+        "buid"
+    ],
     "dependencies": {
         "firebase": "10.13.2"
     }

@@ -1,7 +1,8 @@
 import type { App } from "obsidian";
 import { PluginSettingTab, Setting } from "obsidian";
 import type TemplaterPlugin from "main";
-import type { SyncerConfig } from "./sync/syncer";
+import type { SyncerConfig } from "settings/syncer_config_data";
+import type { Settings } from "settings/settings_data";
 import { RootSyncType } from "./sync/syncer";
 import { uuidv7 } from "./lib/uuid";
 import { SearchStringFuzzySearch } from "./ui/querySuggest";
@@ -47,19 +48,9 @@ function CreateDefaultSyncConfig(): SyncerConfig {
 
 export const DEFAULT_SETTINGS: Settings = {
     clientId: uuidv7(),
-    syncers: []
+    syncers: [],
+    version: "v2"
 };
-
-export interface Settings {
-    /** Unique client id for each device. */
-    clientId: string;
-    /** Firestore email. */
-    email?: string;
-    /** Firestore password. */
-    password?: string;
-    /** Individual syncer configs. */
-    syncers: SyncerConfig[];
-}
 
 /** The firebase sync settings. */
 export class FirebaseSyncSettingTab extends PluginSettingTab {

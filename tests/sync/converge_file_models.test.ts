@@ -1025,7 +1025,7 @@ describe("ConvergeMapsToUpdateStates", () => {
         expect(result.ok).toBeTruthy();
         expect(result.val).toStrictEqual([
             {
-                action: "using_local",
+                action: "null_update",
                 localState: Some(localNodes[0]),
                 cloudState: Some(cloudNodes[0])
             }

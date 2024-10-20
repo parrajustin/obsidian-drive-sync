@@ -30,35 +30,11 @@ import type { FileNode } from "./file_node";
 import type { ConvergenceUpdate, NullUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { uuidv7 } from "../lib/uuid";
-import type { FirebaseStoredData } from "./firebase_cache";
+import type { SyncerConfig } from "../settings/syncer_config_data";
 
 export enum RootSyncType {
     ROOT_SYNCER = "root",
     FOLDER_TO_ROOT = "nested"
-}
-
-export interface SyncerConfig {
-    type: RootSyncType;
-    /** The name of the vault, to connect remote syncers. */
-    vaultName: string;
-    /** Sync config identifier. */
-    syncerId: string;
-    /** Max syncs per file update. */
-    maxUpdatePerSyncer: number;
-    /** If data storage encryption is enabled. Only encrypts the data. */
-    dataStorageEncrypted: boolean;
-    /** The password for encryption, all locations must have the same. */
-    encryptionPassword?: string;
-    /** Filter for files. */
-    syncQuery: string;
-    /** Query to denote raw files to add to syncing. */
-    rawFileSyncQuery: string;
-    /** Query to denote obsidian files to add to syncing. */
-    obsidianFileSyncQuery: string;
-    /** Query where not to write file ids. */
-    fileIdFileQuery: string;
-    /** Firebase cache. */
-    storedFirebaseCache: FirebaseStoredData;
 }
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */

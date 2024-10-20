@@ -10,7 +10,10 @@ const config = tseslint.config({
         ...tseslint.configs.recommended,
         eslintPluginPrettierRecommended
     ],
-    ignores: ["**/*.js"],
+    ignores: [
+        "dist/*",
+        "coverage/*"
+    ],
     // This is required, see the docs
     languageOptions: {
         parserOptions: {
