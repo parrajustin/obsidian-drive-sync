@@ -41,6 +41,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: TypeCheck
+        run: npm run type-check
+
       - name: Lint
         run: npm run lint
 

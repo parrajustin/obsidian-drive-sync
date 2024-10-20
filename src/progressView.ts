@@ -77,7 +77,7 @@ export class SyncProgressView extends ItemView {
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
-        const container = this.containerEl.children[1] as Element;
+        const container = this.containerEl.children[1]!;
         container.empty();
         this._headerElement = container.createEl("h2", {
             text: "Sync Progress View (Need to login...)"
@@ -86,6 +86,7 @@ export class SyncProgressView extends ItemView {
         this._syncerDiv = container.createEl("div", "syncer-statuses");
         this._progressContainer = container.createEl("div", "progress-div");
         this._historicalDiv = container.createEl("div", "hsitorical-div");
+        this._progressListContainer = this._progressContainer.createDiv("progress-list");
         this.updateProgressView();
     }
 
@@ -302,12 +303,14 @@ export class SyncProgressView extends ItemView {
         }
     }
 
-    public async onOpen() {
+    public override onOpen() {
         this.updateProgressView();
+        return Promise.resolve();
     }
 
-    public async onClose() {
+    public override onClose() {
         CURRENT_PROGRESS_VIEW = None;
+        return Promise.resolve();
     }
 
     /** Create a sync block information. */
@@ -433,7 +436,7 @@ export class SyncProgressView extends ItemView {
     private createInProgressEntry(
         container: HTMLDivElement,
         syncProgress: SyncProgress,
-        noProgress: boolean = false
+        noProgress = false
     ) {
         const entryDiv = container.createDiv("progress-entry");
         entryDiv.style.display = "flex";
@@ -524,7 +527,7 @@ export async function GetOrCreateSyncProgressView(
     if (CURRENT_PROGRESS_VIEW.some) {
         if (reveal) {
             // "Reveal" the leaf in case it is in a collapsed sidebar
-            workspace.revealLeaf(CURRENT_PROGRESS_VIEW.safeValue());
+            await workspace.revealLeaf(CURRENT_PROGRESS_VIEW.safeValue());
         }
         return CURRENT_PROGRESS_VIEW.safeValue().view as SyncProgressView;
     }
@@ -534,17 +537,17 @@ export async function GetOrCreateSyncProgressView(
 
     if (leaves.length > 0) {
         // A leaf with our view already exists, use that
-        leaf = leaves[0] as WorkspaceLeaf;
+        leaf = leaves[0]!;
     } else {
         // Our view could not be found in the workspace, create a new leaf
         // in the right sidebar for it
-        leaf = workspace.getRightLeaf(false) as WorkspaceLeaf;
+        leaf = workspace.getRightLeaf(false)!;
         await leaf.setViewState({ type: PROGRESS_VIEW_TYPE, active: true });
     }
 
     if (reveal) {
         // "Reveal" the leaf in case it is in a collapsed sidebar
-        workspace.revealLeaf(leaf);
+        await workspace.revealLeaf(leaf);
     }
     CURRENT_PROGRESS_VIEW = Some(leaf);
     return leaf.view as SyncProgressView;

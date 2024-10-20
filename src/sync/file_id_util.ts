@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /**
  * Utils for file unique ids in markdown files with frontmatter.
  */
 
-import type { App, DataWriteOptions, TAbstractFile } from "obsidian";
+import type { App, DataWriteOptions } from "obsidian";
 import { TFile } from "obsidian";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
@@ -56,7 +57,7 @@ export async function WriteUidToAllFilesIfNecessary(
         if (!ShouldHaveFileId(fileName, config)) {
             continue;
         }
-        const entry = app.vault.fileMap[fileName] as TAbstractFile;
+        const entry = app.vault.fileMap[fileName]!;
         if (!(entry instanceof TFile)) {
             continue;
         }

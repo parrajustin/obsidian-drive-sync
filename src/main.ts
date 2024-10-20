@@ -1,3 +1,4 @@
+import type { App, PluginManifest } from "obsidian";
 import { Plugin } from "obsidian";
 import type { FirebaseApp } from "firebase/app";
 import { initializeApp } from "firebase/app";
@@ -37,6 +38,14 @@ export default class FirestoreSyncPlugin extends Plugin {
     /** If a microtask has been created to load syncers. */
     private _loadingSyncers = false;
 
+    constructor(app: App, manifest: PluginManifest) {
+        super(app, manifest);
+        this.settings = DEFAULT_SETTINGS;
+        const { promise, resolve } = CreateExternallyResolvablePromise<UserCredential>();
+        this.loggedIn = promise;
+        this.loggedInResolve = resolve;
+    }
+
     public override async onload(): Promise<void> {
         // Register the sync progress view.
         this.registerView(PROGRESS_VIEW_TYPE, (leaf) => new SyncProgressView(leaf));
@@ -59,9 +68,6 @@ export default class FirestoreSyncPlugin extends Plugin {
         const firebaseApp = initializeApp(firebaseConfig);
         this.firebaseApp = Some(firebaseApp);
 
-        const { promise, resolve } = CreateExternallyResolvablePromise<UserCredential>();
-        this.loggedIn = promise;
-        this.loggedInResolve = resolve;
         await this.loadSettings();
         // TODO: Add SDKs for Firebase products that you want to use
         // https://firebase.google.com/docs/web/setup#available-libraries
@@ -75,20 +81,23 @@ export default class FirestoreSyncPlugin extends Plugin {
         this.addSettingTab(new FirebaseSyncSettingTab(this.app, this));
     }
 
-    public override async onunload(): Promise<void> {
-        await this.teardownSyncers();
+    public override onunload() {
+        void (async () => {
+            await this.teardownSyncers();
+        })();
     }
 
     public async saveSettings(startupSyncer = true): Promise<void> {
         await this.saveData(this.settings);
         if (startupSyncer) {
-            await this.startupSyncers();
+            this.startupSyncers();
         }
     }
 
     public async loadSettings(): Promise<void> {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-        await this.startupSyncers();
+        this.startupSyncers();
     }
 
     /** Attempts to login from the settings tab. */
@@ -153,7 +162,7 @@ export default class FirestoreSyncPlugin extends Plugin {
 
     private async teardownSyncers(): Promise<void> {
         for (const syncer of this._syncers) {
-            await syncer.teardown();
+            syncer.teardown();
         }
         const view = await GetOrCreateSyncProgressView(this.app, /*reveal=*/ false);
         view.resetView();
@@ -162,7 +171,7 @@ export default class FirestoreSyncPlugin extends Plugin {
     /**
      * Sets up all the syncers based on their configs. Will shutdown them all if any have an error.
      */
-    private async startupSyncers() {
+    private startupSyncers() {
         if (this._loadingSyncers) {
             return;
         }
@@ -206,7 +215,7 @@ export default class FirestoreSyncPlugin extends Plugin {
             let tearDown = false;
             const results = await Promise.all(setupStatuses);
             for (let i = 0; i < setupStatuses.length; i++) {
-                const result = results[i] as StatusResult<StatusError>;
+                const result = results[i]!;
                 if (result.err) {
                     const config = this.settings.syncers[i];
                     if (config !== undefined) {

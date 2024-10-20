@@ -14,7 +14,7 @@ export async function WrapPromise<TInput>(
             .then((v) => {
                 resolve(Ok(v));
             })
-            .catch((e) => {
+            .catch((e: unknown) => {
                 let outputError: StatusError;
                 if (e instanceof StatusError) {
                     outputError = e;
@@ -27,10 +27,8 @@ export async function WrapPromise<TInput>(
                 } else {
                     outputError = ConvertToUnknownError(textForUnknown)(e);
                 }
-                if (mutators !== undefined) {
-                    for (const mutator of mutators) {
-                        outputError.with(mutator);
-                    }
+                for (const mutator of mutators) {
+                    outputError.with(mutator);
                 }
                 resolve(Err(outputError));
             });

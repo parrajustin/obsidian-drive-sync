@@ -1,5 +1,4 @@
 import type {
-    DocumentData,
     FirestoreDataConverter,
     QueryDocumentSnapshot,
     SnapshotOptions,
@@ -71,7 +70,7 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
     }
 
     public fromFirestore(
-        _snapshot: QueryDocumentSnapshot<FileDbModel, DocumentData>,
+        _snapshot: QueryDocumentSnapshot<FileDbModel>,
         _options: SnapshotOptions
     ): FileNode<Some<string>> {
         const data = _snapshot.data();
@@ -105,6 +104,7 @@ export function SetFileSchemaConverter(plugin: FirestoreSyncPlugin, creds: UserC
 
 export function GetFileSchemaConverter(): FileSchemaConverter {
     if (FIRESTORE_CONVERTER.none) {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw InternalError("FIRESTORE_CONVERTER is None.");
     }
     return FIRESTORE_CONVERTER.safeValue();

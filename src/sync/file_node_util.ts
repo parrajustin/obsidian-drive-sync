@@ -1,4 +1,4 @@
-import type { App, TAbstractFile } from "obsidian";
+import type { App } from "obsidian";
 import { TFile } from "obsidian";
 import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
@@ -28,8 +28,8 @@ async function GetObsidianNode(
     app: App,
     config: SyncerConfig,
     fileName: string
-): Promise<Result<Option<FileNode<Option<string>>>, StatusError>> {
-    const file = app.vault.fileMap[fileName] as TAbstractFile;
+): Promise<Result<Option<FileNode>, StatusError>> {
+    const file = app.vault.fileMap[fileName]!;
     if (!(file instanceof TFile)) {
         return Ok(None);
     }
@@ -53,7 +53,7 @@ async function GetRawNode(
     app: App,
     config: SyncerConfig,
     fileName: string
-): Promise<Result<Option<FileNode<Option<string>>>, StatusError>> {
+): Promise<Result<Option<FileNode>, StatusError>> {
     const fileStat = await WrapPromise(
         app.vault.adapter.stat(fileName),
         /*textForUnknown=*/ `Failed to stat ${fileName}`
@@ -70,7 +70,7 @@ async function GetRawNode(
     }
 
     const path = fileName.split("/");
-    const file = path.pop() as string;
+    const file = path.pop()!;
     const [baseName, extension] = file.split(".") as [string, string | undefined];
     const dataType: LocalDataType = { type: "RAW" };
     const nodeParams: FileNodeParams<None> = {
@@ -107,10 +107,10 @@ async function GetRawNode(
 export async function UpdateFileMapWithChanges(
     app: App,
     config: SyncerConfig,
-    fileMap: FileMapOfNodes<Option<string>>,
-    changedNodes: Set<FileNode<Option<string>>>,
+    fileMap: FileMapOfNodes,
+    changedNodes: Set<FileNode>,
     changedPath: Set<string>
-): Promise<Result<FileMapOfNodes<Option<string>>, StatusError>> {
+): Promise<Result<FileMapOfNodes, StatusError>> {
     if (changedNodes.size === 0 && changedPath.size === 0) {
         return Ok(fileMap);
     }
@@ -156,7 +156,7 @@ export async function UpdateFileMapWithChanges(
         }
         const origNode = foundNode.safeUnwrap();
 
-        let newNode: Option<FileNode<Option<string>>> = None;
+        let newNode: Option<FileNode> = None;
         if (!IsAcceptablePath(path, config)) {
             continue;
         }
@@ -278,7 +278,7 @@ export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Opt
             return Err(InternalError(`No path nodes found. "${node.data.fullPath}"`));
         }
         // Remove the last element which is the filename itself.
-        const finalFileName = pathSplit.pop() as string;
+        const finalFileName = pathSplit.pop()!;
         let folderNode = mapOfNodes;
         for (const path of pathSplit) {
             if (!folderNode.has(path)) {
@@ -385,7 +385,7 @@ export function GetNonDeletedByFilePath<TypeOfData extends Option<string> = Opti
     if (pathSegments.length === 0) {
         return Err(InvalidArgumentError("FilePath is required."));
     }
-    const fileName = pathSegments.pop() as string;
+    const fileName = pathSegments.pop()!;
     let selectedFileNode = fileMap;
     for (const path of pathSegments) {
         const node = selectedFileNode.get(path);
@@ -412,5 +412,5 @@ export function GetNonDeletedByFilePath<TypeOfData extends Option<string> = Opti
     } else if (nonDeletedNodes.length === 0) {
         return Ok(None);
     }
-    return Ok(Some(nonDeletedNodes[0] as FileNode<TypeOfData>));
+    return Ok(Some(nonDeletedNodes[0]!));
 }

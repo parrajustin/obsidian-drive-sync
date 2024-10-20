@@ -149,7 +149,7 @@ export class UUID {
     public toString(): string {
         let text = "";
         for (let i = 0; i < this._bytes.length; i++) {
-            const byte = this._bytes[i] as number;
+            const byte = this._bytes[i]!;
             text += DIGITS.charAt(byte >>> 4);
             text += DIGITS.charAt(byte & 0xf);
             if (i === 3 || i === 5 || i === 7 || i === 9) {
@@ -165,8 +165,7 @@ export class UUID {
      */
     public toHex(): string {
         let text = "";
-        for (let i = 0; i < this._bytes.length; i++) {
-            const byte = this._bytes[i] as number;
+        for (const byte of this._bytes) {
             text += DIGITS.charAt(byte >>> 4);
             text += DIGITS.charAt(byte & 0xf);
         }
@@ -187,7 +186,7 @@ export class UUID {
      * subsumed under the variants `0b0` and `0b111`, respectively.
      */
     public getVariant(): "VAR_0" | "VAR_10" | "VAR_110" | "VAR_RESERVED" | "NIL" | "MAX" {
-        const n = (this._bytes[8] as number) >>> 4;
+        const n = this._bytes[8]! >>> 4;
         if (n < 0) {
             throw new Error("unreachable");
         } else if (n <= 0b0111) {
@@ -208,7 +207,7 @@ export class UUID {
      * not have the variant field value of `0b10`.
      */
     public getVersion(): number | undefined {
-        return this.getVariant() === "VAR_10" ? (this._bytes[6] as number) >>> 4 : undefined;
+        return this.getVariant() === "VAR_10" ? this._bytes[6]! >>> 4 : undefined;
     }
 
     /** Creates an object from `this`. */
@@ -227,7 +226,7 @@ export class UUID {
      */
     public compareTo(other: UUID): number {
         for (let i = 0; i < 16; i++) {
-            const diff = (this._bytes[i] as number) - (other._bytes[i] as number);
+            const diff = this._bytes[i]! - other._bytes[i]!;
             if (diff !== 0) {
                 return Math.sign(diff);
             }
@@ -378,8 +377,8 @@ export class V7Generator {
                 this._random.nextUint32()
             ).buffer
         );
-        bytes[6] = 0x40 | ((bytes[6] as number) >>> 4);
-        bytes[8] = 0x80 | ((bytes[8] as number) >>> 2);
+        bytes[6] = 0x40 | (bytes[6]! >>> 4);
+        bytes[8] = 0x80 | (bytes[8]! >>> 2);
         return UUID.ofInner(bytes);
     }
 
@@ -423,7 +422,7 @@ class BufferedCryptoRandom {
             crypto.getRandomValues(this._buffer);
             this._cursor = 0;
         }
-        return this._buffer[this._cursor++] as number;
+        return this._buffer[this._cursor++]!;
     }
 }
 
@@ -439,7 +438,7 @@ export const uuidv7 = (): string => uuidv7obj().toString();
 
 /** Generates a UUIDv7 object. */
 export const uuidv7obj = (): UUID =>
-    (defaultGenerator || (defaultGenerator = new V7Generator())).generate();
+    (defaultGenerator ?? (defaultGenerator = new V7Generator())).generate();
 
 /**
  * Generates a UUIDv4 string.
@@ -451,4 +450,4 @@ export const uuidv4 = (): string => uuidv4obj().toString();
 
 /** Generates a UUIDv4 object. */
 export const uuidv4obj = (): UUID =>
-    (defaultGenerator || (defaultGenerator = new V7Generator())).generateV4();
+    (defaultGenerator ?? (defaultGenerator = new V7Generator())).generateV4();

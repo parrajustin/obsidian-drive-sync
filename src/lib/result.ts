@@ -207,7 +207,7 @@ export class OkImpl<T> implements BaseResult<T, never> {
 }
 
 // This allows Ok to be callable - possible because of the es5 compilation target
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
 export function Ok<T>(val: T = undefined as any): OkImpl<T> {
     return new OkImpl<T>(val);
 }

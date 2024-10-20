@@ -9,7 +9,9 @@ export function CreateExternallyResolvablePromise<T>(): {
     resolve: (arg: T | PromiseLike<T>) => void;
     reject: (error: StatusError) => void;
 } {
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     let func: (arg: T | PromiseLike<T>) => void = () => {};
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     let err: (error: StatusError) => void = () => {};
     const promise = new Promise<T>((resolve, reject) => {
         func = resolve;

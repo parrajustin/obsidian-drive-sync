@@ -36,13 +36,13 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
         const parsedQuery = this._searchString.getParsedQuery();
         // check if any of the exclude filters match.
         const fileExcludeFilters = [
-            ...(parsedQuery.exclude["f"] ?? []),
-            ...(parsedQuery.exclude["file"] ?? [])
+            ...(parsedQuery.exclude.f ?? []),
+            ...(parsedQuery.exclude.file ?? [])
         ];
         // Check if any include filters match if any.
         const fileIncludeFilter = [
-            ...(parsedQuery.include["f"] ?? []),
-            ...(parsedQuery.include["file"] ?? [])
+            ...(parsedQuery.include.f ?? []),
+            ...(parsedQuery.include.file ?? [])
         ];
 
         // Create list of nodes.

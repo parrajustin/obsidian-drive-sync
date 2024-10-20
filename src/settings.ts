@@ -16,15 +16,17 @@ export interface FolderTemplate {
 
 function CreateAllFileConfig(): SyncerConfig {
     return {
+        version: "v2",
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
         syncQuery: "*",
         rawFileSyncQuery: "f:^.obsidian",
         obsidianFileSyncQuery: "-f:^.obsidian",
+        enableFileIdWriting: false,
         fileIdFileQuery: "-f:template",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        vaultName: ((window as any).app as App).vault.getName() ?? "",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+        vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
         storedFirebaseCache: { lastUpdate: 0, cache: [] }
     };
@@ -32,15 +34,17 @@ function CreateAllFileConfig(): SyncerConfig {
 
 function CreateDefaultSyncConfig(): SyncerConfig {
     return {
+        version: "v2",
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
         syncQuery: "*",
         rawFileSyncQuery: "f:^.obsidian.*.(json)$ -f:^.obsidian/plugins/.*",
         obsidianFileSyncQuery: "-f:^.obsidian",
+        enableFileIdWriting: false,
         fileIdFileQuery: "-f:template -f:templator",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        vaultName: ((window as any).app as App).vault.getName() ?? "",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+        vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
         storedFirebaseCache: { lastUpdate: 0, cache: [] }
     };
@@ -49,7 +53,7 @@ function CreateDefaultSyncConfig(): SyncerConfig {
 export const DEFAULT_SETTINGS: Settings = {
     clientId: uuidv7(),
     syncers: [],
-    version: "v2"
+    version: "v3"
 };
 
 /** The firebase sync settings. */
@@ -74,10 +78,12 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
         this.resetSettings();
     }
 
-    public override async hide() {
-        this._plugin.settings = this._settings;
-        await this._plugin.saveSettings();
-        await this._plugin.loginForSettings();
+    public override hide() {
+        void (async () => {
+            this._plugin.settings = this._settings;
+            await this._plugin.saveSettings();
+            await this._plugin.loginForSettings();
+        })();
     }
 
     /* Adds button to reset the settings. */
@@ -101,9 +107,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
             .setName("Device ID")
             .setDesc("Used to identify changes to the device (should be unique).")
             .addText((cb) => {
-                if (this._settings.clientId !== undefined) {
-                    cb.setValue(this._settings.clientId);
-                }
+                cb.setValue(this._settings.clientId);
                 cb.onChange((value) => {
                     this._settings.clientId = value;
                 });
@@ -260,6 +264,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                         });
                     });
 
+                // eslint-disable-next-line @typescript-eslint/no-empty-function
                 let setSyncFilter: (data: string) => void = () => {};
                 new Setting(liContainer)
                     .setName("Syncer Filter")
@@ -295,6 +300,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     });
                 });
 
+                // eslint-disable-next-line @typescript-eslint/no-empty-function
                 let rawFileFilterText: (data: string) => void = () => {};
                 new Setting(liContainer)
                     .setName("Raw Filter")
@@ -328,6 +334,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     });
                 });
 
+                // eslint-disable-next-line @typescript-eslint/no-empty-function
                 let setObsidianFileFilter: (data: string) => void = () => {};
                 new Setting(liContainer)
                     .setName("Obisdian Filter")
@@ -361,6 +368,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     });
                 });
 
+                // eslint-disable-next-line @typescript-eslint/no-empty-function
                 let setFileIdFilter: (data: string) => void = () => {};
                 new Setting(liContainer)
                     .setName("File Id Auto write Filter")

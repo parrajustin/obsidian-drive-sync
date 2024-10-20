@@ -108,14 +108,13 @@ export class FileSyncer {
 
     /** Initialize the file syncer. */
     public async init(): Promise<StatusResult<StatusError>> {
-        // eslint-disable-next-line @typescript-eslint/return-await
         return await this._plugin.loggedIn.then<StatusResult<StatusError>>(
             async (creds: UserCredential) => {
                 const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
 
                 view.setSyncerStatus(this._config.syncerId, "setting up obsidian watcher");
                 // Also setup the internal files watched now.
-                await this.listenForFileChanges();
+                this.listenForFileChanges();
 
                 view.setSyncerStatus(this._config.syncerId, "building firebase syncer");
                 // Build the firebase syncer and init it.
@@ -135,7 +134,7 @@ export class FileSyncer {
                 const firebaseSyncer = buildFirebaseSyncer.safeUnwrap();
                 this._firebaseSyncer = Some(firebaseSyncer);
                 view.setSyncerStatus(this._config.syncerId, "firebase building realtime sync");
-                await firebaseSyncer.initailizeRealTimeUpdates();
+                firebaseSyncer.initailizeRealTimeUpdates();
 
                 view.setSyncerStatus(this._config.syncerId, "running first tick");
                 // Start the file syncer repeating tick.
@@ -147,7 +146,7 @@ export class FileSyncer {
         );
     }
 
-    public async teardown() {
+    public teardown() {
         this._isDead = true;
         if (this._firebaseSyncer.some) {
             this._firebaseSyncer.safeValue().teardown();
@@ -160,7 +159,7 @@ export class FileSyncer {
         }
     }
 
-    private async listenForFileChanges() {
+    private listenForFileChanges() {
         this._unsubWatchHandler = Some(
             AddWatchHandler(this._plugin.app, (type, path, oldPath, _info) => {
                 switch (type) {
@@ -170,11 +169,14 @@ export class FileSyncer {
                         this._touchedFilepaths.add(path);
                         break;
                     case "modified":
-                        return this.handleModification(path);
+                        this.handleModification(path);
+                        break;
                     case "file-removed":
-                        return this.handleRemoval(path);
+                        this.handleRemoval(path);
+                        break;
                     case "renamed":
-                        return this.handleRename(path, oldPath);
+                        this.handleRename(path, oldPath);
+                        break;
                     case "closed":
                         this._touchedFilepaths.add(path);
                         break;
@@ -188,7 +190,7 @@ export class FileSyncer {
     }
 
     /** Handle the modification of a file. */
-    private async handleModification(path: string) {
+    private handleModification(path: string) {
         const nonDeleteNode = GetNonDeletedByFilePath(this._mapOfFileNodes, path);
         if (nonDeleteNode.err) {
             LogError(nonDeleteNode.val);
@@ -204,7 +206,7 @@ export class FileSyncer {
     }
 
     /** Handle the removal of a file. */
-    private async handleRemoval(path: string) {
+    private handleRemoval(path: string) {
         const nonDeleteNode = GetNonDeletedByFilePath(this._mapOfFileNodes, path);
         if (nonDeleteNode.err) {
             LogError(nonDeleteNode.val);
@@ -220,7 +222,7 @@ export class FileSyncer {
     }
 
     /** Handle the renaming of files. */
-    private async handleRename(path: string, oldPath?: string) {
+    private handleRename(path: string, oldPath?: string) {
         if (path === "") {
             return;
         }
@@ -245,7 +247,7 @@ export class FileSyncer {
         this._touchedFileNodes.add(optNode.safeValue());
 
         const pathSplit = path.split("/");
-        const fileName = pathSplit.pop() as string;
+        const fileName = pathSplit.pop()!;
         const [baseName, extension] = fileName.split(".") as [string, string | undefined];
         node.data.baseName = baseName;
         node.data.extension = extension ?? "";

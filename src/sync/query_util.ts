@@ -21,7 +21,7 @@ export function ChecksPassedFilter(data: string, searchString: SearchString): bo
     const query = searchString.getParsedQuery();
 
     // check if any of the exclude filters match.
-    const fileExcludeFilters = [...(query.exclude["f"] ?? []), ...(query.exclude["file"] ?? [])];
+    const fileExcludeFilters = [...(query.exclude.f ?? []), ...(query.exclude.file ?? [])];
     for (const filter of fileExcludeFilters) {
         if (data.match(filter)) {
             return false;
@@ -29,7 +29,7 @@ export function ChecksPassedFilter(data: string, searchString: SearchString): bo
     }
 
     // Check if any include filters match if any.
-    const fileIncludeFilter = [...(query.include["f"] ?? []), ...(query.include["file"] ?? [])];
+    const fileIncludeFilter = [...(query.include.f ?? []), ...(query.include.file ?? [])];
     // If there are no include filters all are included.
     if (fileIncludeFilter.length === 0) {
         return true;

@@ -314,17 +314,17 @@ describe("searchString", () => {
         const parsed = SearchString.parse(str, [transform]);
         expect(parsed.getTextSegments()).toEqual([]);
         expect(GetNumKeywords(parsed)).toEqual(1);
-        expect(parsed.getParsedQuery().include["to"]).toEqual(["a@b.com", "c@d.com"]);
+        expect(parsed.getParsedQuery().include.to).toEqual(["a@b.com", "c@d.com"]);
     });
 
     test("removeEntry simple case", () => {
         const str = "foo:bar,baz";
         const parsed = SearchString.parse(str);
-        expect(parsed.getParsedQuery().include["foo"]).toEqual(["bar", "baz"]);
+        expect(parsed.getParsedQuery().include.foo).toEqual(["bar", "baz"]);
 
         parsed.removeEntry("foo", "baz", false);
 
-        expect(parsed.getParsedQuery().include["foo"]).toEqual(["bar"]);
+        expect(parsed.getParsedQuery().include.foo).toEqual(["bar"]);
     });
 
     test("removeEntry should remove only one case", () => {
@@ -340,7 +340,7 @@ describe("searchString", () => {
     test("removeEntry should be noop if entry is not found", () => {
         const str = "foo:bar";
         const parsed = SearchString.parse(str);
-        expect(parsed.getParsedQuery().include["foo"]).toEqual(["bar"]);
+        expect(parsed.getParsedQuery().include.foo).toEqual(["bar"]);
         expect(parsed.toString()).toEqual("foo:bar");
         expect(parsed.isStringDirty).toEqual(false);
 

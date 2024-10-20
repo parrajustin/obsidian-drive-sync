@@ -1,5 +1,3 @@
-import type { DataWriteOptions, TAbstractFile } from "obsidian";
-
 export type OpType =
     | "folder-created"
     | "file-created"

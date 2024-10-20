@@ -12,7 +12,7 @@ function ReplaceHandler(app: App) {
     }
     ORIGINAL_OBISDIAN_HANDLER = app.vault.adapter.handler;
     app.vault.adapter.handler = (type, path, oldPath, info) => {
-        const result = (ORIGINAL_OBISDIAN_HANDLER as HandlerFunc)(type, path, oldPath, info);
+        const result = ORIGINAL_OBISDIAN_HANDLER!(type, path, oldPath, info);
         for (const watcher of WATCHERS) {
             queueMicrotask(() => {
                 watcher(type, path, oldPath, info);

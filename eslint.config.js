@@ -8,12 +8,11 @@ const config = tseslint.config({
     extends: [
         eslint.configs.recommended,
         ...tseslint.configs.recommended,
-        eslintPluginPrettierRecommended
+        eslintPluginPrettierRecommended,
+        ...tseslint.configs.strictTypeChecked,
+        ...tseslint.configs.stylisticTypeChecked
     ],
-    ignores: [
-        "dist/*",
-        "coverage/*"
-    ],
+    ignores: ["dist/*", "coverage/*"],
     // This is required, see the docs
     languageOptions: {
         parserOptions: {
@@ -58,53 +57,53 @@ const config = tseslint.config({
         "@typescript-eslint/naming-convention": [
             "error",
             {
-                "selector": "default",
-                "format": ["camelCase"],
-                "leadingUnderscore": "forbid",
-                "trailingUnderscore": "forbid"
+                selector: "default",
+                format: ["camelCase"],
+                leadingUnderscore: "forbid",
+                trailingUnderscore: "forbid"
             },
             {
-                "selector": "parameter",
-                "format": ["camelCase"],
-                "leadingUnderscore": "allow"
+                selector: "parameter",
+                format: ["camelCase"],
+                leadingUnderscore: "allow"
             },
             {
-                "selector": "typeLike",
-                "format": ["PascalCase"]
+                selector: "typeLike",
+                format: ["PascalCase"]
             },
             {
-                "selector": "typeParameter",
-                "format": ["PascalCase"]
+                selector: "typeParameter",
+                format: ["PascalCase"]
             },
             {
-                "selector": "import",
-                "format": ["camelCase", "PascalCase"]
+                selector: "import",
+                format: ["camelCase", "PascalCase"]
             },
             {
-                "selector": "enumMember",
-                "format": ["UPPER_CASE"]
+                selector: "enumMember",
+                format: ["UPPER_CASE"]
             },
             {
-                "selector": "variable",
-                "format": ["camelCase", "UPPER_CASE"],
-                "leadingUnderscore": "allow",
-                "trailingUnderscore": "allow"
+                selector: "variable",
+                format: ["camelCase", "UPPER_CASE"],
+                leadingUnderscore: "allow",
+                trailingUnderscore: "allow"
             },
             {
-                "selector": ["memberLike"],
-                "format": ["camelCase"],
-                "modifiers": ["private"],
-                "leadingUnderscore": "require"
+                selector: ["memberLike"],
+                format: ["camelCase"],
+                modifiers: ["private"],
+                leadingUnderscore: "require"
             },
             {
-                "selector": ["function"],
-                "format": ["PascalCase"],
-                "modifiers": ["global"]
+                selector: ["function"],
+                format: ["PascalCase"],
+                modifiers: ["global"]
             },
             {
-                "selector": ["classMethod"],
-                "format": ["camelCase"]
-            },
+                selector: ["classMethod"],
+                format: ["camelCase"]
+            }
         ],
         "@typescript-eslint/no-confusing-void-expression": "error",
         "@typescript-eslint/no-confusing-non-null-assertion": "error",
@@ -125,10 +124,16 @@ const config = tseslint.config({
         // Note: you must disable the base rule as it can report incorrect errors
         "no-return-await": "off",
         "@typescript-eslint/return-await": "error",
-        "@typescript-eslint/restrict-template-expressions": "error",
+        "@typescript-eslint/restrict-template-expressions": [
+            "error",
+            {
+                allowNumber: true
+            }
+        ],
         "@typescript-eslint/restrict-plus-operands": "error",
         "@typescript-eslint/array-type": "error",
         "@typescript-eslint/consistent-type-imports": "error",
+        "@typescript-eslint/no-non-null-assertion": "off",
         "no-console": 1, // Means warning
         "prettier/prettier": 2 // Means error
     }

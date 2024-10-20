@@ -373,24 +373,28 @@ export function CreateOperationsToUpdateLocal(
         );
 
         // Do the convergence operation.
-        if (update.action === ConvergenceAction.USE_CLOUD) {
-            const downloadResult = await DownloadCloudUpdate(
-                db,
-                userId,
-                ids,
-                app,
-                syncConfig,
-                update,
-                view,
-                fileId
-            );
-            if (downloadResult.err) {
-                return downloadResult;
+        switch (update.action) {
+            case ConvergenceAction.USE_CLOUD: {
+                const downloadResult = await DownloadCloudUpdate(
+                    db,
+                    userId,
+                    ids,
+                    app,
+                    syncConfig,
+                    update,
+                    view,
+                    fileId
+                );
+                if (downloadResult.err) {
+                    return downloadResult;
+                }
+                break;
             }
-        } else if (update.action === ConvergenceAction.USE_CLOUD_DELETE_LOCAL) {
-            // For `USE_CLOUD_DELETE_LOCAL` update leave it to the delete left over file system.
-            update.leftOverLocalFile = Some(update.localState.safeValue().data.fullPath);
-            view.setEntryProgress(ids.syncerId, fileId, 0.5);
+            case ConvergenceAction.USE_CLOUD_DELETE_LOCAL: {
+                // For `USE_CLOUD_DELETE_LOCAL` update leave it to the delete left over file system.
+                update.leftOverLocalFile = Some(update.localState.safeValue().data.fullPath);
+                view.setEntryProgress(ids.syncerId, fileId, 0.5);
+            }
         }
 
         // Update local file if there is one.

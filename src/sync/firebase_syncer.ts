@@ -108,7 +108,7 @@ export class FirebaseSyncer {
     }
 
     /** Initializes the real time subscription on firestore data. */
-    public async initailizeRealTimeUpdates() {
+    public initailizeRealTimeUpdates() {
         const queryOfFiles = query(
             collection(this._db, this._creds.user.uid),
             where("userId", "==", this._creds.user.uid),
@@ -148,7 +148,7 @@ export class FirebaseSyncer {
                         this._config.storedFirebaseCache = ConvertMapOfFileNodesToCache(
                             this._cloudNodes
                         );
-                        this._plugin.saveSettings(/*startupSyncer=*/ false).catch((e) => {
+                        this._plugin.saveSettings(/*startupSyncer=*/ false).catch((e: unknown) => {
                             const error = ConvertToUnknownError("Saving settings")(e);
                             LogError(error);
                         });

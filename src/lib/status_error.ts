@@ -48,8 +48,8 @@ export class StatusError {
         public message: string,
         error?: Error
     ) {
-        const stackLines = (error !== undefined ? error : new Error()).stack!.split("\n").slice(2);
-        if (stackLines.length > 0 && (stackLines[0] as string).includes("StatusError")) {
+        const stackLines = (error ?? new Error()).stack!.split("\n").slice(2);
+        if (stackLines.length > 0 && stackLines[0]!.includes("StatusError")) {
             stackLines.shift();
         }
 
@@ -68,7 +68,7 @@ export class StatusError {
         return `[${new Date().toISOString()}] ${ErrorCode[this.errorCode]}: ${this.message} at stack:\n${this._stack}${data.length > 0 ? `\n\n[Additional Data:]\n ${data.join("\n")}` : ""}`;
     }
 
-    public with(func: (error: StatusError) => void): StatusError {
+    public with(func: (error: StatusError) => void): this {
         func(this);
         return this;
     }

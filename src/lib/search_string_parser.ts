@@ -15,7 +15,10 @@ interface QuotePairMap {
 }
 
 export type TextTransformer = (text: string) => Option<{ key: string; value: string }>;
-export type ParseQuery = { exclude: Record<string, string[]>; include: Record<string, string[]> };
+export interface ParseQuery {
+    exclude: Record<string, string[]>;
+    include: Record<string, string[]>;
+}
 
 /** Condition search string like "to:justin" */
 export interface Conditions {
@@ -45,7 +48,10 @@ function GetQuotePairMap(str?: string) {
     const prevQuote = { single: -1, double: -1 };
     let prevChar = "";
     for (let i = 0; i < str.length; i++) {
-        const char = str[i] as string;
+        const char = str[i];
+        if (char === undefined) {
+            continue;
+        }
         if (prevChar !== "\\") {
             if (char === '"') {
                 if (prevQuote.double >= 0) {
@@ -116,6 +122,7 @@ export class SearchString {
                     hasTransform = true;
                 }
             });
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (!hasTransform) {
                 textSegments.push({ text, negated });
             }
@@ -153,7 +160,10 @@ export class SearchString {
 
         // Iterate through all the chars of the string.
         for (let i = 0; i < str.length; i++) {
-            const char = str[i] as string;
+            const char = str[i];
+            if (char === undefined) {
+                continue;
+            }
             if (char === " ") {
                 if (inOperand()) {
                     if (inQuote()) {
@@ -350,14 +360,13 @@ export class SearchString {
             // Build conditionStr
             let conditionStr = "";
             Object.keys(conditionGroups).forEach((conditionGroupKey) => {
-                const values = conditionGroups[conditionGroupKey] as string[];
+                const values = conditionGroups[conditionGroupKey]!;
                 const safeValues = values
                     .filter((v) => v)
                     .map((v) => {
                         let newV = "";
                         let shouldQuote = false;
-                        for (let i = 0; i < v.length; i++) {
-                            const char = v[i];
+                        for (const char of v) {
                             if (char === '"') {
                                 newV += '\\"';
                             } else {
