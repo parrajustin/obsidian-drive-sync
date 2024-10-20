@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.5...v1.4.0) (2024-10-20)
+
+
+### Features
+
+* Add feature to enable/disable file id writing ([cdc0403](https://github.com/parrajustin/obsidian-drive-sync/commit/cdc040376d1926e2e12a5c5fbb42c2099ba89ab9))
+* Support versionable settings schema ([d305ce5](https://github.com/parrajustin/obsidian-drive-sync/commit/d305ce5097edca9ec8dba49d7a61df5338cca9bb))
+
+
+### Bug Fixes
+
+* Fix general testing of release ([e1391e5](https://github.com/parrajustin/obsidian-drive-sync/commit/e1391e501a7b39c6b6b7547e9acc8b7cc3bfc52c))
+
 ## [1.3.5](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.3.4...v1.3.5) (2024-09-29)
 
 
