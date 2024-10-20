@@ -1,6 +1,7 @@
 import { SearchString } from "../lib/search_string_parser";
 import type { FileNode, LocalDataType } from "./file_node";
 import type { SyncerConfig } from "../settings/syncer_config_data";
+import { RootSyncType } from "../settings/syncer_config_data";
 
 const SEARCH_STRING_CACHE = new Map<string, SearchString>();
 
@@ -50,8 +51,17 @@ export function ShouldHaveFileId(filePath: string, config: SyncerConfig): boolea
     return ChecksPassedFilter(filePath, searchString);
 }
 
-/** Checks if the file path leads  */
+/** Checks if the file path is acceptable to even be included.  */
 export function IsAcceptablePath(filePath: string, config: SyncerConfig): boolean {
+    if (config.type === RootSyncType.FOLDER_TO_ROOT && config.nestedRootPath === "") {
+        return false;
+    }
+    if (
+        config.type === RootSyncType.FOLDER_TO_ROOT &&
+        !filePath.startsWith(config.nestedRootPath)
+    ) {
+        return false;
+    }
     const searchString = GetQueryString(config.syncQuery);
     return ChecksPassedFilter(filePath, searchString);
 }

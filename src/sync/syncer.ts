@@ -4,7 +4,7 @@
  */
 
 import type FirestoreSyncPlugin from "../main";
-import { InternalError, type StatusError } from "../lib/status_error";
+import { InternalError, UnimplementedError, type StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import type { FileMapOfNodes } from "./file_node_util";
@@ -30,12 +30,7 @@ import type { FileNode } from "./file_node";
 import type { ConvergenceUpdate, NullUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { uuidv7 } from "../lib/uuid";
-import type { SyncerConfig } from "../settings/syncer_config_data";
-
-export enum RootSyncType {
-    ROOT_SYNCER = "root",
-    FOLDER_TO_ROOT = "nested"
-}
+import { RootSyncType, type SyncerConfig } from "../settings/syncer_config_data";
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
 export class FileSyncer {
@@ -162,6 +157,14 @@ export class FileSyncer {
     private listenForFileChanges() {
         this._unsubWatchHandler = Some(
             AddWatchHandler(this._plugin.app, (type, path, oldPath, _info) => {
+                // Skip file paths outside nested root path.
+                if (
+                    this._config.type === RootSyncType.FOLDER_TO_ROOT &&
+                    !path.startsWith(this._config.nestedRootPath)
+                ) {
+                    return;
+                }
+
                 switch (type) {
                     case "folder-created":
                         break;
@@ -319,6 +322,11 @@ export class FileSyncer {
             .getConvergenceUpdates(this._mapOfFileNodes, needToOverrideSyncToUseLocal);
         if (convergenceUpdates.err) {
             return convergenceUpdates;
+        }
+
+        // TODO: Remove this to enable nested syncers.
+        if (this._config.type === RootSyncType.FOLDER_TO_ROOT) {
+            return Err(UnimplementedError("Nested syncers are not enabled yet."));
         }
 
         // Filter out and resolve the null updates.

@@ -8,8 +8,7 @@ import { InternalError, InvalidArgumentError } from "../lib/status_error";
 import { None, Some, type Option } from "../lib/option";
 import { GetFileUidFromFrontmatter } from "./file_id_util";
 import { WrapPromise } from "../lib/wrap_promise";
-import type { FileNodeParams, LocalDataType } from "./file_node";
-import { FileNode } from "./file_node";
+import { FileNode, type FileNodeParams, type LocalDataType } from "./file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
 import type { SyncerConfig } from "../settings/syncer_config_data";
 
@@ -143,7 +142,6 @@ export async function UpdateFileMapWithChanges(
     if (updatedFileMap.err) {
         return updatedFileMap;
     }
-
     for (const path of changedPath) {
         if (checkedPaths.has(path)) {
             continue;

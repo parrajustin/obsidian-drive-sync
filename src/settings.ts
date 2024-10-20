@@ -1,9 +1,8 @@
 import type { App } from "obsidian";
 import { PluginSettingTab, Setting } from "obsidian";
 import type TemplaterPlugin from "main";
-import type { SyncerConfig } from "settings/syncer_config_data";
+import { RootSyncType, type SyncerConfig } from "settings/syncer_config_data";
 import type { Settings } from "settings/settings_data";
-import { RootSyncType } from "./sync/syncer";
 import { uuidv7 } from "./lib/uuid";
 import { SearchStringFuzzySearch } from "./ui/querySuggest";
 import { GetAllFileNodes } from "./sync/file_node_util";
@@ -16,7 +15,7 @@ export interface FolderTemplate {
 
 function CreateAllFileConfig(): SyncerConfig {
     return {
-        version: "v2",
+        version: "v3",
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
@@ -28,13 +27,14 @@ function CreateAllFileConfig(): SyncerConfig {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
         vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
-        storedFirebaseCache: { lastUpdate: 0, cache: [] }
+        storedFirebaseCache: { lastUpdate: 0, cache: [] },
+        nestedRootPath: ""
     };
 }
 
 function CreateDefaultSyncConfig(): SyncerConfig {
     return {
-        version: "v2",
+        version: "v3",
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
@@ -46,14 +46,15 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
         vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
-        storedFirebaseCache: { lastUpdate: 0, cache: [] }
+        storedFirebaseCache: { lastUpdate: 0, cache: [] },
+        nestedRootPath: ""
     };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
     clientId: uuidv7(),
     syncers: [],
-    version: "v3"
+    version: "v4"
 };
 
 /** The firebase sync settings. */
@@ -224,11 +225,30 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                         });
                     });
                 new Setting(liContainer)
+                    .setName("Syncer Type")
+                    .setDesc("The type of syncer. (default: Root)")
+                    .addDropdown((cb) => {
+                        cb.addOption(RootSyncType.ROOT_SYNCER, "Root")
+                            .addOption(RootSyncType.FOLDER_TO_ROOT, "Nested")
+                            .setValue(elem.type)
+                            .onChange((value: RootSyncType) => {
+                                elem.type = value;
+                            });
+                    });
+                new Setting(liContainer)
                     .setName("Vault Name")
                     .setDesc("Syncing remote devices is done through vault name.")
                     .addText((cb) => {
                         cb.setValue(elem.vaultName).onChange((val) => {
                             elem.vaultName = val;
+                        });
+                    });
+                new Setting(liContainer)
+                    .setName("Nested Vault Path")
+                    .setDesc("(only valid for nested type) The nested vault's start path.")
+                    .addText((cb) => {
+                        cb.setValue(elem.nestedRootPath).onChange((val) => {
+                            elem.nestedRootPath = val;
                         });
                     });
                 new Setting(liContainer)

@@ -4,7 +4,7 @@ import type { FirebaseApp } from "firebase/app";
 import { initializeApp } from "firebase/app";
 import type { Option } from "./lib/option";
 import { None, Some } from "./lib/option";
-import type { Settings } from "./settings/settings_data";
+import { UpdateSettingsSchema, type Settings } from "./settings/settings_data";
 import { DEFAULT_SETTINGS, FirebaseSyncSettingTab } from "./settings";
 import type { UserCredential, Auth } from "firebase/auth";
 import {
@@ -95,8 +95,10 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     public async loadSettings(): Promise<void> {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        this.settings = UpdateSettingsSchema(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+            Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+        );
         this.startupSyncers();
     }
 
