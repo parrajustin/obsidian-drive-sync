@@ -27,7 +27,7 @@
     "devDependencies": {
         "@eslint/js": "9.10.0",
         "@jest/globals": "29.7.0",
-        "@types/gsi": "^0.0.4",
+        "@types/gsi": "0.0.4",
         "@types/node": "22.5.5",
         "@typescript-eslint/eslint-plugin": "8.10.0",
         "@typescript-eslint/parser": "8.10.0",
@@ -55,6 +55,8 @@
         "buid"
     ],
     "dependencies": {
-        "firebase": "10.13.2"
+        "firebase": "10.13.2",
+        "lit": "3.2.1",
+        "remeda": "2.16.0"
     }
 }

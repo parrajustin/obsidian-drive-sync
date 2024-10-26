@@ -12,6 +12,10 @@
         "esModuleInterop": true,
         "skipLibCheck": true,
         "lib": ["DOM", "ES5", "ES6", "ES7", "ESNext"],
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "useDefineForClassFields": false,
+        "strictPropertyInitialization": false,
 
         // Strict Checks
         "alwaysStrict": true, // Ensures that your files are parsed in the ECMAScript strict mode, and emit “use strict” for each source file.
