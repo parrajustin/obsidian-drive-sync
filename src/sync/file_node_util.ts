@@ -109,13 +109,15 @@ export async function UpdateFileMapWithChanges(
     fileMap: FileMapOfNodes,
     changedNodes: Set<FileNode>,
     changedPath: Set<string>
-): Promise<Result<FileMapOfNodes, StatusError>> {
+): Promise<Result<Option<FileMapOfNodes>, StatusError>> {
     if (changedNodes.size === 0 && changedPath.size === 0) {
-        return Ok(fileMap);
+        return Ok(None);
     }
     // These are all paths that have been checked.
     const checkedPaths = new Set<string>();
     let flatNodes = FlattenFileNodes(fileMap);
+    // If there was any data change.
+    let hasChangedData = false;
 
     for (const node of changedNodes) {
         checkedPaths.add(node.data.fullPath);
@@ -125,6 +127,7 @@ export async function UpdateFileMapWithChanges(
                 UnknownError(`Somehow trying to update a cloud node for "${node.data.fullPath}"`)
             );
         }
+        // Attempt to get the new data for a specified path.
         const newNodeResult = await (dataType.safeValue().type === "RAW"
             ? GetRawNode(app, config, node.data.fullPath)
             : GetObsidianNode(app, config, node.data.fullPath));
@@ -135,7 +138,12 @@ export async function UpdateFileMapWithChanges(
         if (optNode.none) {
             return Err(UnknownError(`No node found! "${node.data.fullPath}"`));
         }
-        node.overwrite(optNode.safeValue());
+
+        // Check if there is any data difference.
+        if (!node.equalsData(optNode.safeValue())) {
+            node.overwrite(optNode.safeValue());
+            hasChangedData = true;
+        }
     }
 
     const updatedFileMap = ConvertArrayOfNodesToMap(flatNodes);
@@ -147,6 +155,7 @@ export async function UpdateFileMapWithChanges(
             continue;
         }
         checkedPaths.add(path);
+        // The current node.
         const foundNode = GetNonDeletedByFilePath(updatedFileMap.safeUnwrap(), path);
         if (foundNode.err) {
             // We don't care about errors here. all errors are just bout not files found.
@@ -179,15 +188,25 @@ export async function UpdateFileMapWithChanges(
         } else if (origNode.some && newNode.none) {
             // Couldn't get new file information, maybe the file is gone? just remove the file node.
             flatNodes = flatNodes.filter((node) => node !== origNode.safeValue());
+            hasChangedData = true;
         } else if (origNode.none && newNode.some) {
             // Only found the new file.
             flatNodes.push(newNode.safeValue());
-        } else if (origNode.some && newNode.some) {
+            hasChangedData = true;
+        } else if (
+            origNode.some &&
+            newNode.some &&
+            !origNode.safeValue().equalsData(newNode.safeValue())
+        ) {
+            hasChangedData = true;
             origNode.safeValue().overwrite(newNode.safeValue());
         }
     }
 
-    return ConvertArrayOfNodesToMap(flatNodes);
+    if (!hasChangedData) {
+        return Ok(None);
+    }
+    return ConvertArrayOfNodesToMap(flatNodes).map((n) => Some(n));
 }
 
 /** Filters file nodes to make sure they should be kept. */

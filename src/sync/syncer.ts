@@ -337,8 +337,8 @@ export class FileSyncer {
         if (mergeResult.err) {
             return mergeResult;
         }
-        this._mapOfFileNodes = mergeResult.safeUnwrap();
-        if (this._firebaseHistory.some) {
+        this._mapOfFileNodes = mergeResult.safeUnwrap().valueOr(this._mapOfFileNodes);
+        if (this._firebaseHistory.some && mergeResult.safeUnwrap().some) {
             this._firebaseHistory.safeValue().updateMapOfLocalNodes(this._mapOfFileNodes);
         }
 

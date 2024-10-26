@@ -22,6 +22,9 @@ interface BaseOption<T> {
      * This function can be used to compose the Options of two functions.
      */
     map<U>(mapper: (val: T) => U): Option<U>;
+
+    /** Checks if both options are the same. */
+    equals<U>(other: Option<U>): boolean;
 }
 
 /**
@@ -56,6 +59,13 @@ export class NoneImpl implements BaseOption<never> {
      */
     public andThen(_op: unknown): None {
         return this;
+    }
+
+    public equals<T>(other: Option<T>): boolean {
+        if (other instanceof NoneImpl) {
+            return true;
+        }
+        return false;
     }
 }
 
@@ -125,6 +135,13 @@ export class SomeImpl<T> implements BaseOption<T> {
      */
     public safeValue(): T {
         return this.val;
+    }
+
+    public equals(other: Option<unknown>): boolean {
+        if (other instanceof NoneImpl) {
+            return false;
+        }
+        return other.safeValue() === this.val;
     }
 }
 

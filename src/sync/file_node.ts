@@ -86,8 +86,12 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraD
         });
     }
 
-    /** Overwrite most entries except `localDataType`. */
-    public overwrite(other: FileNode<TypeOfData>) {
+    /**
+     * Overwrite most entries except `localDataType`.
+     * @param other
+     * @returns true if there were any diffs
+     */
+    public overwrite(other: FileNode<TypeOfData>): bool {
         this.data.fullPath = other.data.fullPath;
         this.data.ctime = other.data.ctime;
         this.data.mtime = other.data.mtime;
@@ -125,5 +129,20 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraD
 
     public toString() {
         return this.data.fullPath;
+    }
+
+    /** Checks if the data are equal in both file nodes. */
+    public equalsData(other: FileNode): boolean {
+        return (
+            this.data.fullPath === other.data.fullPath &&
+            this.data.ctime === other.data.ctime &&
+            this.data.mtime === other.data.mtime &&
+            this.data.size === other.data.size &&
+            this.data.baseName === other.data.baseName &&
+            this.data.extension === other.data.extension &&
+            this.data.deleted === other.data.deleted &&
+            this.data.data.equals(other.data.data) &&
+            this.data.fileStorageRef.equals(other.data.fileStorageRef)
+        );
     }
 }

@@ -26,8 +26,11 @@ export class HistoryChangeEntry extends LitElement {
             align-items: center;
             justify-content: center;
         }
-        .icon {
+        .icon-btn {
             cursor: pointer;
+        }
+        .icon-btn:active {
+            border: 1px dotted white;
         }
     `;
 
@@ -55,8 +58,8 @@ export class HistoryChangeEntry extends LitElement {
                 <span>Size: ${this.changeFileNode.data.size}</span>
             </div>
             <div class="actions-container">
-                <div class="icon">${diffIcon}</div>
-                ${!this.isActive ? html`<div class="icon">${setActive}</div>` : html``}
+                <div class="icon-btn">${diffIcon}</div>
+                ${!this.isActive ? html`<div class="icon-btn">${setActive}</div>` : html``}
             </div>
         </div>`;
     }
