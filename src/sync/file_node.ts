@@ -47,8 +47,13 @@ export interface FileNodeParams<TypeOfData extends Option<string> = Option<strin
 }
 
 /** File node for book keeping. */
-export class FileNode<TypeOfData extends Option<string> = Option<string>> {
-    constructor(public data: FileNodeParams<TypeOfData>) {}
+
+export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraData = unknown> {
+    constructor(
+        public data: FileNodeParams<TypeOfData>,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+        public extraData: ExtraData = {} as any
+    ) {}
 
     /** Constructs the FileNode from TFiles. */
     public static constructFromTFile(

@@ -31,11 +31,14 @@ import type { ConvergenceUpdate, NullUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { uuidv7 } from "../lib/uuid";
 import { RootSyncType, type SyncerConfig } from "../settings/syncer_config_data";
+import { FirebaseHistory } from "../history/firebase_hist";
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
 export class FileSyncer {
     /** firebase syncer if one has been created. */
     private _firebaseSyncer: Option<FirebaseSyncer> = None;
+    /** firebase syncer if one has been created. */
+    private _firebaseHistory: Option<FirebaseHistory> = None;
     /** Identified file changes to check for changes. */
     private _touchedFilepaths = new Set<string>();
     /** Files that have been changed in some way. */
@@ -110,6 +113,26 @@ export class FileSyncer {
                 view.setSyncerStatus(this._config.syncerId, "setting up obsidian watcher");
                 // Also setup the internal files watched now.
                 this.listenForFileChanges();
+
+                view.setSyncerStatus(this._config.syncerId, "building firebase history");
+                console.log("history");
+                const buildFirebaseHistory = await FirebaseHistory.buildFirebaseHistory(
+                    this._plugin,
+                    this._firebaseApp,
+                    this._config,
+                    creds,
+                    this._mapOfFileNodes
+                );
+                if (buildFirebaseHistory.err) {
+                    return buildFirebaseHistory;
+                }
+                this._firebaseHistory = Some(buildFirebaseHistory.safeUnwrap());
+                this._firebaseHistory.safeValue().initailizeRealTimeUpdates();
+                this._firebaseHistory.safeValue().updateMapOfLocalNodes(this._mapOfFileNodes);
+                view.setSyncerHistory(this._config, buildFirebaseHistory.safeUnwrap());
+
+                // Save the cache for firebase.
+                await this._plugin.saveSettings(/*startupSyncer=*/ false);
 
                 view.setSyncerStatus(this._config.syncerId, "building firebase syncer");
                 // Build the firebase syncer and init it.
@@ -315,6 +338,9 @@ export class FileSyncer {
             return mergeResult;
         }
         this._mapOfFileNodes = mergeResult.safeUnwrap();
+        if (this._firebaseHistory.some) {
+            this._firebaseHistory.safeValue().updateMapOfLocalNodes(this._mapOfFileNodes);
+        }
 
         // Get the updates necessary.
         const convergenceUpdates = this._firebaseSyncer

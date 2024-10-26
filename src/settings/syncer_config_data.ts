@@ -1,3 +1,4 @@
+import type { HistoryFileNodeExtra } from "../history/history_schema";
 import type { FirebaseStoredData } from "../sync/firebase_cache";
 
 export enum RootSyncType {
@@ -43,7 +44,14 @@ export interface SyncerConfigV3 extends Omit<SyncerConfigV2, "version"> {
     nestedRootPath: string;
 }
 
-export type SyncerConfig = SyncerConfigV3;
+/** Adds cache for firebase history. */
+export interface SyncerConfigV4 extends Omit<SyncerConfigV3, "version"> {
+    version: "v4";
+    /** Firebase cache for historic changes. */
+    storedFirebaseHistory: FirebaseStoredData<HistoryFileNodeExtra>;
+}
+
+export type SyncerConfig = SyncerConfigV4;
 
 export function UpdateSchemaV1ToV2(v1Schema: SyncerConfigV1): SyncerConfigV2 {
     return { ...v1Schema, version: "v2", enableFileIdWriting: false };
@@ -51,4 +59,8 @@ export function UpdateSchemaV1ToV2(v1Schema: SyncerConfigV1): SyncerConfigV2 {
 
 export function UpdateSchemaV2ToV3(v2Schema: SyncerConfigV2): SyncerConfigV3 {
     return { ...v2Schema, version: "v3", nestedRootPath: "" };
+}
+
+export function UpdateSchemaV3ToV4(prevSchema: SyncerConfigV3): SyncerConfigV4 {
+    return { ...prevSchema, version: "v4", storedFirebaseHistory: { lastUpdate: 0, cache: [] } };
 }

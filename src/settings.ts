@@ -15,7 +15,7 @@ export interface FolderTemplate {
 
 function CreateAllFileConfig(): SyncerConfig {
     return {
-        version: "v3",
+        version: "v4",
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
@@ -28,13 +28,14 @@ function CreateAllFileConfig(): SyncerConfig {
         vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
         storedFirebaseCache: { lastUpdate: 0, cache: [] },
-        nestedRootPath: ""
+        nestedRootPath: "",
+        storedFirebaseHistory: { lastUpdate: 0, cache: [] }
     };
 }
 
 function CreateDefaultSyncConfig(): SyncerConfig {
     return {
-        version: "v3",
+        version: "v4",
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
@@ -47,14 +48,15 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
         storedFirebaseCache: { lastUpdate: 0, cache: [] },
-        nestedRootPath: ""
+        nestedRootPath: "",
+        storedFirebaseHistory: { lastUpdate: 0, cache: [] }
     };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
     clientId: uuidv7(),
     syncers: [],
-    version: "v4"
+    version: "v5"
 };
 
 /** The firebase sync settings. */
@@ -440,6 +442,17 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                         cb.setIcon("eraser").onClick(() => {
                             elem.storedFirebaseCache = { lastUpdate: 0, cache: [] };
                             cacheSize.innerText = `Cache size: ${elem.storedFirebaseCache.cache.length}`;
+                        });
+                    });
+                const cacheHistorySize = liContainer.createEl("span");
+                cacheHistorySize.innerText = `Cache size: ${elem.storedFirebaseHistory.cache.length}`;
+                new Setting(liContainer)
+                    .setName("Clear firestore history cache")
+                    .setDesc("Clear the cache of firestore history entries")
+                    .addButton((cb) => {
+                        cb.setIcon("eraser").onClick(() => {
+                            elem.storedFirebaseHistory = { lastUpdate: 0, cache: [] };
+                            cacheHistorySize.innerText = `Cache size: ${elem.storedFirebaseHistory.cache.length}`;
                         });
                     });
             };

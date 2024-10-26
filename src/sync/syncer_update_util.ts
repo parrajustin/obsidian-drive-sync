@@ -3,8 +3,8 @@
  * firestore or cloud storgae and keeping the progress viewer up to date.
  */
 
-import type { Firestore } from "firebase/firestore";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import type { Firestore, Transaction } from "firebase/firestore";
+import { doc, getDoc, runTransaction } from "firebase/firestore";
 import type { App } from "obsidian";
 import { TFile } from "obsidian";
 import type { Option } from "../lib/option";
@@ -42,6 +42,8 @@ import {
 } from "./query_util";
 import type { FileNodeParams, LocalDataType } from "./file_node";
 import { FileNode } from "./file_node";
+import type { HistoryFileNodeExtra } from "../history/history_schema";
+import { GetHistorySchemaConverter } from "../history/history_schema";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
@@ -52,25 +54,29 @@ export interface Identifiers {
     cycleId: string;
 }
 
-/** Upload the file to firestore. */
-async function UploadFileToFirestore(
+/** Upload the file to firestore. Also uploads the data to history. */
+function UploadFileToFirestore(
     db: Firestore,
+    transaction: Transaction,
     node: FileNode,
+    cloudNode: Option<FileNode<Some<string>>>,
     userId: string,
     fileId: string
-): Promise<StatusResult<StatusError>> {
+) {
+    // Upload the new file.
     const entry = `${userId}/${fileId}`;
     const documentRef = doc(db, entry).withConverter(GetFileSchemaConverter());
+    transaction.set(documentRef, node);
 
-    const setResult = await WrapPromise(
-        setDoc(documentRef, node),
-        /*textForUnknown=*/ `Failed to setDoc for ${entry}`
-    );
-    if (setResult.err) {
-        return setResult;
+    // Upload the cloud node which is the old one, to the history. If any.
+    if (cloudNode.some) {
+        const histEntry = `hist/${uuidv7()}`;
+        const histDocumentRef = doc(db, histEntry).withConverter(GetHistorySchemaConverter());
+        transaction.set(
+            histDocumentRef,
+            cloudNode.safeValue() as FileNode<Some<string>, HistoryFileNodeExtra>
+        );
     }
-
-    return Ok();
 }
 
 /**
@@ -206,7 +212,7 @@ export function CreateOperationsToUpdateCloud(
                     syncConfig,
                     localState.data.fullPath,
                     creds,
-                    fileId
+                    /*fileId=*/ uuidv7()
                 );
                 view.setEntryProgress(ids.syncerId, fileId, 0.6);
                 if (uploadCloudStoreResult.err) {
@@ -217,10 +223,23 @@ export function CreateOperationsToUpdateCloud(
 
             // Upload the data to firestore.
             const uploadNode = new FileNode<Some<string>>(node);
-            const uploadCloudState = await UploadFileToFirestore(db, uploadNode, userId, fileId);
+            const transactionResult = await WrapPromise(
+                runTransaction(db, (transaction: Transaction): Promise<void> => {
+                    UploadFileToFirestore(
+                        db,
+                        transaction,
+                        uploadNode,
+                        update.cloudState,
+                        userId,
+                        fileId
+                    );
+                    return Promise.resolve();
+                }),
+                /*textForUnkown=*/ `Failed transaction for "${fileId}"`
+            );
             view.setEntryProgress(ids.syncerId, fileId, 0.7);
-            if (uploadCloudState.err) {
-                return uploadCloudState;
+            if (transactionResult.err) {
+                return transactionResult;
             }
 
             // Update the local file node.

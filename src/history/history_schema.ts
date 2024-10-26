@@ -5,15 +5,16 @@ import type {
     WithFieldValue
 } from "firebase/firestore";
 import { Bytes } from "firebase/firestore";
-import type { FileNodeParams } from "./file_node";
-import { FileNode } from "./file_node";
+import type { FileNodeParams } from "../sync/file_node";
+import { FileNode } from "../sync/file_node";
 import type { UserCredential } from "firebase/auth";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import type FirestoreSyncPlugin from "../main";
 import { InternalError } from "../lib/status_error";
+import { uuidv7 } from "../lib/uuid";
 
-export interface FileDbModel {
+export interface HistoryDbModel {
     // Full filepath.
     path: string;
     // The file creation time.
@@ -41,19 +42,28 @@ export interface FileDbModel {
     deviceId: string;
     /** The syncer config id that pushed the update. */
     syncerConfigId: string;
+
+    /** The file id of the historic node. */
+    fileId: string;
 }
 
-// Firestore data converter
-export class FileSchemaConverter implements FirestoreDataConverter<FileNode, FileDbModel> {
+export interface HistoryFileNodeExtra {
+    historyDocId: string;
+}
+
+// Firestore history data converter
+export class HistorySchemaConverter
+    implements
+        FirestoreDataConverter<FileNode<Option<string>, HistoryFileNodeExtra>, HistoryDbModel>
+{
     constructor(
         private _plugin: FirestoreSyncPlugin,
         private _userCreds: UserCredential
     ) {}
 
     public toFirestore(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        node: WithFieldValue<FileNode<Option<string>, any>>
-    ): WithFieldValue<FileDbModel> {
+        node: WithFieldValue<FileNode<Option<string>, HistoryFileNodeExtra>>
+    ): WithFieldValue<HistoryDbModel> {
         const fileNode = node as FileNode;
         return {
             path: fileNode.data.fullPath,
@@ -68,14 +78,15 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             fileStorageRef: fileNode.data.fileStorageRef.valueOr(null),
             vaultName: fileNode.data.vaultName,
             deviceId: this._plugin.settings.clientId,
-            syncerConfigId: fileNode.data.syncerConfigId
+            syncerConfigId: fileNode.data.syncerConfigId,
+            fileId: fileNode.data.fileId.valueOr(uuidv7())
         };
     }
 
     public fromFirestore(
-        _snapshot: QueryDocumentSnapshot<FileDbModel>,
+        _snapshot: QueryDocumentSnapshot<HistoryDbModel>,
         _options: SnapshotOptions
-    ): FileNode<Some<string>> {
+    ): FileNode<Some<string>, HistoryFileNodeExtra> {
         const data = _snapshot.data();
         const params: FileNodeParams<Some<string>> = {
             fullPath: data.path,
@@ -84,7 +95,7 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             size: data.size,
             baseName: data.baseName,
             extension: data.ext,
-            fileId: Some(_snapshot.id),
+            fileId: Some(data.fileId),
             userId: Some(data.userId),
             deleted: data.deleted,
             vaultName: data.vaultName,
@@ -96,19 +107,19 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             isFromCloudCache: false
         };
 
-        return new FileNode(params);
+        return new FileNode(params, { historyDocId: _snapshot.ref.id });
     }
 }
 
-let FIRESTORE_CONVERTER: Option<FileSchemaConverter> = None;
-export function SetFileSchemaConverter(plugin: FirestoreSyncPlugin, creds: UserCredential) {
-    FIRESTORE_CONVERTER = Some(new FileSchemaConverter(plugin, creds));
+let FIRESTORE_HISTORY_CONVERTER: Option<HistorySchemaConverter> = None;
+export function SetHistorySchemaConverter(plugin: FirestoreSyncPlugin, creds: UserCredential) {
+    FIRESTORE_HISTORY_CONVERTER = Some(new HistorySchemaConverter(plugin, creds));
 }
 
-export function GetFileSchemaConverter(): FileSchemaConverter {
-    if (FIRESTORE_CONVERTER.none) {
+export function GetHistorySchemaConverter(): HistorySchemaConverter {
+    if (FIRESTORE_HISTORY_CONVERTER.none) {
         // eslint-disable-next-line @typescript-eslint/only-throw-error
-        throw InternalError("FIRESTORE_CONVERTER is None.");
+        throw InternalError("FIRESTORE_HISTORY_CONVERTER is None.");
     }
-    return FIRESTORE_CONVERTER.safeValue();
+    return FIRESTORE_HISTORY_CONVERTER.safeValue();
 }

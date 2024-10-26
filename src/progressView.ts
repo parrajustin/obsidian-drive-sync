@@ -4,6 +4,7 @@ import { ConvergenceAction } from "./sync/converge_file_models";
 import { None, Some, type Option } from "./lib/option";
 import { ErrorCode, type StatusError } from "./lib/status_error";
 import type { SyncerConfig } from "./settings/syncer_config_data";
+import type { FirebaseHistory } from "./history/firebase_hist";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
 const MAX_NUMBER_OF_CYCLES = 50;
@@ -74,6 +75,10 @@ export class SyncProgressView extends ItemView {
     private _syncerConfigs: SyncerConfig[] = [];
     /** Statuses of individal syncers. */
     private _syncerStatuses = new Map<string, HTMLSpanElement>();
+    /** Reference to the firebase history elements. */
+    private _syncerHistory = new Map<string, FirebaseHistory>();
+    /** The buttons to click to see a syncer history panel. */
+    private _syncerHistBtn = new Map<string, HTMLDivElement>();
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -106,19 +111,29 @@ export class SyncProgressView extends ItemView {
         this._currentCycleChanges = [];
         this._mapSyncerCycleToCurrentProgress = new Map();
         this._syncerConfigs = [];
+        this._syncerHistory = new Map<string, FirebaseHistory>();
+        this._syncerHistBtn = new Map<string, HTMLDivElement>();
         this.updateProgressView();
     }
 
     /** Set all the syncer configs to setup the view. */
     public setSyncers(configs: SyncerConfig[]) {
-        this._syncerDiv.empty();
         this._syncerConfigs = configs;
-        for (const config of this._syncerConfigs) {
-            this._syncerStatuses.set(config.syncerId, this._syncerDiv.createSpan());
-        }
         this.updateProgressView();
-        for (const config of this._syncerConfigs) {
-            this.setSyncerStatus(config.syncerId, "No data");
+        this.renderSyncers();
+    }
+
+    /** Sets the syncer history for a specific id. */
+    public setSyncerHistory(config: SyncerConfig, history: FirebaseHistory) {
+        this._syncerHistory.set(config.syncerId, history);
+        const containerEl = this._syncerHistBtn.get(config.syncerId);
+        if (containerEl !== undefined) {
+            containerEl.empty();
+            const btnEl = containerEl.createEl("button");
+            btnEl.onclick = () => {
+                void history.openPanel();
+            };
+            btnEl.innerText = "Open History";
         }
     }
 
@@ -505,6 +520,21 @@ export class SyncProgressView extends ItemView {
             };
         }
     }
+
+    private renderSyncers() {
+        this._syncerDiv.empty();
+        for (const config of this._syncerConfigs) {
+            const container = this._syncerDiv.createDiv("progress-fields");
+            container.style.display = "flex";
+            container.style.flexDirection = "column";
+            container.style.width = "100%";
+            this._syncerStatuses.set(config.syncerId, container.createSpan());
+            this._syncerHistBtn.set(config.syncerId, container.createDiv());
+        }
+        for (const config of this._syncerConfigs) {
+            this.setSyncerStatus(config.syncerId, "No data");
+        }
+    }
 }
 
 let CURRENT_PROGRESS_VIEW: Option<WorkspaceLeaf> = None;
@@ -533,21 +563,14 @@ export async function GetOrCreateSyncProgressView(
         return CURRENT_PROGRESS_VIEW.safeValue().view as SyncProgressView;
     }
 
-    let leaf: WorkspaceLeaf | null = null;
+    // Remove any pre-existing leaves.
     const leaves = workspace.getLeavesOfType(PROGRESS_VIEW_TYPE);
-
-    if (leaves.length > 0) {
-        // A leaf with our view already exists, use that
-        leaf = leaves[0]!;
-        for (let i = 1; i < leaves.length; i++) {
-            leaves[i]!.detach();
-        }
-    } else {
-        // Our view could not be found in the workspace, create a new leaf
-        // in the right sidebar for it
-        leaf = workspace.getRightLeaf(false)!;
-        await leaf.setViewState({ type: PROGRESS_VIEW_TYPE, active: true });
+    for (const rightLeaf of leaves) {
+        rightLeaf.detach();
     }
+
+    const leaf = workspace.getRightLeaf(false)!;
+    await leaf.setViewState({ type: PROGRESS_VIEW_TYPE, active: true });
 
     if (reveal) {
         // "Reveal" the leaf in case it is in a collapsed sidebar

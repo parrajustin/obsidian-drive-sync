@@ -24,6 +24,8 @@ import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
 import { GetOrCreateSyncProgressView, PROGRESS_VIEW_TYPE, SyncProgressView } from "./progressView";
 import { SetFileSchemaConverter } from "./sync/firestore_schema";
+import { SetHistorySchemaConverter } from "./history/history_schema";
+import { HISTORY_VIEW_TYPE, HistoryProgressView } from "./history/history_view";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -48,6 +50,7 @@ export default class FirestoreSyncPlugin extends Plugin {
 
     public override async onload(): Promise<void> {
         // Register the sync progress view.
+        this.registerView(HISTORY_VIEW_TYPE, (leaf) => new HistoryProgressView(leaf));
         this.registerView(PROGRESS_VIEW_TYPE, (leaf) => new SyncProgressView(leaf));
         this.addRibbonIcon("cloud", "Show sync view", async () => {
             await GetOrCreateSyncProgressView(this.app, /*reveal=*/ true);
@@ -147,6 +150,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         const creds = loginResult.safeUnwrap();
         this.userCreds = Some(creds);
         SetFileSchemaConverter(this, creds);
+        SetHistorySchemaConverter(this, creds);
         this.loggedInResolve(creds);
         return loginResult;
     }
