@@ -3,7 +3,7 @@ import type { Result } from "./result";
 import { Err, Ok } from "./result";
 import { ErrorCode, StatusError } from "./status_error";
 
-/** Wraps the given promise into a result type. No erros should be propogated. */
+/** Wraps the given promise into a result type. No errors should be propogated. */
 export async function WrapPromise<TInput>(
     promise: Promise<TInput>,
     textForUnknown: string,

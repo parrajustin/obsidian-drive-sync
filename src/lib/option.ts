@@ -139,3 +139,13 @@ export type Option<T> = Some<T> | None;
 export function IsOption<T = unknown>(value: unknown): value is Option<T> {
     return value instanceof SomeImpl || value === None;
 }
+
+export function WrapOptional<T = unknown>(value: T | null | undefined): Option<T> {
+    if (value === undefined) {
+        return None;
+    }
+    if (value === null) {
+        return None;
+    }
+    return Some(value);
+}
