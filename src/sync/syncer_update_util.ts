@@ -146,7 +146,8 @@ export function CreateOperationsToUpdateCloud(
                 localDataType: None,
                 deviceId: None,
                 syncerConfigId: syncConfig.syncerId,
-                isFromCloudCache: false
+                isFromCloudCache: false,
+                fileHash: localState.data.fileHash
             };
 
             const initalFileName: Option<string> = update.cloudState.andThen<string>(

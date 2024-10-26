@@ -34,6 +34,8 @@ export interface FileDbModel {
     data: Bytes | null;
     /** The location of the file in cloud storage if not in `data`. */
     fileStorageRef: string | null;
+    /** The hash of the file contents. */
+    fileHash?: string | null;
 
     /** The name of the vault. */
     vaultName: string;
@@ -68,7 +70,8 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             fileStorageRef: fileNode.data.fileStorageRef.valueOr(null),
             vaultName: fileNode.data.vaultName,
             deviceId: this._plugin.settings.clientId,
-            syncerConfigId: fileNode.data.syncerConfigId
+            syncerConfigId: fileNode.data.syncerConfigId,
+            fileHash: fileNode.data.fileHash.valueOr(null)
         };
     }
 
@@ -93,7 +96,9 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             localDataType: None,
             deviceId: Some(data.deviceId),
             syncerConfigId: data.syncerConfigId,
-            isFromCloudCache: false
+            isFromCloudCache: false,
+            fileHash:
+                data.fileHash === undefined || data.fileHash === null ? None : Some(data.fileHash)
         };
 
         return new FileNode(params);

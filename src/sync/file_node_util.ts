@@ -11,6 +11,10 @@ import { WrapPromise } from "../lib/wrap_promise";
 import { FileNode, type FileNodeParams, type LocalDataType } from "./file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
 import type { SyncerConfig } from "../settings/syncer_config_data";
+import { Bytes } from "firebase/firestore";
+import GetSha256Hash from "../lib/sha";
+import { ReadObsidianFile } from "./file_util_obsidian_api";
+import { ReadRawFile } from "./file_util_raw_api";
 
 /** Flat array of all nodes to a single file path. */
 export class FileNodeArray<TypeOfData extends Option<string> = Option<string>> {
@@ -37,12 +41,18 @@ async function GetObsidianNode(
         return fileIdResult;
     }
 
+    const fileContents = await ReadObsidianFile(app, fileName);
+    const fileHash = fileContents
+        .map((f) => Bytes.fromUint8Array(GetSha256Hash(new Uint8Array(f))).toBase64())
+        .map((b) => Some(b))
+        .unwrapOr(None);
     const node = FileNode.constructFromTFile(
         config.vaultName,
         config.syncerId,
         fileName,
         file,
-        fileIdResult.safeUnwrap()
+        fileIdResult.safeUnwrap(),
+        fileHash
     );
     return Ok(Some(node));
 }
@@ -72,6 +82,13 @@ async function GetRawNode(
     const file = path.pop()!;
     const [baseName, extension] = file.split(".") as [string, string | undefined];
     const dataType: LocalDataType = { type: "RAW" };
+
+    const fileContents = await ReadRawFile(app, fileName);
+    const fileHash = fileContents
+        .map((f) => Bytes.fromUint8Array(GetSha256Hash(new Uint8Array(f))).toBase64())
+        .map((b) => Some(b))
+        .unwrapOr(None);
+
     const nodeParams: FileNodeParams<None> = {
         fullPath: fileName,
         ctime: stat.ctime,
@@ -88,7 +105,8 @@ async function GetRawNode(
         fileStorageRef: None,
         deviceId: None,
         syncerConfigId: config.syncerId,
-        isFromCloudCache: false
+        isFromCloudCache: false,
+        fileHash
     };
     const node = new FileNode(nodeParams);
     return Ok(Some(node));

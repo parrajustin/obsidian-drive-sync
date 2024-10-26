@@ -44,6 +44,8 @@ export interface FileNodeParams<TypeOfData extends Option<string> = Option<strin
     syncerConfigId: string;
     /** If this file node is vitual and just represents an entry from cache.  */
     isFromCloudCache: boolean;
+    /** The hash of the file contents. */
+    fileHash: Option<string>;
 }
 
 /** File node for book keeping. */
@@ -61,7 +63,8 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraD
         syncerConfigId: string,
         fullPath: string,
         file: TFile,
-        fileId: Option<string>
+        fileId: Option<string>,
+        fileHash: Option<string>
     ) {
         const backingdata: LocalDataType = {
             type: "OBSIDIAN"
@@ -82,7 +85,8 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraD
             localDataType: Some(backingdata),
             deviceId: None,
             syncerConfigId: syncerConfigId,
-            isFromCloudCache: false
+            isFromCloudCache: false,
+            fileHash
         });
     }
 
@@ -91,7 +95,7 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraD
      * @param other
      * @returns true if there were any diffs
      */
-    public overwrite(other: FileNode<TypeOfData>): bool {
+    public overwrite(other: FileNode<TypeOfData>) {
         this.data.fullPath = other.data.fullPath;
         this.data.ctime = other.data.ctime;
         this.data.mtime = other.data.mtime;
@@ -142,7 +146,8 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraD
             this.data.extension === other.data.extension &&
             this.data.deleted === other.data.deleted &&
             this.data.data.equals(other.data.data) &&
-            this.data.fileStorageRef.equals(other.data.fileStorageRef)
+            this.data.fileStorageRef.equals(other.data.fileStorageRef) &&
+            this.data.fileHash.equals(other.data.fileHash)
         );
     }
 }

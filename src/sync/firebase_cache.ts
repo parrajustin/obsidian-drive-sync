@@ -33,6 +33,8 @@ export interface CacheModel<TExtraData = unknown> {
     syncerConfigId: string;
     /** Any filenode extra data. */
     extraData?: TExtraData;
+    /** The hash of the file contents. */
+    fileHash?: string;
 }
 
 export interface FirebaseStoredData<TExtraData = unknown> {
@@ -67,7 +69,8 @@ export function ConvertCacheToFileNode<TExtraData = unknown>(
             deviceId: Some(model.deviceId),
             syncerConfigId: model.syncerConfigId,
             isFromCloudCache: true,
-            localDataType: None
+            localDataType: None,
+            fileHash: model.fileHash !== undefined ? Some(model.fileHash) : None
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
         model.extraData ?? ({} as any)

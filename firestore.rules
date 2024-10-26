@@ -10,19 +10,19 @@ service cloud.firestore {
         allow delete: if false;
         allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
         allow create: if request.auth != null && request.resource.data.keys().hasOnly(
-        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName"]) && request.auth.uid == request.resource.data.userId;
+        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileHash"]) && request.auth.uid == request.resource.data.userId;
     }
     match /hist/{file} {
         allow update: if false;
         allow read, delete: if request.auth != null && request.auth.uid == resource.data.userId;
         allow create: if request.auth != null && request.resource.data.keys().hasOnly(
-        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileId"]) && request.auth.uid == request.resource.data.userId;
+        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileId", "fileHash"]) && request.auth.uid == request.resource.data.userId;
     }
     match /{uid}/{document=**} {
         allow delete: if false;
         allow read, update: if request.auth != null && request.auth.uid == uid && request.auth.uid == resource.data.userId;
         allow create: if request.auth != null && request.auth.uid == uid && request.resource.data.keys().hasOnly(
-        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName"]) && request.auth.uid == request.resource.data.userId;
+        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileHash"]) && request.auth.uid == request.resource.data.userId;
     }
 
     match /{document=**} {

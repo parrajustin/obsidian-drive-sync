@@ -35,6 +35,8 @@ export interface HistoryDbModel {
     data: Bytes | null;
     /** The location of the file in cloud storage if not in `data`. */
     fileStorageRef: string | null;
+    /** The hash of the file contents. */
+    fileHash?: string | null;
 
     /** The name of the vault. */
     vaultName: string;
@@ -79,7 +81,8 @@ export class HistorySchemaConverter
             vaultName: fileNode.data.vaultName,
             deviceId: this._plugin.settings.clientId,
             syncerConfigId: fileNode.data.syncerConfigId,
-            fileId: fileNode.data.fileId.valueOr(uuidv7())
+            fileId: fileNode.data.fileId.valueOr(uuidv7()),
+            fileHash: fileNode.data.fileHash.valueOr(null)
         };
     }
 
@@ -104,7 +107,9 @@ export class HistorySchemaConverter
             localDataType: None,
             deviceId: Some(data.deviceId),
             syncerConfigId: data.syncerConfigId,
-            isFromCloudCache: false
+            isFromCloudCache: false,
+            fileHash:
+                data.fileHash === undefined || data.fileHash === null ? None : Some(data.fileHash)
         };
 
         return new FileNode(params, { historyDocId: _snapshot.ref.id });
