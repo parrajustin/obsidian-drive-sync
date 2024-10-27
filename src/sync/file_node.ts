@@ -117,6 +117,7 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraD
         if (this.data.localDataType.none) {
             this.data.isFromCloudCache = other.data.isFromCloudCache;
         }
+        this.data.fileHash = other.data.fileHash;
     }
 
     /** Overwrite metadata from the cloud. */
