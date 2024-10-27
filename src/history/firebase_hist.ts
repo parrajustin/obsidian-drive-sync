@@ -284,7 +284,6 @@ export class FirebaseHistory {
             }
             // Delete old changes.
             for (const deleteEntry of changes.slice(MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT)) {
-                console.log("attemting to remove", deleteEntry.extraData.historyDocId);
                 batcher.delete(doc(this.db, "hist", deleteEntry.extraData.historyDocId));
             }
         }

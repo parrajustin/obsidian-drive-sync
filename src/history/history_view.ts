@@ -38,7 +38,6 @@ export class HistoryProgressView extends ItemView {
     }
 
     public setHistory(history: FirebaseHistory) {
-        console.log("SetHistory", history);
         if (this._history.some) {
             this._history.safeValue().activeHistoryView = None;
         }
@@ -48,7 +47,6 @@ export class HistoryProgressView extends ItemView {
     }
 
     public clearHistory() {
-        console.log("Cleared history");
         this._history = None;
         this.updateView();
     }
@@ -68,9 +66,6 @@ export class HistoryProgressView extends ItemView {
 
     public override onClose() {
         CURRENT_HISTORY_VIEW = None;
-        // if (this._contextProvider.some) {
-        //     this._contextProvider.safeValue().clearCallbacks();
-        // }
         return Promise.resolve();
     }
 

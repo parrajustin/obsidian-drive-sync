@@ -16,9 +16,6 @@ export class HistoryContainer extends LitElement {
         }
     `;
 
-    // @provide({ context: historyView.appContext })
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-
     // Vault name.
     @property()
     public vaultName = "No Vault";
@@ -39,7 +36,6 @@ export class HistoryContainer extends LitElement {
 
     // Render the UI as a function of component state
     public override render() {
-        console.log("history container", this.provider, this);
         return html`<h1>History for ${this.vaultName}!</h1>
             <div class="history-entry-list">
                 ${this.historyEntries.map(
