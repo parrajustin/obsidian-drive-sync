@@ -32,6 +32,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -54,6 +55,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -97,6 +99,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -117,6 +120,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -137,6 +141,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -190,6 +195,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -210,6 +216,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -232,6 +239,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -281,6 +289,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -301,6 +310,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -323,6 +333,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -343,6 +354,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -392,6 +404,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: true,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -414,6 +427,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: None,
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -458,6 +472,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -478,6 +493,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -500,6 +516,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -548,6 +565,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -568,6 +586,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -590,6 +609,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -638,6 +658,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -660,6 +681,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -703,6 +725,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -723,6 +746,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -745,6 +769,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -784,6 +809,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -804,6 +830,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -826,6 +853,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -846,6 +874,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -885,6 +914,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -907,6 +937,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: true,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -950,6 +981,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -972,6 +1004,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: None,
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -1015,6 +1048,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -1037,6 +1071,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -1080,6 +1115,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",
@@ -1102,6 +1138,7 @@ describe("ConvergeMapsToUpdateStates", () => {
                 userId: Some("User1"),
                 deleted: false,
                 localDataType: None,
+                cloudDataType: None,
 
                 fileStorageRef: None,
                 vaultName: "",

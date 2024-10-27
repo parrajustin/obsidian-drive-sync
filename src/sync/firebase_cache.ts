@@ -1,4 +1,5 @@
 import { None, Some } from "../lib/option";
+import type { CloudDataType } from "./file_node";
 import { FileNode } from "./file_node";
 import type { FileMapOfNodes } from "./file_node_util";
 import { FlattenFileNodes } from "./file_node_util";
@@ -35,6 +36,8 @@ export interface CacheModel<TExtraData = unknown> {
     extraData?: TExtraData;
     /** The hash of the file contents. */
     fileHash?: string;
+    /** The cloud data type if this is from the cloud. */
+    cloudDataType?: CloudDataType;
 }
 
 export interface FirebaseStoredData<TExtraData = unknown> {
@@ -70,6 +73,7 @@ export function ConvertCacheToFileNode<TExtraData = unknown>(
             syncerConfigId: model.syncerConfigId,
             isFromCloudCache: true,
             localDataType: None,
+            cloudDataType: model.cloudDataType === undefined ? None : Some(model.cloudDataType),
             fileHash: model.fileHash !== undefined ? Some(model.fileHash) : None
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any

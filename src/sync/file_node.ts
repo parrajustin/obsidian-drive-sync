@@ -11,6 +11,12 @@ interface LocalRawFile {
 
 export type LocalDataType = LocalObsidianFile | LocalRawFile;
 
+/** Denotes where the data came from. */
+export enum CloudDataType {
+    FILE = "file",
+    HISTORIC = "historic"
+}
+
 export interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
     /** Full filepath. */
     fullPath: string;
@@ -38,6 +44,8 @@ export interface FileNodeParams<TypeOfData extends Option<string> = Option<strin
     fileStorageRef: Option<string>;
     /** If this is a local file this denotes where the data is. */
     localDataType: Option<LocalDataType>;
+    /** The cloud data type if this is from the cloud. */
+    cloudDataType: Option<CloudDataType>;
     /** The id of the device. */
     deviceId: Option<string>;
     /** The syncer config id that pushed the update. */
@@ -83,6 +91,7 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraD
             data: None,
             fileStorageRef: None,
             localDataType: Some(backingdata),
+            cloudDataType: None,
             deviceId: None,
             syncerConfigId: syncerConfigId,
             isFromCloudCache: false,

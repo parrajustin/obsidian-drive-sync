@@ -6,7 +6,7 @@ import type {
 } from "firebase/firestore";
 import { Bytes } from "firebase/firestore";
 import type { FileNodeParams } from "../sync/file_node";
-import { FileNode } from "../sync/file_node";
+import { CloudDataType, FileNode } from "../sync/file_node";
 import type { UserCredential } from "firebase/auth";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
@@ -105,6 +105,7 @@ export class HistorySchemaConverter
             data: data.data !== null ? Some(data.data.toUint8Array()) : None,
             fileStorageRef: data.fileStorageRef !== null ? Some(data.fileStorageRef) : None,
             localDataType: None,
+            cloudDataType: Some(CloudDataType.HISTORIC),
             deviceId: Some(data.deviceId),
             syncerConfigId: data.syncerConfigId,
             isFromCloudCache: false,

@@ -144,6 +144,7 @@ export function CreateOperationsToUpdateCloud(
                 data: None,
                 fileStorageRef: None,
                 localDataType: None,
+                cloudDataType: None,
                 deviceId: None,
                 syncerConfigId: syncConfig.syncerId,
                 isFromCloudCache: false,

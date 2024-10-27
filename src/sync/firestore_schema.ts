@@ -6,7 +6,7 @@ import type {
 } from "firebase/firestore";
 import { Bytes } from "firebase/firestore";
 import type { FileNodeParams } from "./file_node";
-import { FileNode } from "./file_node";
+import { CloudDataType, FileNode } from "./file_node";
 import type { UserCredential } from "firebase/auth";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
@@ -94,6 +94,7 @@ export class FileSchemaConverter implements FirestoreDataConverter<FileNode, Fil
             data: data.data !== null ? Some(data.data.toUint8Array()) : None,
             fileStorageRef: data.fileStorageRef !== null ? Some(data.fileStorageRef) : None,
             localDataType: None,
+            cloudDataType: Some(CloudDataType.FILE),
             deviceId: Some(data.deviceId),
             syncerConfigId: data.syncerConfigId,
             isFromCloudCache: false,

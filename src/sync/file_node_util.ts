@@ -99,6 +99,7 @@ async function GetRawNode(
         fileId: None,
         userId: None,
         localDataType: Some(dataType),
+        cloudDataType: None,
         deleted: false,
         vaultName: config.vaultName,
         data: None,
