@@ -29,7 +29,7 @@ export class HistoryEntry extends LitElement {
             flex-direction: column;
             max-height: 0px;
             transition: max-height 0.25s ease-out;
-            overflow-y: hidden;
+            overflow-y: auto;
             border-left: 2px solid white;
             padding-left: 4px;
             gap: 4px;
@@ -89,7 +89,7 @@ export class HistoryEntry extends LitElement {
         if (this._isOpen) {
             this._entryList.style.maxHeight = "0px";
         } else {
-            this._entryList.style.maxHeight = "2000px";
+            this._entryList.style.maxHeight = "800px";
         }
         this._isOpen = !this._isOpen;
     }

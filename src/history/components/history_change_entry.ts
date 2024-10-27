@@ -18,6 +18,7 @@ export class HistoryChangeEntry extends LitElement {
             display: flex;
             flex: 1 1 auto;
             flex-direction: column;
+            overflow-x: auto;
         }
         .actions-container {
             display: flex;
@@ -56,6 +57,9 @@ export class HistoryChangeEntry extends LitElement {
                     .andThen((n) => html`<span>${n}</span>`)
                     .valueOr(html``)}
                 <span>Size: ${this.changeFileNode.data.size}</span>
+                ${this.changeFileNode.data.fileHash
+                    .andThen((n) => html`<span>Hash: ${n}</span>`)
+                    .valueOr(html``)}
             </div>
             <div class="actions-container">
                 <div class="icon-btn">${diffIcon}</div>
