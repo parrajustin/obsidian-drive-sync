@@ -33,6 +33,14 @@ export class HistoryChangeEntry extends LitElement {
         .icon-btn:active {
             border: 1px dotted white;
         }
+        .row {
+            display: flex;
+            flex-direction: row;
+        }
+        .row .trim {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     `;
 
     @property()
@@ -58,7 +66,12 @@ export class HistoryChangeEntry extends LitElement {
                     .valueOr(html``)}
                 <span>Size: ${this.changeFileNode.data.size}</span>
                 ${this.changeFileNode.data.fileHash
-                    .andThen((n) => html`<span>Hash: ${n}</span>`)
+                    .andThen(
+                        (n) =>
+                            html`<div class="row">
+                                <span>Hash:</span><span class="trim">${n}</span>
+                            </div>`
+                    )
                     .valueOr(html``)}
             </div>
             <div class="actions-container">
