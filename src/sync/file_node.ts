@@ -58,7 +58,10 @@ export interface FileNodeParams<TypeOfData extends Option<string> = Option<strin
 
 /** File node for book keeping. */
 
-export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraData = unknown> {
+export class FileNode<
+    TypeOfData extends Option<string> = Option<string>,
+    ExtraData extends object = object
+> {
     constructor(
         public data: FileNodeParams<TypeOfData>,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
@@ -142,7 +145,20 @@ export class FileNode<TypeOfData extends Option<string> = Option<string>, ExtraD
     }
 
     public toString() {
-        return this.data.fullPath;
+        const attributes: string[] = [
+            this.data.fileId.andThen((val) => `Id: ${val}`).valueOr(""),
+            this.data.localDataType.some
+                ? `LocalType: ${this.data.localDataType.safeValue().type}`
+                : this.data.cloudDataType
+                      .andThen((val) => `CloudType: ${val}`)
+                      .valueOr("Cloud UnknownType"),
+            this.data.fileHash.andThen((hash) => `Hash: ${hash}`).valueOr(""),
+            ...Object.keys(this.extraData).map(
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
+                (key) => `${key}: ${JSON.stringify((this.extraData as any)[key as any] as any)}`
+            )
+        ].filter((v) => v !== "");
+        return `File "${this.data.fullPath}" [${attributes.join(", ")}]`;
     }
 
     /** Checks if the data are equal in both file nodes. */

@@ -35,9 +35,9 @@ export interface CacheModel<TExtraData = unknown> {
     /** Any filenode extra data. */
     extraData?: TExtraData;
     /** The hash of the file contents. */
-    fileHash?: string;
+    fileHash?: string | null;
     /** The cloud data type if this is from the cloud. */
-    cloudDataType?: CloudDataType;
+    cloudDataType?: CloudDataType | null;
 }
 
 export interface FirebaseStoredData<TExtraData = unknown> {
@@ -73,8 +73,14 @@ export function ConvertCacheToFileNode<TExtraData = unknown>(
             syncerConfigId: model.syncerConfigId,
             isFromCloudCache: true,
             localDataType: None,
-            cloudDataType: model.cloudDataType === undefined ? None : Some(model.cloudDataType),
-            fileHash: model.fileHash !== undefined ? Some(model.fileHash) : None
+            cloudDataType:
+                model.cloudDataType === undefined || model.cloudDataType === null
+                    ? None
+                    : Some(model.cloudDataType),
+            fileHash:
+                model.fileHash !== undefined && model.fileHash !== null
+                    ? Some(model.fileHash)
+                    : None
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
         model.extraData ?? ({} as any)
@@ -115,7 +121,9 @@ export function ConvertFlatFileNodesToCache<TExtraData = unknown>(
             vaultName: node.data.vaultName,
             deviceId: node.data.deviceId.some ? node.data.deviceId.safeValue() : "CACHED NONE",
             syncerConfigId: node.data.syncerConfigId,
-            extraData: node.extraData
+            extraData: node.extraData,
+            fileHash: node.data.fileHash.valueOr(null),
+            cloudDataType: node.data.cloudDataType.valueOr(null)
         };
         lastUpdate = Math.max(lastUpdate, node.data.mtime);
         cache.push(entry);

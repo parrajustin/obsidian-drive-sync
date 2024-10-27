@@ -3,9 +3,11 @@ import { ItemView } from "obsidian";
 import { None, Some } from "../lib/option";
 import type { Option } from "../lib/option";
 import type { FirebaseHistory } from "./firebase_hist";
-import { html, render } from "lit";
+import { html, render, RootPart } from "lit";
 import type { HistoryEntryData } from "./components/history_entry_data";
-
+import { ContextProvider, createContext } from "@lit/context";
+import type { Firestore } from "firebase/firestore";
+import type { UserCredential } from "firebase/auth";
 import "./components/history_container";
 import "./components/history_entry";
 import "./components/history_change_entry";
@@ -13,9 +15,19 @@ import "./components/history_change_entry";
 let CURRENT_HISTORY_VIEW: Option<WorkspaceLeaf> = None;
 export const HISTORY_VIEW_TYPE = "drive-sync-history-view";
 
+export interface AppContext {
+    app: App;
+    db: Firestore;
+    creds: UserCredential;
+}
+
+const CONTEXT_KEY = Symbol.for("AppContext");
+export const appContext = createContext<AppContext, typeof CONTEXT_KEY>(CONTEXT_KEY);
+
 export class HistoryProgressView extends ItemView {
     private _container: HTMLElement;
     private _history: Option<FirebaseHistory> = None;
+    private _rootPart: Option<RootPart> = None;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -56,15 +68,23 @@ export class HistoryProgressView extends ItemView {
 
     public override onClose() {
         CURRENT_HISTORY_VIEW = None;
+        // if (this._contextProvider.some) {
+        //     this._contextProvider.safeValue().clearCallbacks();
+        // }
         return Promise.resolve();
     }
 
     public updateView() {
-        console.log("updateView", this._history);
+        if (this._rootPart.some) {
+            this._rootPart.safeValue().setConnected(false);
+            this._rootPart = None;
+        }
         if (this._history.none) {
             this._container.empty();
             return;
         }
+
+        // Convert history nodes to a format for the lit html.
         const history = this._history.safeValue().getHistoricNodes();
         const mapFileIdToNodes = new Map<string, HistoryEntryData>();
         for (const [_, entry] of history) {
@@ -97,12 +117,19 @@ export class HistoryProgressView extends ItemView {
         historyEntries.forEach((n) => {
             n.historyNodes.sort((a, b) => b.data.mtime - a.data.mtime);
         });
+
         render(
             html`<history-container
+                .context="${{
+                    app: this.app,
+                    db: this._history.safeValue().db,
+                    creds: this._history.safeValue().creds
+                }}"
                 .vaultName="${this._history.safeValue().getVaultName()}"
                 .historyEntries="${historyEntries}"
             ></history-container>`,
-            this._container
+            this._container,
+            { isConnected: true, host: this }
         );
     }
 }

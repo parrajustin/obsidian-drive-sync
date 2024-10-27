@@ -63,11 +63,6 @@ function UploadFileToFirestore(
     userId: string,
     fileId: string
 ) {
-    // Upload the new file.
-    const entry = `${userId}/${fileId}`;
-    const documentRef = doc(db, entry).withConverter(GetFileSchemaConverter());
-    transaction.set(documentRef, node);
-
     // Upload the cloud node which is the old one, to the history. If any.
     if (cloudNode.some) {
         const histEntry = `hist/${uuidv7()}`;
@@ -77,6 +72,11 @@ function UploadFileToFirestore(
             cloudNode.safeValue() as FileNode<Some<string>, HistoryFileNodeExtra>
         );
     }
+
+    // Upload the new file.
+    const entry = `${userId}/${fileId}`;
+    const documentRef = doc(db, entry).withConverter(GetFileSchemaConverter());
+    transaction.set(documentRef, node);
 }
 
 /**

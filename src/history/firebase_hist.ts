@@ -83,8 +83,8 @@ export class FirebaseHistory {
     private constructor(
         private _plugin: FirestoreSyncPlugin,
         private _config: SyncerConfig,
-        private _creds: UserCredential,
-        private _db: Firestore,
+        public creds: UserCredential,
+        public db: Firestore,
         private _historicChanges: Map<string, FileNode<Some<string>, HistoryFileNodeExtra>>,
         private _mapOfLocalFile: Map<string, FileNode>
     ) {
@@ -146,10 +146,9 @@ export class FirebaseHistory {
     /** Initializes the real time subscription on firestore data. */
     public initailizeRealTimeUpdates() {
         const queryOfFiles = query(
-            collection(this._db, "hist"),
-            where("userId", "==", this._creds.user.uid),
-            where("vaultName", "==", this._config.vaultName),
-            where("mTime", ">=", this._config.storedFirebaseHistory.lastUpdate)
+            collection(this.db, "hist"),
+            where("userId", "==", this.creds.user.uid),
+            where("vaultName", "==", this._config.vaultName)
         ).withConverter(GetHistorySchemaConverter());
 
         this._unsubscribe = Some(
@@ -233,8 +232,8 @@ export class FirebaseHistory {
 
     private async resetHistoryData() {
         const newNodes = await GetHistoryData(
-            this._db,
-            this._creds,
+            this.db,
+            this.creds,
             this._config,
             /*startTimestamp=*/ 0
         );
@@ -260,7 +259,7 @@ export class FirebaseHistory {
         }
 
         let hasChange = false;
-        const batcher = writeBatch(this._db);
+        const batcher = writeBatch(this.db);
         const keptHistoricChanges = new Map<string, FileNode<Some<string>, HistoryFileNodeExtra>>();
         // Now for the ones that have > max number of entries sort them and delete the old ones.
         for (const [_, changes] of historyByFileId) {
@@ -286,7 +285,7 @@ export class FirebaseHistory {
             // Delete old changes.
             for (const deleteEntry of changes.slice(MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT)) {
                 console.log("attemting to remove", deleteEntry.extraData.historyDocId);
-                batcher.delete(doc(this._db, "hist", deleteEntry.extraData.historyDocId));
+                batcher.delete(doc(this.db, "hist", deleteEntry.extraData.historyDocId));
             }
         }
         if (hasChange) {

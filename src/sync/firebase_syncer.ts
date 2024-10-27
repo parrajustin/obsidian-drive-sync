@@ -39,6 +39,7 @@ import type { SyncerConfig } from "../settings/syncer_config_data";
 import { ConvertMapOfFileNodesToCache, GetFlatFileNodesFromCache } from "./firebase_cache";
 import type FirestoreSyncPlugin from "../main";
 import { ConvertToUnknownError } from "../util";
+import { GetFileCollectionPath } from "../firestore/file_db_util";
 
 /**
  * Syncer that maintains the firebase file map state.
@@ -70,7 +71,7 @@ export class FirebaseSyncer {
 
         // Get the file metadata from firestore.
         const queryOfFiles = query(
-            collection(db, creds.user.uid),
+            collection(db, GetFileCollectionPath(creds)),
             where("userId", "==", creds.user.uid),
             where("vaultName", "==", config.vaultName),
             where("mTime", ">=", config.storedFirebaseCache.lastUpdate)
@@ -110,7 +111,7 @@ export class FirebaseSyncer {
     /** Initializes the real time subscription on firestore data. */
     public initailizeRealTimeUpdates() {
         const queryOfFiles = query(
-            collection(this._db, this._creds.user.uid),
+            collection(this._db, GetFileCollectionPath(this._creds)),
             where("userId", "==", this._creds.user.uid),
             where("vaultName", "==", this._config.vaultName),
             where("mTime", ">=", this._config.storedFirebaseCache.lastUpdate)

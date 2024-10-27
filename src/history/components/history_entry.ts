@@ -10,6 +10,7 @@ export class HistoryEntry extends LitElement {
         .history-entry-container {
             display: flex;
             flex-direction: column;
+            border-bottom: 1px solid white;
         }
         .header-entry-header {
             display: flex;

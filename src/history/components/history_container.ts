@@ -1,6 +1,8 @@
 import { LitElement, css, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { HistoryArray } from "./history_entry_data";
+import * as historyView from "../history_view";
+import { ContextProvider } from "@lit/context";
 
 @customElement("history-container")
 export class HistoryContainer extends LitElement {
@@ -10,9 +12,12 @@ export class HistoryContainer extends LitElement {
             display: flex;
             flex-direction: column;
             width: 100%;
-            gap: 4px;
+            gap: 8px;
         }
     `;
+
+    // @provide({ context: historyView.appContext })
+    // eslint-disable-next-line @typescript-eslint/naming-convention
 
     // Vault name.
     @property()
@@ -21,9 +26,20 @@ export class HistoryContainer extends LitElement {
     @property()
     public historyEntries: HistoryArray[] = [];
 
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    private provider = new ContextProvider(this, {
+        context: historyView.appContext,
+        initialValue: {} as historyView.AppContext
+    });
+
+    @property({ attribute: false })
+    public set context(v: historyView.AppContext) {
+        this.provider.setValue(v);
+    }
+
     // Render the UI as a function of component state
     public override render() {
-        console.log("historyEntries", this.historyEntries);
+        console.log("history container", this.provider, this);
         return html`<h1>History for ${this.vaultName}!</h1>
             <div class="history-entry-list">
                 ${this.historyEntries.map(

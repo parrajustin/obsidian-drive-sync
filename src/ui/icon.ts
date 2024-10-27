@@ -8,7 +8,8 @@ export enum IconName {
     CIRCLE_CHEVRON_DOWN = "circle-chevron-down",
     CIRCLE_CHEVRON_UP = "circle-chevron-up",
     DIFF = "diff",
-    ASTERICK = "asterisk"
+    ASTERICK = "asterisk",
+    EYE = "eye"
 }
 
 export function CreateIcon(hoverToolTip: string, iconName: IconName) {
@@ -53,6 +54,9 @@ export function CreateIcon(hoverToolTip: string, iconName: IconName) {
             break;
         case IconName.ASTERICK:
             iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-asterisk"><path d="M12 6v12"/><path d="M17.196 9 6.804 15"/><path d="m6.804 9 10.392 6"/></svg>`;
+            break;
+        case IconName.EYE:
+            iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`;
             break;
     }
     return iconSpan;

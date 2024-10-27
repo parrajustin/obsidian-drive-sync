@@ -4,6 +4,9 @@ import { Option } from "../../lib/option";
 import { FileNode } from "../../sync/file_node";
 import type { HistoryFileNodeExtra } from "../history_schema";
 import { CreateIcon, IconName } from "../../ui/icon";
+import { ViewModal } from "./view_modal";
+import { ContextConsumer } from "@lit/context";
+import { appContext } from "../history_view";
 
 @customElement("history-change-entry")
 export class HistoryChangeEntry extends LitElement {
@@ -49,10 +52,15 @@ export class HistoryChangeEntry extends LitElement {
     @property()
     public isActive = false;
 
+    private _appContext = new ContextConsumer(this, {
+        subscribe: true,
+        context: appContext
+    });
+
     // Render the UI as a function of component state
     public override render() {
         const diffIcon = CreateIcon("Dif", IconName.DIFF);
-        const setActive = CreateIcon("Set Active", IconName.ASTERICK);
+        const viewIcon = CreateIcon("View Icon", IconName.EYE);
         return html`<div class="change-container">
             <div class="property-container">
                 <span>${this.changeFileNode.data.fullPath}</span>
@@ -76,7 +84,23 @@ export class HistoryChangeEntry extends LitElement {
             </div>
             <div class="actions-container">
                 <div class="icon-btn">${diffIcon}</div>
-                ${!this.isActive ? html`<div class="icon-btn">${setActive}</div>` : html``}
+                <div
+                    class="icon-btn"
+                    @click="${() => {
+                        if (this._appContext.value === undefined) {
+                            return;
+                        }
+                        const modal = new ViewModal(
+                            this._appContext.value.app,
+                            this._appContext.value.db,
+                            this._appContext.value.creds,
+                            this.changeFileNode
+                        );
+                        modal.open();
+                    }}"
+                >
+                    ${viewIcon}
+                </div>
             </div>
         </div>`;
     }
