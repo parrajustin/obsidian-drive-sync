@@ -112,7 +112,8 @@ export class FirebaseSyncer {
         const queryOfFiles = query(
             collection(this._db, this._creds.user.uid),
             where("userId", "==", this._creds.user.uid),
-            where("vaultName", "==", this._config.vaultName)
+            where("vaultName", "==", this._config.vaultName),
+            where("mTime", ">=", this._config.storedFirebaseCache.lastUpdate)
         ).withConverter(GetFileSchemaConverter());
 
         this._unsubscribe = Some(
