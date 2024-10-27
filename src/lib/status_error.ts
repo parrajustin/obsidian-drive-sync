@@ -39,7 +39,8 @@ export enum ErrorCode {
 /** An error holder. */
 export class StatusError {
     private readonly _stack!: string;
-    private readonly _additionalData = new Map<string, string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private readonly _additionalData = new Map<string, any>();
 
     constructor(
         /* The status error code. */
@@ -56,7 +57,8 @@ export class StatusError {
         this._stack = stackLines.join("\n");
     }
 
-    public setPayload(name: string, payload: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    public setPayload(name: string, payload: any) {
         this._additionalData.set(name, payload);
     }
 
