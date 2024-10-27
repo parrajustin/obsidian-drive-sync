@@ -55,7 +55,7 @@ export interface Identifiers {
 }
 
 /** Upload the file to firestore. Also uploads the data to history. */
-function UploadFileToFirestore(
+async function UploadFileToFirestore(
     db: Firestore,
     transaction: Transaction,
     node: FileNode,
@@ -63,18 +63,22 @@ function UploadFileToFirestore(
     userId: string,
     fileId: string
 ) {
+    const entry = `${userId}/${fileId}`;
     // Upload the cloud node which is the old one, to the history. If any.
     if (cloudNode.some) {
+        const result = await transaction.get(
+            doc(db, entry).withConverter(GetFileSchemaConverter())
+        );
+        const fetchedCloudNode = result.data() as FileNode<Some<string>>;
         const histEntry = `hist/${uuidv7()}`;
         const histDocumentRef = doc(db, histEntry).withConverter(GetHistorySchemaConverter());
         transaction.set(
             histDocumentRef,
-            cloudNode.safeValue() as FileNode<Some<string>, HistoryFileNodeExtra>
+            fetchedCloudNode as FileNode<Some<string>, HistoryFileNodeExtra>
         );
     }
 
     // Upload the new file.
-    const entry = `${userId}/${fileId}`;
     const documentRef = doc(db, entry).withConverter(GetFileSchemaConverter());
     transaction.set(documentRef, node);
 }
@@ -226,8 +230,8 @@ export function CreateOperationsToUpdateCloud(
             // Upload the data to firestore.
             const uploadNode = new FileNode<Some<string>>(node);
             const transactionResult = await WrapPromise(
-                runTransaction(db, (transaction: Transaction): Promise<void> => {
-                    UploadFileToFirestore(
+                runTransaction(db, async (transaction: Transaction): Promise<void> => {
+                    await UploadFileToFirestore(
                         db,
                         transaction,
                         uploadNode,

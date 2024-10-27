@@ -5,7 +5,7 @@ import type { FileMapOfNodes } from "./file_node_util";
 import { FlattenFileNodes } from "./file_node_util";
 
 /** Cached information from firestore data. */
-export interface CacheModel<TExtraData = unknown> {
+export interface CacheModel<TExtraData extends object = object> {
     // Full filepath.
     path: string;
     // The file creation time.
@@ -40,7 +40,7 @@ export interface CacheModel<TExtraData = unknown> {
     cloudDataType?: CloudDataType | null;
 }
 
-export interface FirebaseStoredData<TExtraData = unknown> {
+export interface FirebaseStoredData<TExtraData extends object = object> {
     /** The date of the latest update. */
     lastUpdate: number;
     /** Cached data has everything but the actual file data. */
@@ -52,7 +52,7 @@ export interface FirebaseStoredData<TExtraData = unknown> {
  * @param model the cache data to turn to a fileNode
  * @returns a file node
  */
-export function ConvertCacheToFileNode<TExtraData = unknown>(
+export function ConvertCacheToFileNode<TExtraData extends object = object>(
     model: CacheModel<TExtraData>
 ): FileNode<Some<string>, TExtraData> {
     return new FileNode<Some<string>, TExtraData>(
@@ -88,7 +88,7 @@ export function ConvertCacheToFileNode<TExtraData = unknown>(
 }
 
 /** Converts the cache data to FileNodes. in flat array form. */
-export function GetFlatFileNodesFromCache<TExtraData = unknown>(
+export function GetFlatFileNodesFromCache<TExtraData extends object = object>(
     cache: CacheModel<TExtraData>[]
 ): FileNode<Some<string>, TExtraData>[] {
     const nodes: FileNode<Some<string>, TExtraData>[] = [];
@@ -99,7 +99,7 @@ export function GetFlatFileNodesFromCache<TExtraData = unknown>(
 }
 
 /** Converts a flat array of file nodes to the cache entry. */
-export function ConvertFlatFileNodesToCache<TExtraData = unknown>(
+export function ConvertFlatFileNodesToCache<TExtraData extends object = object>(
     flatNodes: FileNode<Some<string>, TExtraData>[]
 ): FirebaseStoredData<TExtraData> {
     const cache: CacheModel<TExtraData>[] = [];

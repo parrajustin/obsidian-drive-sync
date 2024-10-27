@@ -87,12 +87,8 @@ export async function ReadFileNode(
     creds: UserCredential,
     fileNode: FileNode | FileNode<Option<string>, HistoryFileNodeExtra>
 ): Promise<Result<Uint8Array, StatusError>> {
-    if (!fileNode.data.isFromCloudCache) {
-        return ReadFile(
-            app,
-            fileNode.data.fullPath,
-            fileNode.data.localDataType.valueOr({ type: "RAW" })
-        );
+    if (fileNode.data.localDataType.some) {
+        return ReadFile(app, fileNode.data.fullPath, fileNode.data.localDataType.safeValue());
     }
     if (fileNode.data.fileStorageRef.some) {
         const data = await DownloadFileFromStorage(fileNode.data.fileStorageRef.safeValue());
