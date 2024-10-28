@@ -138,6 +138,7 @@ const config = tseslint.config({
             "prefer": 'type-imports',
           }],
         "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/prefer-string-starts-ends-with": "off",
         "no-console": 1, // Means warning
         "prettier/prettier": 2 // Means error
     }
