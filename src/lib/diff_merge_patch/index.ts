@@ -1,4 +1,4 @@
-export { DiffOp } from "./diff-op.enum";
-export { type Diff } from "./diff.type";
-export { PatchOperation } from "./patch-operation.class";
-export { DiffMatchPatch } from "./diff-match-patch.class";
+export { DiffOp } from "./diff_op";
+export { type DiffPair as Diff } from "./diff_type";
+export { PatchOperation } from "./patch_operation";
+export { DiffMatchPatch } from "./diff_match_patch";

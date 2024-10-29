@@ -31,9 +31,9 @@ import type { Result } from "../result";
 import { Err, Ok } from "../result";
 import type { StatusError } from "../status_error";
 import { InternalError, InvalidArgumentError } from "../status_error";
-import { DiffOp } from "./diff-op.enum";
-import type { Diff } from "./diff.type.ts";
-import { PatchOperation } from "./patch-operation.class";
+import { DiffOp } from "./diff_op";
+import type { DiffPair } from "./diff_type";
+import { ChangeOperation, PatchOperation } from "./patch_operation";
 
 /**
  * Class containing the diff, match and patch methods.
@@ -93,7 +93,7 @@ export class DiffMatchPatch {
         text2: string | null,
         optChecklines?: boolean,
         optDeadline?: number
-    ): Result<Diff[], StatusError> {
+    ): Result<DiffPair[], StatusError> {
         // Set a deadline by which time the diff must be complete.
         if (typeof optDeadline === "undefined") {
             if (this.diffTimeout <= 0) {
@@ -112,7 +112,7 @@ export class DiffMatchPatch {
         // Check for equality (speedup).
         if (text1 === text2) {
             if (text1 !== "") {
-                const diff = [DiffOp.EQUAL, text1] as Diff;
+                const diff = [DiffOp.EQUAL, text1] as DiffPair;
                 return Ok([diff]);
             }
             return Ok([]);
@@ -157,7 +157,7 @@ export class DiffMatchPatch {
      * Reduce the number of edits by eliminating semantically trivial equalities.
      * @param {!Array.<!diff_match_patch.Diff>} diffs Array of diff tuples.
      */
-    public diffCleanupSemantic(diffs: Diff[]): void {
+    public diffCleanupSemantic(diffs: DiffPair[]): void {
         let changes = false;
         const equalities = []; // Stack of indices where equalities are found.
         let equalitiesLength = 0; // Keeping our own length const is faster in JS.
@@ -284,7 +284,7 @@ export class DiffMatchPatch {
      * Reduce the number of edits by eliminating operationally trivial equalities.
      * @param {!Array.<!diff_match_patch.Diff>} diffs Array of diff tuples.
      */
-    public diffCleanupEfficiency(diffs: Diff[]): void {
+    public diffCleanupEfficiency(diffs: DiffPair[]): void {
         let changes = false;
         const equalities = []; // Stack of indices where equalities are found.
         let equalitiesLength = 0; // Keeping our own length const is faster in JS.
@@ -374,7 +374,7 @@ export class DiffMatchPatch {
      * @param {!Array.<!diff_match_patch.Diff>} diffs Array of diff tuples.
      * @return {string} HTML representation.
      */
-    public diffPrettyHtml(diffs: Diff[]): string {
+    public diffPrettyHtml(diffs: DiffPair[]): string {
         const html = [];
         const patternAmp = /&/g;
         const patternLt = /</g;
@@ -409,7 +409,7 @@ export class DiffMatchPatch {
      * @param {!Array.<!diff_match_patch.Diff>} diffs Array of diff tuples.
      * @return {number} Number of changes.
      */
-    public diffLevenshtein(diffs: Diff[]): number {
+    public diffLevenshtein(diffs: DiffPair[]): number {
         let levenshtein = 0;
         let insertions = 0;
         let deletions = 0;
@@ -436,6 +436,105 @@ export class DiffMatchPatch {
     }
 
     /**
+     * Converts Diffs to changes.
+     *
+     * @param {string|!Array.<!diff_match_patch.Diff>} a text1 (methods 1,3,4) or
+     * Array of diff tuples for text1 to text2 (method 2).
+     * @param {string|!Array.<!diff_match_patch.Diff>} optB text2 (methods 1,4) or
+     * Array of diff tuples for text1 to text2 (method 3) or undefined (method 2).
+     * @param {string|!Array.<!diff_match_patch.Diff>} optC Array of diff tuples
+     * for text1 to text2 (method 4) or undefined (methods 1,2,3).
+     * @return {!Array.<!diff_match_patch.PatchOperation>} Array of Patch objects.
+     */
+    public changeMake(diffs: DiffPair[]): Result<ChangeOperation[], StatusError> {
+        if (diffs.length === 0) {
+            return Ok([]); // Get rid of the null case.
+        }
+        const patches: ChangeOperation[] = [];
+        let charCountBase = 0; // Number of characters into the text1 string.
+        let charCountTest = 0; // Number of characters into the text2 string.
+        for (const diff of diffs) {
+            // public baseStart = 0,
+            // public testStart = 0,
+            // public baseEnd = 0,
+            // public testEnd = 0,
+            // public baseLength = 0,
+            // public testLength = 0
+            const baseStart = charCountBase;
+            const testStart = charCountTest;
+            let baseEnd = charCountBase;
+            let testEnd = charCountTest;
+            let baseLength = 0;
+            let testLength = 0;
+
+            const diffType = diff[0];
+            const diffText = diff[1];
+
+            switch (diffType) {
+                case DiffOp.INSERT:
+                    testEnd = testStart + diffText.length;
+                    testLength = diffText.length;
+                    charCountTest += diffText.length;
+                    patches.push(
+                        new ChangeOperation(
+                            diff,
+                            baseStart,
+                            testStart,
+                            baseEnd,
+                            testEnd,
+                            baseLength,
+                            testLength,
+                            "",
+                            diffText
+                        )
+                    );
+                    break;
+                case DiffOp.DELETE:
+                    baseEnd = baseStart + diffText.length;
+                    baseLength = diffText.length;
+                    charCountBase += diffText.length;
+                    patches.push(
+                        new ChangeOperation(
+                            diff,
+                            baseStart,
+                            testStart,
+                            baseEnd,
+                            testEnd,
+                            baseLength,
+                            testLength,
+                            diffText,
+                            ""
+                        )
+                    );
+                    break;
+                case DiffOp.EQUAL:
+                    testEnd = testStart + diffText.length;
+                    testLength = diffText.length;
+                    charCountTest += diffText.length;
+                    baseEnd = baseStart + diffText.length;
+                    baseLength = diffText.length;
+                    charCountBase += diffText.length;
+                    patches.push(
+                        new ChangeOperation(
+                            diff,
+                            baseStart,
+                            testStart,
+                            baseEnd,
+                            testEnd,
+                            baseLength,
+                            testLength,
+                            diffText,
+                            diffText
+                        )
+                    );
+                    break;
+            }
+        }
+
+        return Ok(patches);
+    }
+
+    /**
      * Compute a list of patches to turn text1 into text2.
      * Use diffs if provided, otherwise compute it ourselves.
      * There are four ways to call this function, depending on what data is
@@ -458,12 +557,12 @@ export class DiffMatchPatch {
      * @return {!Array.<!diff_match_patch.PatchOperation>} Array of Patch objects.
      */
     public patchMake(
-        a: string | Diff[],
-        optB?: string | Diff[],
-        optC?: string | Diff[]
+        a: string | DiffPair[],
+        optB?: string | DiffPair[],
+        optC?: string | DiffPair[]
     ): Result<PatchOperation[], StatusError> {
         let text1;
-        let diffs: undefined | Diff[];
+        let diffs: undefined | DiffPair[];
         if (typeof a === "string" && typeof optB === "string" && typeof optC === "undefined") {
             // Method 1: text1, text2
             // Compute diffs from text1 and text2.
@@ -899,7 +998,7 @@ export class DiffMatchPatch {
      * Any edit section can move as long as it doesn't cross an equality.
      * @param {!Array.<!diff_match_patch.Diff>} diffs Array of diff tuples.
      */
-    public diffCleanupMerge(diffs: Diff[]): void {
+    public diffCleanupMerge(diffs: DiffPair[]): void {
         diffs.push([DiffOp.EQUAL, ""]); // Add a dummy entry at the end.
         let pointer = 0;
         let countDelete = 0;
@@ -1056,7 +1155,7 @@ export class DiffMatchPatch {
      * @param {!Array.<!diff_match_patch.Diff>} diffs Array of diff tuples.
      * @return {string} Source text.
      */
-    public diffText1(diffs: Diff[]): string {
+    public diffText1(diffs: DiffPair[]): string {
         const text = [];
         for (let x = 0; x < diffs.length; x++) {
             if (diffs[x]![0] !== DiffOp.INSERT) {
@@ -1071,7 +1170,7 @@ export class DiffMatchPatch {
      * @param {!Array.<!diff_match_patch.Diff>} diffs Array of diff tuples.
      * @return {string} Destination text.
      */
-    public diffText2(diffs: Diff[]): string {
+    public diffText2(diffs: DiffPair[]): string {
         const text = [];
         for (let x = 0; x < diffs.length; x++) {
             if (diffs[x]![0] !== DiffOp.DELETE) {
@@ -1087,7 +1186,7 @@ export class DiffMatchPatch {
      * @param {string} text2 New string to be diffed.
      * @return {!Array.<!diff_match_patch.Diff>} Array of diff tuples.
      */
-    public diffLineMode(text1: string, text2: string): Result<Diff[], StatusError> {
+    public diffLineMode(text1: string, text2: string): Result<DiffPair[], StatusError> {
         const encodedStrings = this.diffLinesToChars(text1, text2);
         const diffs = this.diffMain(encodedStrings.chars1, encodedStrings.chars2, false);
         if (diffs.err) {
@@ -1105,7 +1204,7 @@ export class DiffMatchPatch {
      * @param {!Array.<!diff_match_patch.Diff>} diffs Array of diff tuples.
      * @return {string} Delta text.
      */
-    public diffToDelta(diffs: Diff[]): string {
+    public diffToDelta(diffs: DiffPair[]): string {
         const text = [];
         for (let x = 0; x < diffs.length; x++) {
             switch (diffs[x]![0]) {
@@ -1131,8 +1230,8 @@ export class DiffMatchPatch {
      * @return {!Array.<!diff_match_patch.Diff>} Array of diff tuples.
      * @throws {!Error} If invalid input.
      */
-    public diffFromDelta(text1: string, delta: string): Result<Diff[], StatusError> {
-        const diffs: Diff[] = [];
+    public diffFromDelta(text1: string, delta: string): Result<DiffPair[], StatusError> {
+        const diffs: DiffPair[] = [];
         let diffsLength = 0; // Keeping our own length const is faster in JS.
         let pointer = 0; // Cursor in text1
         const tokens = delta.split(/\t/g);
@@ -1201,17 +1300,17 @@ export class DiffMatchPatch {
         text2: string,
         checklines: boolean,
         deadline: number
-    ): Result<Diff[], StatusError> {
-        let diffs: Diff[];
+    ): Result<DiffPair[], StatusError> {
+        let diffs: DiffPair[];
 
         if (!text1) {
             // Just add some text (speedup).
-            return Ok([[DiffOp.INSERT, text2]] as Diff[]);
+            return Ok([[DiffOp.INSERT, text2]] as DiffPair[]);
         }
 
         if (!text2) {
             // Just delete some text (speedup).
-            return Ok([[DiffOp.DELETE, text1]] as Diff[]);
+            return Ok([[DiffOp.DELETE, text1]] as DiffPair[]);
         }
 
         const longtext = text1.length > text2.length ? text1 : text2;
@@ -1237,7 +1336,7 @@ export class DiffMatchPatch {
             return Ok([
                 [DiffOp.DELETE, text1],
                 [DiffOp.INSERT, text2]
-            ] as Diff[]);
+            ] as DiffPair[]);
         }
 
         // Check to see if the problem can be split in two.
@@ -1284,7 +1383,7 @@ export class DiffMatchPatch {
         text1: string,
         text2: string,
         deadline: number
-    ): Result<Diff[], StatusError> {
+    ): Result<DiffPair[], StatusError> {
         // Scan the text on a line-by-line basis first.
         const a = this.diffLinesToChars(text1, text2);
         text1 = a.chars1;
@@ -1364,7 +1463,7 @@ export class DiffMatchPatch {
         text1: string,
         text2: string,
         deadline: number
-    ): Result<Diff[], StatusError> {
+    ): Result<DiffPair[], StatusError> {
         // Cache the text lengths to prevent multiple calls.
         const text1Length = text1.length;
         const text2Length = text2.length;
@@ -1480,7 +1579,7 @@ export class DiffMatchPatch {
         return Ok([
             [DiffOp.DELETE, text1],
             [DiffOp.INSERT, text2]
-        ] as Diff[]);
+        ] as DiffPair[]);
     }
 
     /**
@@ -1500,7 +1599,7 @@ export class DiffMatchPatch {
         x: number,
         y: number,
         deadline: number
-    ): Result<Diff[], StatusError> {
+    ): Result<DiffPair[], StatusError> {
         const text1a = text1.substring(0, x);
         const text2a = text2.substring(0, y);
         const text1b = text1.substring(x);
@@ -1596,7 +1695,7 @@ export class DiffMatchPatch {
      * @param {!Array.<string>} lineArray Array of unique strings.
      * @private
      */
-    private diffCharsToLines(diffs: Diff[], lineArray: string[]): void {
+    private diffCharsToLines(diffs: DiffPair[], lineArray: string[]): void {
         for (const diff of diffs) {
             const chars = diff[1];
             const text = [];
@@ -1844,7 +1943,7 @@ export class DiffMatchPatch {
      * e.g: The c<ins>at c</ins>ame. -> The <ins>cat </ins>came.
      * @param {!Array.<!diff_match_patch.Diff>} diffs Array of diff tuples.
      */
-    private diffCleanupSemanticLossless(diffs: Diff[]): void {
+    private diffCleanupSemanticLossless(diffs: DiffPair[]): void {
         let pointer = 1;
         // Intentionally ignore the first and last element (don't need checking).
         while (pointer < diffs.length - 1) {
@@ -1918,7 +2017,7 @@ export class DiffMatchPatch {
      * @param {number} loc Location within text1.
      * @return {number} Location within text2.
      */
-    private diffXIndex(diffs: Diff[], loc: number): number {
+    private diffXIndex(diffs: DiffPair[], loc: number): number {
         let chars1 = 0;
         let chars2 = 0;
         let lastChars1 = 0;

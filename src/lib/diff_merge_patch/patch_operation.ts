@@ -25,15 +25,15 @@
  * limitations under the License.
  */
 
-import { DiffOp } from "./diff-op.enum";
-import type { Diff } from "./diff.type";
+import { DiffOp } from "./diff_op";
+import type { DiffPair } from "./diff_type";
 
 /**
  * Class representing one patch operation.
  * @constructor
  */
 export class PatchOperation {
-    public diffs: Diff[] = [];
+    public diffs: DiffPair[] = [];
     public start1 = 0;
     public start2 = 0;
     public length1 = 0;
@@ -52,7 +52,7 @@ export class PatchOperation {
         } else if (this.length1 === 1) {
             coords1 = this.start1 + 1;
         } else {
-            coords1 = `${this.start1 + 1},this.length1`;
+            coords1 = `${this.start1 + 1},${this.length1}`;
         }
         if (this.length2 === 0) {
             coords2 = `${this.start2},0`;
@@ -80,4 +80,21 @@ export class PatchOperation {
         }
         return text.join("").replace(/%20/g, " ");
     }
+}
+
+/**
+ * Represents a change to the base to get to the test.
+ */
+export class ChangeOperation {
+    constructor(
+        public diff: DiffPair,
+        public baseStart = 0,
+        public testStart = 0,
+        public baseEnd = 0,
+        public testEnd = 0,
+        public baseLength = 0,
+        public testLength = 0,
+        public baseContent = "",
+        public testContent = ""
+    ) {}
 }

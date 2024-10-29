@@ -6,7 +6,7 @@ import type { Firestore } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
 import { DiffMatchPatch } from "../../../lib/diff_merge_patch";
 import { LogError } from "../../../log";
-import type { Option } from "../../../lib/option";
+import { None, Some, type Option } from "../../../lib/option";
 
 export class DiffModal extends Modal {
     constructor(
@@ -23,6 +23,33 @@ export class DiffModal extends Modal {
 
     public override onOpen(): void {
         void (async () => {
+            const baseFileContent = (
+                await this._baseNode
+                    .andThen<Promise<Option<string>>>((n) => {
+                        return new Promise((resolve) => {
+                            void (async () => {
+                                const baseReadResult = await ReadFileNode(
+                                    this.app,
+                                    this._db,
+                                    this._creds,
+                                    n
+                                );
+                                if (baseReadResult.err) {
+                                    resolve(None);
+                                    return;
+                                }
+                                resolve(
+                                    Some(
+                                        new window.TextDecoder("utf-8").decode(
+                                            baseReadResult.safeUnwrap()
+                                        )
+                                    )
+                                );
+                            })();
+                        });
+                    })
+                    .valueOr(Promise.resolve(None))
+            ).valueOr("");
             const aRawFileContent = await ReadFileNode(
                 this.app,
                 this._db,
@@ -62,6 +89,13 @@ export class DiffModal extends Modal {
             console.log(diff);
             this.contentEl.createSpan().innerHTML = patcher.diffPrettyHtml(diff);
             this.contentEl.createDiv().innerText = "TEST";
+            const patchResult = patcher.patchMake(diff);
+            if (patchResult.err) {
+                LogError(patchResult.val);
+                return;
+            }
+            console.log("patchResult", patchResult);
+            this.contentEl.createSpan().innerText = JSON.stringify(patchResult.safeUnwrap());
 
             //   var dmp = new diff_match_patch();
             //   var diff = dmp.diff_main('Hello World.', 'Goodbye World.');
