@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@lit-labs/signals':
+        specifier: 0.1.1
+        version: 0.1.1
       '@lit/context':
         specifier: 1.1.3
         version: 1.1.3
@@ -747,6 +750,9 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@lit-labs/signals@0.1.1':
+    resolution: {integrity: sha512-QQYp2CyXzxaYho4EHKLLOHLMX0Jz8HWUfGGiCKyei54Vol0DqiPggbA1z3t53oYJ3mqU/NTWF+flfcY7Tfpozg==}
 
   '@lit-labs/ssr-dom-shim@1.2.1':
     resolution: {integrity: sha512-wx4aBmgeGvFmOKucFKY+8VFJSYZxs9poN3SDNQFF6lT6NrQUnHiPB2PWz2sc4ieEcAaYYzN+1uWahEeTq2aRIQ==}
@@ -2117,6 +2123,9 @@ packages:
   signal-exit@3.0.7:
     resolution: {integrity: sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ==}
 
+  signal-polyfill@0.2.1:
+    resolution: {integrity: sha512-HtchWosT4UT1i6yIMmxjg7gqkDT9lXvQtJRGVppi2TDwVjgs8cS+7ATVFqBvgJGThludjxrxJFOvmzzGSAc8OA==}
+
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
@@ -3287,6 +3296,11 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
+
+  '@lit-labs/signals@0.1.1':
+    dependencies:
+      lit: 3.2.1
+      signal-polyfill: 0.2.1
 
   '@lit-labs/ssr-dom-shim@1.2.1': {}
 
@@ -4916,6 +4930,8 @@ snapshots:
   shebang-regex@3.0.0: {}
 
   signal-exit@3.0.7: {}
+
+  signal-polyfill@0.2.1: {}
 
   sisteransi@1.0.5: {}
 

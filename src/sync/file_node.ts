@@ -176,4 +176,23 @@ export class FileNode<
             this.data.fileHash.equals(other.data.fileHash)
         );
     }
+
+    public cloneWithChange(
+        modification: Partial<{ data: Partial<FileNodeParams>; extra: Partial<ExtraData> }>
+    ): FileNode<TypeOfData, ExtraData> {
+        const node = new FileNode({ ...this.data }, { ...this.extraData });
+        if (modification.data !== undefined) {
+            for (const key in modification.data) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+                (node.data as any)[key] = (modification.data as any)[key];
+            }
+        }
+        if (modification.extra !== undefined) {
+            for (const key in modification.extra) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+                (node.extraData as any)[key] = (modification.extra as any)[key];
+            }
+        }
+        return node;
+    }
 }

@@ -25,6 +25,8 @@ interface BaseOption<T> {
 
     /** Checks if both options are the same. */
     equals<U>(other: Option<U>): boolean;
+
+    clone(): BaseOption<T>;
 }
 
 /**
@@ -66,6 +68,10 @@ export class NoneImpl implements BaseOption<never> {
             return true;
         }
         return false;
+    }
+
+    public clone() {
+        return None;
     }
 }
 
@@ -142,6 +148,10 @@ export class SomeImpl<T> implements BaseOption<T> {
             return false;
         }
         return other.safeValue() === this.val;
+    }
+
+    public clone() {
+        return Some(this.val);
     }
 }
 

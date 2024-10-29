@@ -74,7 +74,10 @@ async function UploadFileToFirestore(
         const histDocumentRef = doc(db, histEntry).withConverter(GetHistorySchemaConverter());
         transaction.set(
             histDocumentRef,
-            fetchedCloudNode as FileNode<Some<string>, HistoryFileNodeExtra>
+            fetchedCloudNode.cloneWithChange({ data: { mtime: Date.now() } }) as FileNode<
+                Some<string>,
+                HistoryFileNodeExtra
+            >
         );
     }
 

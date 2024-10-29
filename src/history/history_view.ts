@@ -9,6 +9,10 @@ import type { HistoryEntryData } from "./components/history_entry_data";
 import { createContext } from "@lit/context";
 import type { Firestore } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
+import { Signal, signal } from "@lit-labs/signals";
+import type { FileNode } from "../sync/file_node";
+import { DiffModal } from "./components/diff_modal/diff_modal";
+import type { HistoryFileNodeExtra } from "./history_schema";
 import "./components/history_container";
 import "./components/history_entry";
 import "./components/history_change_entry";
@@ -16,10 +20,18 @@ import "./components/history_change_entry";
 let CURRENT_HISTORY_VIEW: Option<WorkspaceLeaf> = None;
 export const HISTORY_VIEW_TYPE = "drive-sync-history-view";
 
+export const DIFF_SIGNAL = signal<
+    [
+        Option<FileNode<Some<string>, HistoryFileNodeExtra>>,
+        Option<FileNode<Some<string>, HistoryFileNodeExtra>>
+    ]
+>([None, None]);
+
 export interface AppContext {
     app: App;
     db: Firestore;
     creds: UserCredential;
+    diff: typeof DIFF_SIGNAL;
 }
 
 const CONTEXT_KEY = Symbol.for("AppContext");
@@ -29,6 +41,46 @@ export class HistoryProgressView extends ItemView {
     private _container: HTMLElement;
     private _history: Option<FirebaseHistory> = None;
     private _rootPart: Option<RootPart> = None;
+    private _entries: Option<HistoryEntryData[]> = None;
+    private _watcher = new Signal.subtle.Watcher(() => {
+        void (async () => {
+            // Wait to let the signals notification phase pass.
+            await Promise.resolve();
+
+            const data = DIFF_SIGNAL.get();
+            if (this._history.some && data[0].some && data[1].some && this._entries.some) {
+                const fileId = data[0].safeValue().data.fileId.valueOr("");
+                const historyIds = [
+                    data[0].safeValue().extraData.historyDocId,
+                    data[1].safeValue().extraData.historyDocId
+                ];
+                let countFound = 0;
+                let baseNode: Option<FileNode<Option<string>, HistoryFileNodeExtra>> = None;
+                const thisHistoryDocNodes = this._entries
+                    .safeValue()
+                    .find((v) => v.fileId === fileId);
+                for (const entry of thisHistoryDocNodes?.historyNodes ?? []) {
+                    if (countFound === 2) {
+                        baseNode = Some(entry);
+                        break;
+                    }
+                    if (historyIds.contains(entry.extraData.historyDocId)) {
+                        countFound++;
+                    }
+                }
+                const modal = new DiffModal(
+                    this.app,
+                    this._history.safeValue().db,
+                    this._history.safeValue().creds,
+                    baseNode,
+                    data[0].safeValue(),
+                    data[1].safeValue()
+                );
+                modal.open();
+            }
+        })();
+        this._watcher.watch();
+    });
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -62,11 +114,13 @@ export class HistoryProgressView extends ItemView {
 
     public override onOpen() {
         this.updateView();
+        this._watcher.watch(DIFF_SIGNAL);
         return Promise.resolve();
     }
 
     public override onClose() {
         CURRENT_HISTORY_VIEW = None;
+        this._watcher.unwatch(DIFF_SIGNAL);
         return Promise.resolve();
     }
 
@@ -107,22 +161,24 @@ export class HistoryProgressView extends ItemView {
                 mapEntry.historyNodes.push(entry);
             }
         }
-        const historyEntries = [...mapFileIdToNodes.entries()].map((x) => x[1]);
+        this._entries = Some([...mapFileIdToNodes.entries()].map((x) => x[1]));
         // Sorts descending by latest modification time.
-        historyEntries.sort((a, b) => b.latestModification - a.latestModification);
-        historyEntries.forEach((n) => {
+        this._entries.safeValue().sort((a, b) => b.latestModification - a.latestModification);
+        this._entries.safeValue().forEach((n) => {
             n.historyNodes.sort((a, b) => b.data.mtime - a.data.mtime);
         });
 
+        const context: AppContext = {
+            app: this.app,
+            db: this._history.safeValue().db,
+            creds: this._history.safeValue().creds,
+            diff: DIFF_SIGNAL
+        };
         render(
             html`<history-container
-                .context="${{
-                    app: this.app,
-                    db: this._history.safeValue().db,
-                    creds: this._history.safeValue().creds
-                }}"
+                .context="${context}"
                 .vaultName="${this._history.safeValue().getVaultName()}"
-                .historyEntries="${historyEntries}"
+                .historyEntries="${this._entries.safeValue()}"
             ></history-container>`,
             this._container,
             { isConnected: true, host: this }
