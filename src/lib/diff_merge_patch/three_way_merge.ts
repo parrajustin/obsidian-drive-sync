@@ -1,8 +1,12 @@
+import type { Option } from "../option";
+import { None, Some, WrapOptional } from "../option";
 import type { Result } from "../result";
 import { Ok } from "../result";
 import type { StatusError } from "../status_error";
 import { DiffMatchPatch } from "./diff_match_patch";
-import type { ChangeOperation } from "./patch_operation";
+import { DiffOp } from "./diff_op";
+import { ChangeOperation } from "./patch_operation";
+// import type { ChangeOperation } from "./patch_operation";
 
 export enum ChangeType {
     CHOOSE_RIGHT = "choose_right",
@@ -19,9 +23,11 @@ export enum Side {
 export class ThreeWayDiff {
     constructor(
         public changeType: ChangeType,
+        public leftChanges: ChangeOperation[],
         public leftLo: number,
         public leftHi: number,
         public leftStr: string,
+        public rigthChanges: ChangeOperation[],
         public rightLo: number,
         public rightHi: number,
         public rightStr: string,
@@ -30,17 +36,6 @@ export class ThreeWayDiff {
         public baseStr: string
     ) {}
 }
-
-// export default class Diff3 {
-//     constructor(
-//         public left: string[],
-//         public base: string[],
-//         public right: string[]
-//     ) {}
-
-//     public static executeDiff(left: string[], base: string[], right: string[]) {
-//         return new Diff3(left, base, right).getDifferences();
-//     }
 
 export function GetThreeWayDifferences(
     base: string,
@@ -68,191 +63,206 @@ export function GetThreeWayDifferences(
         return rightPatchResult;
     }
 
-    return CollapseDifferences(
-        base,
-        left,
-        right,
-        new DiffDoubleQueue(leftPatchResult.safeUnwrap(), rightPatchResult.safeUnwrap())
-    );
+    // return Ok([]);
+    return Ok(CollapseChanges(leftPatchResult.safeUnwrap(), rightPatchResult.safeUnwrap()));
 }
 
-function CollapseDifferences(
-    base: string,
-    left: string,
-    right: string,
-    diffsQueue: DiffDoubleQueue,
-    diffs: ThreeWayDiff[] = []
-): Result<ThreeWayDiff[], StatusError> {
-    if (diffsQueue.isFinished()) {
-        return Ok(diffs);
-    } else {
-        const resultQueue = new DiffDoubleQueue();
-        const initSide = diffsQueue.chooseSide();
-        // Won't be undefined, we already check `isFinished` and `chooseSide` will set go to non
-        // empty side.
-        const topDiff = diffsQueue.dequeue()!;
+function CollapseChanges(
+    leftChanges: ChangeOperation[],
+    rightChanges: ChangeOperation[]
+): ThreeWayDiff[] {
+    let leftIndex = 0;
+    let rightIndex = 0;
+    let baseIndex = 0;
+    let leftCurrentChange = WrapOptional(leftChanges.shift());
+    let rightCurrentChange = WrapOptional(rightChanges.shift());
+    const merges: ThreeWayDiff[] = [];
+    while (leftCurrentChange.some || rightCurrentChange.some) {
+        // Easy case first handle insertions.
+        if (leftCurrentChange.some && leftCurrentChange.safeValue().op === DiffOp.INSERT) {
+            // Left has an insertion at the current index.
+            const op = leftCurrentChange.safeValue();
+            merges.push(
+                new ThreeWayDiff(
+                    ChangeType.CHOOSE_LEFT,
+                    [op],
+                    op.testStart,
+                    op.testEnd,
+                    op.testContent,
+                    [],
+                    rightIndex,
+                    rightIndex,
+                    /*rightStr=*/ "",
+                    baseIndex,
+                    baseIndex,
+                    /*baseStr=*/ ""
+                )
+            );
+            leftIndex = op.testEnd;
+            leftCurrentChange = None;
+        }
+        if (rightCurrentChange.some && rightCurrentChange.safeValue().op === DiffOp.INSERT) {
+            // Right has an insertion at the current index.
+            const op = rightCurrentChange.safeValue();
+            merges.push(
+                new ThreeWayDiff(
+                    ChangeType.CHOOSE_RIGHT,
+                    [],
+                    leftIndex,
+                    leftIndex,
+                    /*leftStr=*/ "",
+                    [op],
+                    op.testStart,
+                    op.testEnd,
+                    /*rightStr=*/ op.testContent,
+                    baseIndex,
+                    baseIndex,
+                    /*baseStr=*/ ""
+                )
+            );
+            rightIndex = op.testEnd;
+            rightCurrentChange = None;
+        }
 
-        resultQueue.enqueue(initSide, topDiff);
+        // Instance where both changes are equal ops.
+        if (
+            leftCurrentChange.some &&
+            leftCurrentChange.safeValue().op === DiffOp.EQUAL &&
+            rightCurrentChange.some &&
+            rightCurrentChange.safeValue().op === DiffOp.EQUAL
+        ) {
+            let mergeChange: ThreeWayDiff;
+            [leftCurrentChange, rightCurrentChange, mergeChange] = CombineEqualOps(
+                leftCurrentChange,
+                rightCurrentChange
+            );
+            baseIndex = mergeChange.baseHi;
+            leftIndex = mergeChange.leftHi;
+            rightIndex = mergeChange.rightHi;
+            merges.push(mergeChange);
+        }
 
-        diffsQueue.switchSides();
-        BuildResultQueue(diffsQueue, topDiff.baseEnd, resultQueue);
+        // TODO: Add merging of removal ops.
 
-        diffs.push(
-            DetermineDifference(base, left, right, resultQueue, initSide, diffsQueue.switchSides())
+        // Refresh the current changes.
+        if (leftCurrentChange.none) {
+            leftCurrentChange = WrapOptional(leftChanges.shift());
+        }
+        if (rightCurrentChange.none) {
+            rightCurrentChange = WrapOptional(rightChanges.shift());
+        }
+    }
+    return merges;
+}
+
+/** Combine the equal ops where they overlap. Expects both ops to start at the same base index. */
+function CombineEqualOps(
+    leftChange: Some<ChangeOperation>,
+    rightChange: Some<ChangeOperation>
+): [Option<ChangeOperation>, Option<ChangeOperation>, ThreeWayDiff] {
+    const leftOp = leftChange.safeValue();
+    const rightOp = rightChange.safeValue();
+    const minBaseEnd = Math.min(leftOp.baseEnd, rightOp.baseEnd);
+    // Easy case both end at the same place.
+    if (leftOp.baseEnd === minBaseEnd && rightOp.baseEnd === minBaseEnd) {
+        return [
+            None,
+            None,
+            new ThreeWayDiff(
+                ChangeType.NO_CONFLICT_FOUND,
+                [leftOp],
+                leftOp.testStart,
+                leftOp.testEnd,
+                leftOp.testContent,
+                [rightOp],
+                rightOp.testStart,
+                rightOp.testEnd,
+                rightOp.testContent,
+                leftOp.baseStart,
+                leftOp.baseEnd,
+                leftOp.baseContent
+            )
+        ];
+    }
+
+    const leftTruncate = TruncateEqualOp(leftChange, minBaseEnd);
+    const rightTruncate = TruncateEqualOp(rightChange, minBaseEnd);
+    return [
+        leftTruncate.leftOverEqualOp,
+        rightTruncate.leftOverEqualOp,
+        new ThreeWayDiff(
+            ChangeType.NO_CONFLICT_FOUND,
+            [leftTruncate.truncatedEqualOp.safeValue()],
+            leftTruncate.truncatedEqualOp.safeValue().testStart,
+            leftTruncate.truncatedEqualOp.safeValue().testEnd,
+            leftTruncate.truncatedEqualOp.safeValue().testContent,
+            [rightTruncate.truncatedEqualOp.safeValue()],
+            rightTruncate.truncatedEqualOp.safeValue().testStart,
+            rightTruncate.truncatedEqualOp.safeValue().testEnd,
+            rightTruncate.truncatedEqualOp.safeValue().testContent,
+            leftTruncate.truncatedEqualOp.safeValue().baseStart,
+            leftTruncate.truncatedEqualOp.safeValue().baseEnd,
+            leftTruncate.truncatedEqualOp.safeValue().baseContent
+        )
+    ];
+}
+
+interface TruncatedResults {
+    truncatedEqualOp: Some<ChangeOperation>;
+    leftOverEqualOp: Option<ChangeOperation>;
+}
+function TruncateEqualOp(change: Some<ChangeOperation>, maxBaseIndex: number): TruncatedResults {
+    const op = change.safeValue();
+    const baseIndex = change.safeValue().baseStart;
+    const length = maxBaseIndex - baseIndex;
+    if (length === op.testLength) {
+        return { truncatedEqualOp: change, leftOverEqualOp: None };
+    }
+
+    const truncatedEqualOp = Some(
+        new ChangeOperation(
+            op.op,
+            op.baseStart,
+            op.testStart,
+            op.baseStart + length,
+            op.testStart + length,
+            length,
+            length,
+            op.baseContent.slice(0, length),
+            op.testContent.slice(0, length)
+        )
+    );
+    let leftOverEqualOp: Option<ChangeOperation> = None;
+    if (length !== op.baseLength) {
+        const leftOverLength = op.baseLength - length;
+        leftOverEqualOp = Some(
+            new ChangeOperation(
+                op.op,
+                op.baseStart + length,
+                op.testStart + length,
+                op.baseEnd,
+                op.testEnd,
+                leftOverLength,
+                leftOverLength,
+                op.baseContent.slice(length),
+                op.testContent.slice(length)
+            )
         );
-
-        return CollapseDifferences(base, left, right, diffsQueue, diffs);
     }
+    return { truncatedEqualOp, leftOverEqualOp };
 }
 
-function BuildResultQueue(
-    diffsQueue: DiffDoubleQueue,
-    prevBaseHi: number,
-    resultQueue: DiffDoubleQueue
-): DiffDoubleQueue {
-    if (QueueIsFinished(diffsQueue.peek(), prevBaseHi)) {
-        return resultQueue;
-    } else {
-        const topDiff = diffsQueue.dequeue()!;
-        resultQueue.enqueue(diffsQueue.currentSide, topDiff);
+// /** Checks if the two changes operations have any overlap. */
+// function CheckChangesHaveOverlap(
+//     leftChange: Option<ChangeOperation>,
+//     rightChange: Option<ChangeOperation>
+// ) {
+//     if (leftChange.none) {
+//         return false;
+//     }
+//     if (rightChange.none) {
+//         return false;
+//     }
 
-        if (prevBaseHi < topDiff.baseEnd) {
-            diffsQueue.switchSides();
-            return BuildResultQueue(diffsQueue, GetBaseHigh(topDiff), resultQueue);
-        } else {
-            return BuildResultQueue(diffsQueue, prevBaseHi, resultQueue);
-        }
-    }
-}
-
-function QueueIsFinished(queue: ChangeOperation[], prevBaseHi: number) {
-    return queue.length !== 0 ? queue[0]!.baseStart > prevBaseHi + 1 : true;
-}
-
-function DetermineDifference(
-    base: string,
-    left: string,
-    right: string,
-    diffDiffsQueue: DiffDoubleQueue,
-    initSide: Side,
-    finalSide: Side
-): ThreeWayDiff {
-    const baseLo = diffDiffsQueue.get(initSide)[0]!.baseStart;
-    const finalQueue = diffDiffsQueue.get(finalSide);
-    const baseHi = GetBaseHigh(finalQueue[finalQueue.length - 1]!);
-
-    const [leftLo, leftHi] = DiffableEndpoints(diffDiffsQueue.get(Side.LEFT), baseLo, baseHi);
-    const [rightLo, rightHi] = DiffableEndpoints(diffDiffsQueue.get(Side.RIGHT), baseLo, baseHi);
-
-    const leftSubset = left.slice(leftLo - 1, leftHi);
-    const rightSubset = right.slice(rightLo - 1, rightHi);
-    const changeType = DecideAction(diffDiffsQueue, leftSubset, rightSubset);
-
-    const baseSubset = base.slice(baseLo - 1, baseHi);
-
-    return new ThreeWayDiff(
-        changeType,
-        leftLo,
-        leftHi,
-        leftSubset,
-        rightLo,
-        rightHi,
-        rightSubset,
-        baseLo,
-        baseHi,
-        baseSubset
-    );
-}
-
-function GetBaseHigh(op: ChangeOperation) {
-    return op.baseEnd;
-}
-
-function GetPatchHigh(op: ChangeOperation) {
-    return op.baseEnd;
-}
-
-function DiffableEndpoints(
-    commands: ChangeOperation[],
-    baseLo: number,
-    baseHi: number
-): [number, number] {
-    if (commands.length !== 0) {
-        const firstCommand = commands[0]!;
-        const lastCommand = commands[commands.length - 1]!;
-        const lo = firstCommand.testStart - firstCommand.baseStart + baseLo;
-        const hi = GetPatchHigh(lastCommand) - GetBaseHigh(lastCommand) + baseHi;
-
-        return [lo, hi];
-    } else {
-        return [baseLo, baseHi];
-    }
-}
-
-function DecideAction(diffDiffsQueue: DiffDoubleQueue, leftSubset: string, rightSubset: string) {
-    if (diffDiffsQueue.isEmpty(Side.LEFT)) {
-        return ChangeType.CHOOSE_RIGHT;
-    } else if (diffDiffsQueue.isEmpty(Side.RIGHT)) {
-        return ChangeType.CHOOSE_LEFT;
-    } else {
-        // leftSubset deepEquals rightSubset
-        if (leftSubset !== rightSubset) {
-            return ChangeType.POSSIBLE_CONFLICT;
-        } else {
-            return ChangeType.NO_CONFLICT_FOUND;
-        }
-    }
-}
-
-export class DiffDoubleQueue {
-    currentSide: Side;
-    diffs: { left: ChangeOperation[]; right: ChangeOperation[] };
-
-    constructor(left: ChangeOperation[] = [], right: ChangeOperation[] = []) {
-        this.diffs = { left: left, right: right };
-    }
-
-    public dequeue(side = this.currentSide) {
-        return this.diffs[side].shift();
-    }
-
-    public peek(side = this.currentSide) {
-        return this.diffs[side];
-    }
-
-    public isFinished() {
-        return this.isEmpty(Side.LEFT) && this.isEmpty(Side.RIGHT);
-    }
-
-    public enqueue(side = this.currentSide, val: ChangeOperation) {
-        return this.diffs[side].push(val);
-    }
-
-    public get(side = this.currentSide) {
-        return this.diffs[side];
-    }
-
-    public isEmpty(side = this.currentSide) {
-        return this.diffs[side].length === 0;
-    }
-
-    public switchSides(side = this.currentSide) {
-        this.currentSide = side === Side.LEFT ? Side.RIGHT : Side.LEFT;
-        return this.currentSide;
-    }
-
-    public chooseSide() {
-        if (this.isEmpty(Side.LEFT)) {
-            this.currentSide = Side.RIGHT;
-        } else if (this.isEmpty(Side.RIGHT)) {
-            this.currentSide = Side.LEFT;
-        } else {
-            this.currentSide =
-                this.get(Side.LEFT)[0]!.baseStart <= this.get(Side.RIGHT)[0]!.baseStart
-                    ? Side.LEFT
-                    : Side.RIGHT;
-        }
-
-        return this.currentSide;
-    }
-}
+//     // Both are insertions.
+// }

@@ -477,7 +477,7 @@ export class DiffMatchPatch {
                     charCountTest += diffText.length;
                     patches.push(
                         new ChangeOperation(
-                            diff,
+                            diffType,
                             baseStart,
                             testStart,
                             baseEnd,
@@ -495,7 +495,7 @@ export class DiffMatchPatch {
                     charCountBase += diffText.length;
                     patches.push(
                         new ChangeOperation(
-                            diff,
+                            diffType,
                             baseStart,
                             testStart,
                             baseEnd,
@@ -516,7 +516,7 @@ export class DiffMatchPatch {
                     charCountBase += diffText.length;
                     patches.push(
                         new ChangeOperation(
-                            diff,
+                            diffType,
                             baseStart,
                             testStart,
                             baseEnd,

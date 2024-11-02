@@ -1,6 +1,27 @@
 import { describe, expect, test } from "@jest/globals";
 import { DiffMatchPatch } from "../../../src/lib/diff_merge_patch/diff_match_patch";
 import type { DiffPair } from "../../../src/lib/diff_merge_patch/diff_type";
+import { ChangeOperation } from "../../../src/lib/diff_merge_patch/patch_operation";
+
+type PartialType<Type> = {
+    // For every existing property inside the type of Type
+    // convert it to be a ?: version
+    [Property in keyof Type]: PartialType<Type[Property]>;
+};
+
+function ConvertChangeOp(params: PartialType<ChangeOperation>): ChangeOperation {
+    return new ChangeOperation(
+        params.op,
+        params.baseStart,
+        params.testStart,
+        params.baseEnd,
+        params.testEnd,
+        params.baseLength,
+        params.testLength,
+        params.baseContent,
+        params.testContent
+    );
+}
 
 describe("DiffMatchPatch", () => {
     test("basic diff", () => {
@@ -55,11 +76,8 @@ The door of all subtleties!`;
         const patch = differ.changeMake(diffResult.val as DiffPair[]);
         expect(patch.ok).toBeTruthy();
         expect(patch.val).toStrictEqual([
-            {
-                diff: [
-                    1,
-                    "The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\n"
-                ],
+            ConvertChangeOp({
+                op: 1,
                 baseStart: 0,
                 testStart: 0,
                 baseEnd: 0,
@@ -69,12 +87,9 @@ The door of all subtleties!`;
                 baseContent: "",
                 testContent:
                     "The Way that can be told of is not the eternal Way;\nThe name that can be named is not the eternal name.\n"
-            },
-            {
-                diff: [
-                    0,
-                    "The Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there "
-                ],
+            }),
+            ConvertChangeOp({
+                op: 0,
                 baseStart: 0,
                 testStart: 104,
                 baseEnd: 107,
@@ -85,9 +100,9 @@ The door of all subtleties!`;
                     "The Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there ",
                 testContent:
                     "The Nameless is the origin of Heaven and Earth;\nThe Named is the mother of all things.\nTherefore let there "
-            },
-            {
-                diff: [-1, "always "],
+            }),
+            ConvertChangeOp({
+                op: -1,
                 baseStart: 107,
                 testStart: 211,
                 baseEnd: 114,
@@ -96,9 +111,9 @@ The door of all subtleties!`;
                 testLength: 0,
                 baseContent: "always ",
                 testContent: ""
-            },
-            {
-                diff: [0, "be non-being,\n"],
+            }),
+            ConvertChangeOp({
+                op: 0,
                 baseStart: 114,
                 testStart: 211,
                 baseEnd: 128,
@@ -107,9 +122,9 @@ The door of all subtleties!`;
                 testLength: 14,
                 baseContent: "be non-being,\n",
                 testContent: "be non-being,\n"
-            },
-            {
-                diff: [1, "  "],
+            }),
+            ConvertChangeOp({
+                op: 1,
                 baseStart: 128,
                 testStart: 225,
                 baseEnd: 128,
@@ -118,9 +133,9 @@ The door of all subtleties!`;
                 testLength: 2,
                 baseContent: "",
                 testContent: "  "
-            },
-            {
-                diff: [0, "so we may see their subtlety,"],
+            }),
+            ConvertChangeOp({
+                op: 0,
                 baseStart: 128,
                 testStart: 227,
                 baseEnd: 157,
@@ -129,9 +144,9 @@ The door of all subtleties!`;
                 testLength: 29,
                 baseContent: "so we may see their subtlety,",
                 testContent: "so we may see their subtlety,"
-            },
-            {
-                diff: [-1, "\n"],
+            }),
+            ConvertChangeOp({
+                op: -1,
                 baseStart: 157,
                 testStart: 256,
                 baseEnd: 158,
@@ -140,12 +155,9 @@ The door of all subtleties!`;
                 testLength: 0,
                 baseContent: "\n",
                 testContent: ""
-            },
-            {
-                diff: [
-                    0,
-                    "\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names."
-                ],
+            }),
+            ConvertChangeOp({
+                op: 0,
                 baseStart: 158,
                 testStart: 256,
                 baseEnd: 300,
@@ -156,9 +168,9 @@ The door of all subtleties!`;
                     "\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names.",
                 testContent:
                     "\nAnd let there always be being,\n  so we may see their outcome.\nThe two are the same,\nBut after they are produced,\n  they have different names."
-            },
-            {
-                diff: [-1, ""],
+            }),
+            ConvertChangeOp({
+                op: -1,
                 baseStart: 300,
                 testStart: 398,
                 baseEnd: 300,
@@ -167,9 +179,9 @@ The door of all subtleties!`;
                 testLength: 0,
                 baseContent: "",
                 testContent: ""
-            },
-            {
-                diff: [1, "\nThe door of all subtleties!"],
+            }),
+            ConvertChangeOp({
+                op: 1,
                 baseStart: 300,
                 testStart: 398,
                 baseEnd: 300,
@@ -178,7 +190,7 @@ The door of all subtleties!`;
                 testLength: 28,
                 baseContent: "",
                 testContent: "\nThe door of all subtleties!"
-            }
+            })
         ]);
     });
 });

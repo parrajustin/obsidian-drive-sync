@@ -87,7 +87,7 @@ export class PatchOperation {
  */
 export class ChangeOperation {
     constructor(
-        public diff: DiffPair,
+        public op: DiffOp,
         public baseStart = 0,
         public testStart = 0,
         public baseEnd = 0,
