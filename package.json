@@ -60,5 +60,6 @@
         "firebase": "10.13.2",
         "lit": "3.2.1",
         "remeda": "2.16.0"
-    }
+    },
+    "packageManager": "pnpm@9.12.3+sha224.23b556d397fe35a0beffec995d343732e4b9fd92abc90135370e6ff2"
 }
