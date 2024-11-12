@@ -1,5 +1,44 @@
 # Changelog
 
+## [2.0.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.4.1...v2.0.0) (2024-11-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* Massive changes to the file storage nodes
+
+### Features
+
+* Add ability to diff files ([9074873](https://github.com/parrajustin/obsidian-drive-sync/commit/9074873efe567577e567e38bd382abb33a29a92c))
+* Add file content hashes ([d2a6482](https://github.com/parrajustin/obsidian-drive-sync/commit/d2a6482d19dea65bc2677d2cb1cee79ee6d6832e))
+* Add file viewer for historic files ([0b5e2fa](https://github.com/parrajustin/obsidian-drive-sync/commit/0b5e2fac7864ecd98c8e7cd11159f45ddb08e8ad))
+* Add inital History view ([cc9ff89](https://github.com/parrajustin/obsidian-drive-sync/commit/cc9ff897c823f8c1bc895eed58b96f2213c165f5))
+* **history:** add 3 way merge inital util ([1280dbb](https://github.com/parrajustin/obsidian-drive-sync/commit/1280dbbbb6dc4fb0c1bc5f1a5718402598b80188))
+* **history:** Partial add 3 way merge util ([7679bad](https://github.com/parrajustin/obsidian-drive-sync/commit/7679bad071e26ffd78b4c7c8f864e011b2a26b72))
+* **idx:** Add IDX compatability ([e6bffdb](https://github.com/parrajustin/obsidian-drive-sync/commit/e6bffdb234c80a54e506a805e80fd80686cee0fe))
+* **lib:** Add the diff-match-patch library ([63cd385](https://github.com/parrajustin/obsidian-drive-sync/commit/63cd38555f3484ed54a7c72d0d8b572d47a88efd))
+* Make it so that on error history will reset all the data. ([f33d097](https://github.com/parrajustin/obsidian-drive-sync/commit/f33d0978b968fc5171105c6b8c4c17a71772e03f))
+* Massive changes to the file storage nodes ([abe4f12](https://github.com/parrajustin/obsidian-drive-sync/commit/abe4f128221c7491336b2465ad25e47f9d1ff0bc))
+
+
+### Bug Fixes
+
+* Add icon utils ([ef6a514](https://github.com/parrajustin/obsidian-drive-sync/commit/ef6a5143fc411f3c0748a8d8ccf87eea0286cfb4))
+* Add metadata to know origin of file node from cloud ([20b3885](https://github.com/parrajustin/obsidian-drive-sync/commit/20b388593d915ee595b088b6309060c7104bda71))
+* Add packages for history view ([95340f1](https://github.com/parrajustin/obsidian-drive-sync/commit/95340f19658b4f6c0ea34a38201078160d37cefd))
+* **ci:** remove pnpm version from actions pipeline ([beb7af2](https://github.com/parrajustin/obsidian-drive-sync/commit/beb7af2404188105f721acdd66d14e8482ae0533))
+* **ci:** Update pnpm version to match package.json ([ded3586](https://github.com/parrajustin/obsidian-drive-sync/commit/ded358699f0a15cac6ba7f849aeb9b6273efdd37))
+* Fix firebase security rules for history and files ([2d87c31](https://github.com/parrajustin/obsidian-drive-sync/commit/2d87c31cd4609280e018c4ed185c292ee733092f))
+* Fix firebase syncer getting full update due to snapshot ([a100424](https://github.com/parrajustin/obsidian-drive-sync/commit/a100424297c4baf936556e9c90cf36ff10343042))
+* Fix history data not having file hash ([b2e5bc3](https://github.com/parrajustin/obsidian-drive-sync/commit/b2e5bc3e608e86509b178fd9d6af0084675adfc0))
+* Fix history hash text overflow ([5ab6065](https://github.com/parrajustin/obsidian-drive-sync/commit/5ab60659f41c7486a7987f8f8ebbaf32878410fd))
+* Fix the styling of history view ([684f45e](https://github.com/parrajustin/obsidian-drive-sync/commit/684f45e9a5bdc48ffdfa2a85a768c88a0e232b4d))
+* Fix type check and errors with history reading data ([34aefc7](https://github.com/parrajustin/obsidian-drive-sync/commit/34aefc7afa130bc9035015b82e5914ae2ca64ef6))
+* Make it so file nodes don't update every tick ([069f703](https://github.com/parrajustin/obsidian-drive-sync/commit/069f703b1ca33b379b73b0562f0d404d4218918d))
+* Make status payload be anything ([a67f1e6](https://github.com/parrajustin/obsidian-drive-sync/commit/a67f1e63341ad3bf40e500089de4721a677d2424))
+* Some cleanup of log statements ([afc9698](https://github.com/parrajustin/obsidian-drive-sync/commit/afc9698a9bca799daef84ae349d03ed5aabbd876))
+* Update library utiltiy functions ([3b5f0f6](https://github.com/parrajustin/obsidian-drive-sync/commit/3b5f0f60ffdb91188cb0650bd13835011d205026))
+
 ## [1.4.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.4.0...v1.4.1) (2024-10-20)
 
 
