@@ -43,7 +43,7 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
         syncQuery: "*",
-        rawFileSyncQuery: "f:^.obsidian.*.(json)$ -f:^.obsidian/plugins/.*",
+        rawFileSyncQuery: "f:^.obsidian.*.(json)$ -f:.*obsidian-firebase-sync/data.json",
         obsidianFileSyncQuery: "-f:^.obsidian",
         enableFileIdWriting: false,
         fileIdFileQuery: "-f:template -f:templator",
