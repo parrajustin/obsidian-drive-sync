@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.1.0...v2.1.1) (2024-11-12)
+
+
+### Bug Fixes
+
+* Fix the default syncer config setting to sync all raw but this plugin's settings ([bb78fdd](https://github.com/parrajustin/obsidian-drive-sync/commit/bb78fdd46e0af4a450ab9a7631bc021ea76c17a6))
+
 ## [2.1.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.0.0...v2.1.0) (2024-11-12)
 
 
