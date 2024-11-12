@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.0.0...v2.1.0) (2024-11-12)
+
+
+### Features
+
+* Add view to see version of code ([02e1036](https://github.com/parrajustin/obsidian-drive-sync/commit/02e1036e08fe5182aaa994335eb117dae0e56d44))
+
 ## [2.0.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v1.4.1...v2.0.0) (2024-11-12)
 
 
