@@ -11,6 +11,7 @@ if you want to view the source, please visit the github repository of this plugi
 */
 `;
 
+const version = process.env.SYNCBUNDLEVERSION ?? "v???";
 const prod = process.argv[2] === "production";
 const test_build = process.argv[2] === "test" || process.argv[3] === "test";
 
@@ -65,6 +66,9 @@ const context = await esbuild
         minify: prod,
         outdir: "dist",
         metafile: prod,
+        define: {
+            SYNCBUNDLEVERSION: `"${version}"`
+        }
     });
 
 if (prod) {

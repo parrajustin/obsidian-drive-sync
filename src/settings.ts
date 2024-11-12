@@ -8,6 +8,9 @@ import { SearchStringFuzzySearch } from "./ui/querySuggest";
 import { GetAllFileNodes } from "./sync/file_node_util";
 import { LogError } from "./log";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+declare const SYNCBUNDLEVERSION: string;
+
 export interface FolderTemplate {
     folder: string;
     template: string;
@@ -79,6 +82,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
         this.addUserCredentials();
         this.addSyncerSettings();
         this.resetSettings();
+        this.versionEnd();
     }
 
     public override hide() {
@@ -99,6 +103,14 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                 this.display();
             });
         });
+    }
+
+    private versionEnd(): void {
+        const heading = this.containerEl.createEl("h2");
+        heading.innerText = "Sync Plugin";
+        const version = this.containerEl.createSpan();
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        version.innerText = `Version: ${SYNCBUNDLEVERSION ?? "unknown"}`;
     }
 
     /** Add the device identifier. */

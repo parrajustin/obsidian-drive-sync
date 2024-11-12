@@ -51,6 +51,8 @@ jobs:
 
       - name: Build plugin
         run: npm run build
+        env:
+          SYNCBUNDLEVERSION: ${{ steps.release.outputs.tag_name }}
 
       - name: Update versions
         run: npm run version
