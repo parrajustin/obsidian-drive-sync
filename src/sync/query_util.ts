@@ -1,5 +1,4 @@
 import { SearchString } from "../lib/search_string_parser";
-import type { FileNode, LocalDataType } from "./file_node";
 import type { SyncerConfig } from "../settings/syncer_config_data";
 import { RootSyncType } from "../settings/syncer_config_data";
 
@@ -76,22 +75,4 @@ export function IsObsidianFile(filePath: string, config: SyncerConfig): boolean 
 export function IsLocalFileRaw(filePath: string, config: SyncerConfig): boolean {
     const searchString = GetQueryString(config.rawFileSyncQuery);
     return ChecksPassedFilter(filePath, searchString);
-}
-
-/** Converts the file path to local data type. */
-export function ConvertFilePathToLocalDataType(
-    fullPath: string,
-    config: SyncerConfig
-): LocalDataType {
-    return IsLocalFileRaw(fullPath, config) ? { type: "RAW" } : { type: "OBSIDIAN" };
-}
-
-/** Converts the file node to the local data type obj. */
-export function ConvertFileNodeToLocalDataType(
-    node: FileNode,
-    config: SyncerConfig
-): LocalDataType {
-    return node.data.localDataType.valueOr<LocalDataType>(
-        ConvertFilePathToLocalDataType(node.data.fullPath, config)
-    );
 }

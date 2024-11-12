@@ -1,14 +1,14 @@
 import { LitElement, css, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { None, Option, Some } from "../../lib/option";
-import { FileNode } from "../../sync/file_node";
-import type { HistoryFileNodeExtra } from "../history_schema";
+import { None, Some } from "../../lib/option";
+import { LocalNode } from "../../sync/file_node";
 import { CreateIcon, IconName } from "../../ui/icon";
 import { ViewModal } from "./view_modal";
 import { ContextConsumer } from "@lit/context";
 import { appContext, DIFF_SIGNAL } from "../history_view";
 import { SignalWatcher } from "@lit-labs/signals";
 import { styleMap } from "lit/directives/style-map.js";
+import { HistoricFileNode } from "../history_file_node";
 
 @customElement("history-change-entry")
 export class HistoryChangeEntry extends SignalWatcher(LitElement) {
@@ -49,7 +49,7 @@ export class HistoryChangeEntry extends SignalWatcher(LitElement) {
     `;
 
     @property()
-    public changeFileNode: FileNode<Some<string>, HistoryFileNodeExtra>;
+    public changeFileNode: LocalNode | HistoricFileNode;
 
     @property()
     public isActive = false;
@@ -85,21 +85,16 @@ export class HistoryChangeEntry extends SignalWatcher(LitElement) {
                 <span>${this.changeFileNode.data.fullPath}</span>
                 <span
                     >${window
-                        .moment(this.changeFileNode.data.mtime)
+                        .moment(this.changeFileNode.data.mTime)
                         .format("MMMM Do YYYY, h:mm:ss a")}</span
                 >
-                ${this.changeFileNode.data.deviceId
+                ${this.changeFileNode.metadata.deviceId
                     .andThen((n) => html`<span>${n}</span>`)
                     .valueOr(html``)}
                 <span>Size: ${this.changeFileNode.data.size}</span>
-                ${this.changeFileNode.data.fileHash
-                    .andThen(
-                        (n) =>
-                            html`<div class="row">
-                                <span>Hash:</span><span class="trim">${n}</span>
-                            </div>`
-                    )
-                    .valueOr(html``)}
+                <div class="row">
+                    <span>Hash:</span><span class="trim">${this.changeFileNode.data.fileHash}</span>
+                </div>
             </div>
             <div class="actions-container">
                 <div
@@ -110,46 +105,46 @@ export class HistoryChangeEntry extends SignalWatcher(LitElement) {
                 >
                     ${diffIcon}
                 </div>
-                <div
-                    class="icon-btn"
-                    @click="${() => {
-                        if (this._appContext.value === undefined) {
-                            return;
-                        }
-                        const modal = new ViewModal(
-                            this._appContext.value.app,
-                            this._appContext.value.db,
-                            this._appContext.value.creds,
-                            this.changeFileNode
-                        );
-                        modal.open();
-                    }}"
-                >
-                    ${viewIcon}
-                </div>
+                ${!this.isActive
+                    ? html`<div
+                          class="icon-btn"
+                          @click="${() => {
+                              if (!(this.changeFileNode instanceof HistoricFileNode)) {
+                                  return;
+                              }
+                              if (this._appContext.value === undefined) {
+                                  return;
+                              }
+                              const modal = new ViewModal(
+                                  this._appContext.value.app,
+                                  this._appContext.value.db,
+                                  this._appContext.value.creds,
+                                  this.changeFileNode
+                              );
+                              modal.open();
+                          }}"
+                      >
+                          ${viewIcon}
+                      </div>`
+                    : html``}
             </div>
         </div>`;
     }
 
     private modifyDiffSignal() {
-        console.log("modifyDiffSignal");
         const diffs = DIFF_SIGNAL.get();
         const hasDiffFileId =
             diffs[0].some &&
-            !diffs[0].safeValue().data.fileId.equals(this.changeFileNode.data.fileId);
+            !diffs[0].safeValue().metadata.fileId.equals(this.changeFileNode.metadata.fileId);
         if (hasDiffFileId) {
-            console.log("hasDiffFileId");
             DIFF_SIGNAL.set([Some(this.changeFileNode), None]);
             return;
         }
-        console.log("diffs", diffs);
         if (diffs[0].some && diffs[0].safeValue() === this.changeFileNode) {
-            console.log("Already same 0");
             DIFF_SIGNAL.set([diffs[1], None]);
             return;
         }
         if (diffs[1].some && diffs[1].safeValue() === this.changeFileNode) {
-            console.log("Already same 1");
             DIFF_SIGNAL.set([diffs[0], None]);
             return;
         }

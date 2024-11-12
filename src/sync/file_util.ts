@@ -1,8 +1,14 @@
 import type { App, DataWriteOptions } from "obsidian";
 import { Err, Ok, type Result, type StatusResult } from "../lib/result";
-import { InternalError, NotFoundError, type StatusError } from "../lib/status_error";
-import type { FileNode, LocalDataType } from "./file_node";
-import { CloudDataType } from "./file_node";
+import { InternalError, InvalidArgumentError, type StatusError } from "../lib/status_error";
+import type {
+    AllFileNodeTypes,
+    ImmutableBaseFileNode,
+    FirestoreNodes,
+    LocalNode
+} from "./file_node";
+import { CloudNodeRaw } from "./file_node";
+import { CloudNodeFileRef, LocalNodeObsidian, LocalNodeRaw } from "./file_node";
 import {
     DeleteObsidianFile,
     ReadObsidianFile,
@@ -13,24 +19,25 @@ import { DownloadFileFromStorage } from "./cloud_storage_util";
 import type { DocumentData, Firestore, FirestoreDataConverter } from "firebase/firestore";
 import { doc, getDoc } from "firebase/firestore";
 import { WrapPromise } from "../lib/wrap_promise";
-import type { HistoryFileNodeExtra } from "../history/history_schema";
 import { GetHistorySchemaConverter } from "../history/history_schema";
-import type { Option } from "../lib/option";
 import type { UserCredential } from "firebase/auth";
 import { GetFileCollectionPath } from "../firestore/file_db_util";
 import { GetFileSchemaConverter } from "./firestore_schema";
+import { HistoricFileNode } from "../history/history_file_node";
+import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
+import type { SyncerConfig } from "../settings/syncer_config_data";
 
 /** Reads a file through the raw apis. */
 export async function ReadFile(
     app: App,
     filePath: string,
-    type: LocalDataType
+    node: LocalNode
 ): Promise<Result<Uint8Array, StatusError>> {
-    switch (type.type) {
-        case "OBSIDIAN":
-            return ReadObsidianFile(app, filePath);
-        case "RAW":
+    switch (node.type) {
+        case "LOCAL_RAW":
             return ReadRawFile(app, filePath);
+        case "LOCAL_OBSIDIAN_FILE":
+            return ReadObsidianFile(app, filePath);
     }
 }
 
@@ -39,36 +46,42 @@ export async function WriteFile(
     app: App,
     filePath: string,
     data: Uint8Array,
-    type: LocalDataType,
+    syncConfig: SyncerConfig,
     opts?: DataWriteOptions
 ): Promise<StatusResult<StatusError>> {
-    switch (type.type) {
-        case "OBSIDIAN":
-            return WriteToObsidianFile(app, filePath, data, opts);
-        case "RAW":
-            return WriteToRawFile(app, filePath, data, opts);
+    if (IsAcceptablePath(filePath, syncConfig) && IsObsidianFile(filePath, syncConfig)) {
+        return WriteToObsidianFile(app, filePath, data, opts);
     }
+    if (IsAcceptablePath(filePath, syncConfig) && IsLocalFileRaw(filePath, syncConfig)) {
+        return WriteToRawFile(app, filePath, data, opts);
+    }
+    return Err(InvalidArgumentError(`Path "${filePath}" not writable?!`));
 }
 
 /** Deletes the raw file at `filePath`, works for any file. */
 export async function DeleteFile(
     app: App,
     filePath: string,
-    type: LocalDataType
+    node: LocalNode
 ): Promise<StatusResult<StatusError>> {
-    switch (type.type) {
-        case "OBSIDIAN":
-            return DeleteObsidianFile(app, filePath);
-        case "RAW":
+    switch (node.type) {
+        case "LOCAL_RAW":
             return DeleteRawFile(app, filePath);
+        case "LOCAL_OBSIDIAN_FILE":
+            return DeleteObsidianFile(app, filePath);
     }
 }
 
-async function QueryFirestore<NewAppModelType, NewDbModelType extends DocumentData = DocumentData>(
+/** QUery firestore to get a document. */
+async function QueryFirestore<
+    TFileNode extends ImmutableBaseFileNode,
+    NewAppModelType,
+    NewDbModelType extends DocumentData = DocumentData
+>(
     db: Firestore,
     path: string,
     converter: FirestoreDataConverter<NewAppModelType, NewDbModelType>
-): Promise<Result<FileNode, StatusError>> {
+): Promise<Result<TFileNode, StatusError>> {
     const query = await WrapPromise(
         getDoc(doc(db, path).withConverter(converter)),
         /*textForUnknown=*/ `Failed to query for "${path}"`
@@ -76,7 +89,7 @@ async function QueryFirestore<NewAppModelType, NewDbModelType extends DocumentDa
     if (query.err) {
         return query;
     }
-    const data = query.safeUnwrap().data() as FileNode;
+    const data = query.safeUnwrap().data() as unknown as TFileNode;
     return Ok(data);
 }
 
@@ -85,33 +98,41 @@ export async function ReadFileNode(
     app: App,
     db: Firestore,
     creds: UserCredential,
-    fileNode: FileNode | FileNode<Option<string>, HistoryFileNodeExtra>
+    fileNode: AllFileNodeTypes | HistoricFileNode
 ): Promise<Result<Uint8Array, StatusError>> {
-    if (fileNode.data.localDataType.some) {
-        return ReadFile(app, fileNode.data.fullPath, fileNode.data.localDataType.safeValue());
+    // For local file nodes use the `ReadFile` api.
+    if (fileNode instanceof LocalNodeObsidian || fileNode instanceof LocalNodeRaw) {
+        return ReadFile(app, fileNode.data.fullPath, fileNode);
     }
-    if (fileNode.data.fileStorageRef.some) {
-        const data = await DownloadFileFromStorage(fileNode.data.fileStorageRef.safeValue());
+    // For data in the file storage api just read it.
+    if (fileNode instanceof CloudNodeFileRef) {
+        const data = await DownloadFileFromStorage(fileNode.extra.fileStorageRef);
         return data.map((n) => new Uint8Array(n));
     }
+    if (fileNode instanceof HistoricFileNode && fileNode.extra.type === "file_ref") {
+        const data = await DownloadFileFromStorage(fileNode.extra.fileStorageRef);
+        return data.map((n) => new Uint8Array(n));
+    }
+
+    // For data from the cloud filestore it is compressed and needs to
+    // be preprocessed.
     let readData: Uint8Array;
-    if (fileNode.data.data.some) {
-        readData = fileNode.data.data.safeValue();
+    if (fileNode instanceof HistoricFileNode && fileNode.extra.type === "raw_data") {
+        readData = fileNode.extra.data;
+    } else if (fileNode instanceof CloudNodeRaw && fileNode.extra.data.some) {
+        readData = fileNode.extra.data.safeValue();
     } else {
-        if (!fileNode.data.cloudDataType.some || !fileNode.data.fileId.some) {
-            return Err(NotFoundError(`No cloud data type set for "${fileNode.toString()}"`));
-        }
-        switch (fileNode.data.cloudDataType.safeValue()) {
-            case CloudDataType.FILE: {
-                const queryResult = await QueryFirestore(
+        switch (fileNode.type) {
+            case "CLOUD_RAW": {
+                const queryResult = await QueryFirestore<CloudNodeRaw, FirestoreNodes>(
                     db,
-                    `${GetFileCollectionPath(creds)}/${fileNode.data.fileId.safeValue()}`,
+                    `${GetFileCollectionPath(creds)}/${fileNode.metadata.fileId.safeValue()}`,
                     GetFileSchemaConverter()
                 );
                 if (queryResult.err) {
                     return queryResult;
                 }
-                const data = queryResult.safeUnwrap().data.data;
+                const data = queryResult.safeUnwrap().extra.data;
                 if (data.none) {
                     return Err(
                         InternalError(`Cloud node"${fileNode.toString()}" had no data found`)
@@ -120,23 +141,24 @@ export async function ReadFileNode(
                 readData = data.safeValue();
                 break;
             }
-            case CloudDataType.HISTORIC: {
-                const historyNode = fileNode as FileNode<Option<string>, HistoryFileNodeExtra>;
-                const queryResult = await QueryFirestore(
+            case "HISTORIC_NODE": {
+                const queryResult = await QueryFirestore<HistoricFileNode, HistoricFileNode>(
                     db,
-                    `hist/${historyNode.extraData.historyDocId}`,
+                    `hist/${fileNode.extra.historyDocId}`,
                     GetHistorySchemaConverter()
                 );
                 if (queryResult.err) {
                     return queryResult;
                 }
-                const data = queryResult.safeUnwrap().data.data;
-                if (data.none) {
+                const node = queryResult.safeUnwrap();
+                if (node.extra.type !== "raw_data") {
                     return Err(
-                        InternalError(`History node "${historyNode.toString()}" had no data found`)
+                        InternalError(
+                            `Node "${node.toString()}" has no data but expected in ReadFile.`
+                        )
                     );
                 }
-                readData = data.safeValue();
+                readData = node.extra.data;
                 break;
             }
         }
@@ -162,7 +184,7 @@ export async function ReadFileNode(
     const wrappedResponse = new Response(compressedReadableStream.safeUnwrap());
     const dataDecompressed = await WrapPromise(
         wrappedResponse.arrayBuffer(),
-        /*textForUnknown=*/ `Failed to convert to array buffer`
+        /*textForUnknown=*/ `[ReadFileNode] Failed to convert to array buffer`
     );
     return dataDecompressed.map((n) => new Uint8Array(n));
 }

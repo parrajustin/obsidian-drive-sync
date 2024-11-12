@@ -3,35 +3,36 @@ import { TFile } from "obsidian";
 import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
-import { UnknownError } from "../lib/status_error";
 import { InternalError, InvalidArgumentError } from "../lib/status_error";
 import { None, Some, type Option } from "../lib/option";
 import { GetFileUidFromFrontmatter } from "./file_id_util";
 import { WrapPromise } from "../lib/wrap_promise";
-import { FileNode, type FileNodeParams, type LocalDataType } from "./file_node";
+import type { LocalNode, AllFileNodeTypes, ImmutableBaseFileNode } from "./file_node";
+import { LocalNodeObsidian, LocalNodeRaw } from "./file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
 import type { SyncerConfig } from "../settings/syncer_config_data";
 import { Bytes } from "firebase/firestore";
 import GetSha256Hash from "../lib/sha";
 import { ReadObsidianFile } from "./file_util_obsidian_api";
 import { ReadRawFile } from "./file_util_raw_api";
+import { AsyncForEach, CombineResults } from "../util";
 
 /** Flat array of all nodes to a single file path. */
-export class FileNodeArray<TypeOfData extends Option<string> = Option<string>> {
-    constructor(public nodes: FileNode<TypeOfData>[]) {}
+export class FileNodeArray<TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes> {
+    constructor(public nodes: TypeOfData[]) {}
 }
 /** A map representing a folder in the `FileNode` representation. */
-export type FileMapOfNodes<TypeOfData extends Option<string> = Option<string>> = Map<
+export type FileMapOfNodes<TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes> = Map<
     string,
     FileMapOfNodes<TypeOfData> | FileNodeArray<TypeOfData>
 >;
 
 /** Gets the obsidian file node. */
-async function GetObsidianNode(
+export async function GetObsidianNode(
     app: App,
     config: SyncerConfig,
     fileName: string
-): Promise<Result<Option<FileNode>, StatusError>> {
+): Promise<Result<Option<LocalNodeObsidian>, StatusError>> {
     const file = app.vault.fileMap[fileName]!;
     if (!(file instanceof TFile)) {
         return Ok(None);
@@ -42,27 +43,29 @@ async function GetObsidianNode(
     }
 
     const fileContents = await ReadObsidianFile(app, fileName);
-    const fileHash = fileContents
-        .map((f) => Bytes.fromUint8Array(GetSha256Hash(new Uint8Array(f))).toBase64())
-        .map((b) => Some(b))
-        .unwrapOr(None);
-    const node = FileNode.constructFromTFile(
+    const fileHash = fileContents.map((f) =>
+        Bytes.fromUint8Array(GetSha256Hash(new Uint8Array(f))).toBase64()
+    );
+    if (fileHash.err) {
+        return fileHash;
+    }
+    const node = LocalNodeObsidian.constructFromTFile(
         config.vaultName,
         config.syncerId,
         fileName,
         file,
         fileIdResult.safeUnwrap(),
-        fileHash
+        fileHash.safeUnwrap()
     );
     return Ok(Some(node));
 }
 
 /** Gets the raw file ndoe. */
-async function GetRawNode(
+export async function GetRawNode(
     app: App,
     config: SyncerConfig,
     fileName: string
-): Promise<Result<Option<FileNode>, StatusError>> {
+): Promise<Result<Option<LocalNodeRaw>, StatusError>> {
     const fileStat = await WrapPromise(
         app.vault.adapter.stat(fileName),
         /*textForUnknown=*/ `Failed to stat ${fileName}`
@@ -81,36 +84,58 @@ async function GetRawNode(
     const path = fileName.split("/");
     const file = path.pop()!;
     const [baseName, extension] = file.split(".") as [string, string | undefined];
-    const dataType: LocalDataType = { type: "RAW" };
 
     const fileContents = await ReadRawFile(app, fileName);
-    const fileHash = fileContents
-        .map((f) => Bytes.fromUint8Array(GetSha256Hash(new Uint8Array(f))).toBase64())
-        .map((b) => Some(b))
-        .unwrapOr(None);
+    const fileHash = fileContents.map((f) =>
+        Bytes.fromUint8Array(GetSha256Hash(new Uint8Array(f))).toBase64()
+    );
+    if (fileHash.err) {
+        return fileHash;
+    }
 
-    const nodeParams: FileNodeParams<None> = {
-        fullPath: fileName,
-        ctime: stat.ctime,
-        mtime: stat.mtime,
-        size: stat.size,
-        baseName,
-        extension: extension ?? "",
-        fileId: None,
-        userId: None,
-        localDataType: Some(dataType),
-        cloudDataType: None,
-        deleted: false,
-        vaultName: config.vaultName,
-        data: None,
-        fileStorageRef: None,
-        deviceId: None,
-        syncerConfigId: config.syncerId,
-        isFromCloudCache: false,
-        fileHash
-    };
-    const node = new FileNode(nodeParams);
+    const node = new LocalNodeRaw(
+        {
+            fullPath: fileName,
+            cTime: stat.ctime,
+            mTime: stat.mtime,
+            size: stat.size,
+            baseName,
+            extension: extension ?? "",
+            deleted: false,
+            fileHash: fileHash.safeUnwrap()
+        },
+        {
+            deviceId: None,
+            syncerConfigId: config.syncerId,
+            firestoreTime: None,
+            vaultName: config.vaultName,
+            fileId: None,
+            userId: None
+        }
+    );
     return Ok(Some(node));
+}
+
+export function IsFilePathValid(config: SyncerConfig, fullPath: string) {
+    return (
+        IsAcceptablePath(fullPath, config) &&
+        (IsLocalFileRaw(fullPath, config) || IsObsidianFile(fullPath, config))
+    );
+}
+
+/** Get the local file node if any. */
+export async function GetLocalFileNode(
+    app: App,
+    config: SyncerConfig,
+    fullPath: string
+): Promise<Result<Option<LocalNode>, StatusError>> {
+    if (IsAcceptablePath(fullPath, config) && IsLocalFileRaw(fullPath, config)) {
+        return GetRawNode(app, config, fullPath);
+    }
+    if (IsAcceptablePath(fullPath, config) && IsObsidianFile(fullPath, config)) {
+        return GetObsidianNode(app, config, fullPath);
+    }
+    return Err(InvalidArgumentError(`File path "${fullPath}" not allowed.`));
 }
 
 /**
@@ -122,117 +147,123 @@ async function GetRawNode(
  * @param changedPath paths that have been changed.
  * @param fileIdsToBeReRead The file ids that should be reread.
  */
-export async function UpdateFileMapWithChanges(
+export async function UpdateLocalFileMapWithLocalChanges(
     app: App,
     config: SyncerConfig,
-    fileMap: FileMapOfNodes,
-    changedNodes: Set<FileNode>,
+    fileMap: FileMapOfNodes<LocalNode>,
+    changedNodes: Set<LocalNode>,
     changedPath: Set<string>
-): Promise<Result<Option<FileMapOfNodes>, StatusError>> {
+): Promise<Result<FileMapOfNodes<LocalNode>, StatusError>> {
+    console.log("changedPath", [
+        ...new Set([
+            ...[...changedNodes.entries()].map((n) => n[1].data.fullPath),
+            ...changedPath.entries()
+        ])
+    ]);
     if (changedNodes.size === 0 && changedPath.size === 0) {
-        return Ok(None);
+        return Ok(fileMap);
     }
     // These are all paths that have been checked.
     const checkedPaths = new Set<string>();
-    let flatNodes = FlattenFileNodes(fileMap);
-    // If there was any data change.
-    let hasChangedData = false;
 
-    for (const node of changedNodes) {
-        checkedPaths.add(node.data.fullPath);
-        const dataType = node.data.localDataType;
-        if (dataType.none) {
-            return Err(
-                UnknownError(`Somehow trying to update a cloud node for "${node.data.fullPath}"`)
-            );
-        }
-        // Attempt to get the new data for a specified path.
-        const newNodeResult = await (dataType.safeValue().type === "RAW"
-            ? GetRawNode(app, config, node.data.fullPath)
-            : GetObsidianNode(app, config, node.data.fullPath));
-        if (newNodeResult.err) {
-            return newNodeResult;
-        }
-        const optNode = newNodeResult.safeUnwrap();
-        if (optNode.none) {
-            return Err(UnknownError(`No node found! "${node.data.fullPath}"`));
-        }
+    // Update the data of the file nodes that were "changed".
+    const changedNodeCheckResult = CombineResults(
+        await Promise.all(
+            AsyncForEach(
+                [...changedNodes],
+                async (node: LocalNode): Promise<StatusResult<StatusError>> => {
+                    if (!IsFilePathValid(config, node.data.fullPath)) {
+                        return Ok();
+                    }
 
-        // Check if there is any data difference.
-        if (!node.equalsData(optNode.safeValue())) {
-            node.overwrite(optNode.safeValue());
-            hasChangedData = true;
-        }
+                    // Attempt to get the new data for a specified path.
+                    const newNodeResult = await GetLocalFileNode(app, config, node.data.fullPath);
+                    if (newNodeResult.err) {
+                        // We can ignore file fetch errors.
+                        changedPath.add(node.data.fullPath);
+                        return Ok();
+                    }
+                    const optNode = newNodeResult.safeUnwrap();
+                    if (optNode.none) {
+                        changedPath.add(node.data.fullPath);
+                        return Ok();
+                    }
+
+                    checkedPaths.add(node.data.fullPath);
+                    // Check if there is any data difference.
+                    if (!node.equalsData(optNode.safeValue())) {
+                        node.data = optNode.safeValue().data;
+                        node.metadata.firestoreTime = Some(Date.now());
+                    }
+                    return Ok();
+                }
+            )
+        )
+    );
+    if (changedNodeCheckResult.err) {
+        return changedNodeCheckResult;
     }
 
-    const updatedFileMap = ConvertArrayOfNodesToMap(flatNodes);
-    if (updatedFileMap.err) {
-        return updatedFileMap;
-    }
-    for (const path of changedPath) {
-        if (checkedPaths.has(path)) {
-            continue;
-        }
-        checkedPaths.add(path);
-        // The current node.
-        const foundNode = GetNonDeletedByFilePath(updatedFileMap.safeUnwrap(), path);
-        if (foundNode.err) {
-            // We don't care about errors here. all errors are just bout not files found.
-            continue;
-        }
-        const origNode = foundNode.safeUnwrap();
+    let allFileNodes = FlattenFileNodes(fileMap);
+    const changedPathResult = CombineResults(
+        await Promise.all(
+            AsyncForEach(
+                [...changedPath],
+                async (path: string): Promise<StatusResult<StatusError>> => {
+                    if (!IsFilePathValid(config, path)) {
+                        return Ok();
+                    }
+                    if (checkedPaths.has(path)) {
+                        return Ok();
+                    }
+                    checkedPaths.add(path);
+                    // The current node.
+                    const foundNode = GetNonDeletedByFilePath(fileMap, path);
+                    if (foundNode.err) {
+                        // We don't care about errors here. all errors are just files not found.
+                        return Ok();
+                    }
+                    const origNode = foundNode.safeUnwrap();
+                    const newNodeResult = await GetLocalFileNode(app, config, path);
+                    if (newNodeResult.err) {
+                        return newNodeResult;
+                    }
+                    const newNode = newNodeResult.safeUnwrap();
 
-        let newNode: Option<FileNode> = None;
-        if (!IsAcceptablePath(path, config)) {
-            continue;
-        }
-        if (IsObsidianFile(path, config)) {
-            const fileResult = await GetObsidianNode(app, config, path);
-            if (fileResult.err) {
-                return fileResult;
-            }
-            newNode = fileResult.safeUnwrap();
-        }
-        if (IsLocalFileRaw(path, config)) {
-            const fileResult = await GetRawNode(app, config, path);
-            if (fileResult.err) {
-                return fileResult;
-            }
-            newNode = fileResult.safeUnwrap();
-        }
-
-        if (origNode.none && newNode.none) {
-            // Perfect no nodes!
-            continue;
-        } else if (origNode.some && newNode.none) {
-            // Couldn't get new file information, maybe the file is gone? just remove the file node.
-            flatNodes = flatNodes.filter((node) => node !== origNode.safeValue());
-            hasChangedData = true;
-        } else if (origNode.none && newNode.some) {
-            // Only found the new file.
-            flatNodes.push(newNode.safeValue());
-            hasChangedData = true;
-        } else if (
-            origNode.some &&
-            newNode.some &&
-            !origNode.safeValue().equalsData(newNode.safeValue())
-        ) {
-            hasChangedData = true;
-            origNode.safeValue().overwrite(newNode.safeValue());
-        }
+                    if (origNode.none && newNode.none) {
+                        // Perfect no nodes!
+                        return Ok();
+                    } else if (origNode.some && newNode.none) {
+                        // Couldn't get new file information, maybe the file is gone? just remove the file node.
+                        allFileNodes = allFileNodes.filter((n) => n !== origNode.safeValue());
+                    } else if (origNode.none && newNode.some) {
+                        // Only found the new file.
+                        allFileNodes.push(newNode.safeValue());
+                    } else if (
+                        origNode.some &&
+                        newNode.some &&
+                        !origNode.safeValue().equalsData(newNode.safeValue())
+                    ) {
+                        // Just update the node's metadata.
+                        origNode.safeValue().data = newNode.safeValue().data;
+                    }
+                    return Ok();
+                }
+            )
+        )
+    );
+    if (changedPathResult.err) {
+        return changedPathResult;
     }
 
-    if (!hasChangedData) {
-        return Ok(None);
-    }
-    return ConvertArrayOfNodesToMap(flatNodes).map((n) => Some(n));
+    return ConvertArrayOfNodesToMap(allFileNodes).mapErr((e) => e.setPayload("label", "return"));
 }
 
 /** Filters file nodes to make sure they should be kept. */
-export function FilterFileNodes<TypeOfData extends Option<string> = Option<string>>(
+export function FilterFileNodes<TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes>(
     config: SyncerConfig,
-    nodes: FileNode<TypeOfData>[]
-): FileNode<TypeOfData>[] {
+    nodes: TypeOfData[]
+): TypeOfData[] {
     return nodes.filter(
         (n) =>
             IsAcceptablePath(n.data.fullPath, config) &&
@@ -244,8 +275,8 @@ export function FilterFileNodes<TypeOfData extends Option<string> = Option<strin
 export async function GetAllFileNodes(
     app: App,
     config: SyncerConfig
-): Promise<Result<FileNode[], StatusError>> {
-    const files: FileNode[] = [];
+): Promise<Result<LocalNode[], StatusError>> {
+    const files: LocalNode[] = [];
 
     const iterateFiles = async (path: string): Promise<StatusResult<StatusError>> => {
         const fileNamesResult = await WrapPromise(
@@ -303,9 +334,9 @@ export async function GetAllFileNodes(
  * Converts a flat array of FileNodes to a `FileMapOfNodes`. Also checks only a single non deleted
  * node at each path.
  */
-export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Option<string>>(
-    arry: FileNode<TypeOfData>[]
-): Result<FileMapOfNodes<TypeOfData>, StatusError> {
+export function ConvertArrayOfNodesToMap<
+    TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes
+>(arry: TypeOfData[]): Result<FileMapOfNodes<TypeOfData>, StatusError> {
     const mapOfNodes: FileMapOfNodes<TypeOfData> = new Map();
 
     for (const node of arry) {
@@ -355,7 +386,14 @@ export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Opt
             }
             if (countNonDeleted > 1) {
                 return Err(
-                    InternalError(`Found multiple not deleted files at "${node.data.fullPath}".`)
+                    InternalError(
+                        `Found multiple not deleted files at "${node.data.fullPath}".`
+                    ).with((err) => {
+                        err.setPayload("full map", mapOfNodes).setPayload(
+                            "current error",
+                            folderArray
+                        );
+                    })
                 );
             }
         } else {
@@ -370,7 +408,7 @@ export function ConvertArrayOfNodesToMap<TypeOfData extends Option<string> = Opt
 export async function GetFileMapOfNodes(
     app: App,
     config: SyncerConfig
-): Promise<Result<FileMapOfNodes, StatusError>> {
+): Promise<Result<FileMapOfNodes<LocalNode>, StatusError>> {
     const fileNodesResult = await GetAllFileNodes(app, config);
     if (fileNodesResult.err) {
         return fileNodesResult;
@@ -379,10 +417,10 @@ export async function GetFileMapOfNodes(
 }
 
 /** Flattens the file map to get the array of file nodes. */
-export function FlattenFileNodes<TypeOfData extends Option<string> = Option<string>>(
+export function FlattenFileNodes<TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes>(
     fileMap: FileMapOfNodes<TypeOfData>
-): FileNode<TypeOfData>[] {
-    const fileNodes: FileNode<TypeOfData>[] = [];
+): TypeOfData[] {
+    const fileNodes: TypeOfData[] = [];
 
     const recursiveCheck = (map: FileMapOfNodes<TypeOfData>) => {
         for (const [_key, value] of map) {
@@ -398,25 +436,24 @@ export function FlattenFileNodes<TypeOfData extends Option<string> = Option<stri
 }
 
 /** Gets a map of the nodes keyed by their file-id. */
-export function MapByFileId<TypeOfData extends Option<string> = Option<string>>(
-    arry: FileNode<TypeOfData>[]
-): Map<string, FileNode<TypeOfData>> {
-    const map = new Map<string, FileNode<TypeOfData>>();
+export function MapByFileId<TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes>(
+    arry: TypeOfData[]
+): Map<string, TypeOfData> {
+    const map = new Map<string, TypeOfData>();
     for (const node of arry) {
-        if (node.data.fileId.none) {
+        if (node.metadata.fileId.none) {
             continue;
         }
 
-        map.set(node.data.fileId.safeValue(), node);
+        map.set(node.metadata.fileId.safeValue(), node);
     }
     return map;
 }
 
 /** Get the non deleted file at a file path. */
-export function GetNonDeletedByFilePath<TypeOfData extends Option<string> = Option<string>>(
-    fileMap: FileMapOfNodes<TypeOfData>,
-    filePath: string
-): Result<Option<FileNode<TypeOfData>>, StatusError> {
+export function GetNonDeletedByFilePath<
+    TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes
+>(fileMap: FileMapOfNodes<TypeOfData>, filePath: string): Result<Option<TypeOfData>, StatusError> {
     const pathSegments = filePath.split("/");
     if (pathSegments.length === 0) {
         return Err(InvalidArgumentError("FilePath is required."));

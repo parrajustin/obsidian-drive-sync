@@ -1,16 +1,7 @@
 import type { FirebaseApp } from "firebase/app";
 import type { Unsubscribe, UserCredential } from "firebase/auth";
 import type { Firestore } from "firebase/firestore";
-import {
-    getFirestore,
-    query,
-    collection,
-    where,
-    getDocs,
-    onSnapshot,
-    writeBatch,
-    doc
-} from "firebase/firestore";
+import { query, collection, where, getDocs, onSnapshot, writeBatch, doc } from "firebase/firestore";
 import type { Option } from "../lib/option";
 import { Some, WrapOptional } from "../lib/option";
 import { None } from "../lib/option";
@@ -20,44 +11,46 @@ import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import type FirestoreSyncPlugin from "../main";
 import type { SyncerConfig } from "../settings/syncer_config_data";
-import type { FileNode } from "../sync/file_node";
-import { ConvertFlatFileNodesToCache, ConvertCacheToFileNode } from "../sync/firebase_cache";
+import type { LocalNode } from "../sync/file_node";
 import { LogError } from "../log";
 import { ConvertToUnknownError } from "../util";
 import type { HistoryProgressView } from "./history_view";
 import { GetOrCreateHistoryProgressView } from "./history_view";
-import type { HistoryFileNodeExtra } from "./history_schema";
 import { GetHistorySchemaConverter } from "./history_schema";
 import { FlattenFileNodes, MapByFileId, type FileMapOfNodes } from "../sync/file_node_util";
 import { debounce } from "remeda";
+import type { HistoricFileNode } from "./history_file_node";
+import { ConvertHistoricNodesToCache, GetHistoricNodesFromCache } from "./history_cache";
+import { GetFirestore } from "../firestore/get_firestore";
 
 const MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT = 20;
 
+/** Get all history data from a starting timestamp. */
 async function GetHistoryData(
     db: Firestore,
     creds: UserCredential,
     config: SyncerConfig,
     startTimestamp = 0
-): Promise<Result<Map<string, FileNode<Some<string>, HistoryFileNodeExtra>>, StatusError>> {
+): Promise<Result<Map<string, HistoricFileNode>, StatusError>> {
     // Get the file metadata from firestore.
     const queryOfFiles = query(
         collection(db, "hist"),
-        where("userId", "==", creds.user.uid),
-        where("vaultName", "==", config.vaultName),
-        where("mTime", ">=", startTimestamp)
+        where("file.userId", "==", creds.user.uid),
+        where("file.vaultName", "==", config.vaultName),
+        where("entryTime", ">=", startTimestamp)
     ).withConverter(GetHistorySchemaConverter());
     const querySnapshotResult = await WrapPromise(
         getDocs(queryOfFiles),
-        /*textForUnknown=*/ `failed queryOfFiles getDocs Firebase histroy syncer`
+        /*textForUnknown=*/ `failed queryOfFiles getDocs Firebase history syncer`
     );
     if (querySnapshotResult.err) {
         return querySnapshotResult;
     }
-    const cachedNodes = new Map<string, FileNode<Some<string>, HistoryFileNodeExtra>>();
+    const cachedNodes = new Map<string, HistoricFileNode>();
     // Convert the docs to `FileNode` and combine with the cached data.
     querySnapshotResult.safeUnwrap().forEach((document) => {
-        const node = document.data() as FileNode<Some<string>, HistoryFileNodeExtra>;
-        cachedNodes.set(node.extraData.historyDocId, node);
+        const node = document.data() as HistoricFileNode;
+        cachedNodes.set(node.extra.historyDocId, node);
     });
     return Ok(cachedNodes);
 }
@@ -85,8 +78,8 @@ export class FirebaseHistory {
         private _config: SyncerConfig,
         public creds: UserCredential,
         public db: Firestore,
-        private _historicChanges: Map<string, FileNode<Some<string>, HistoryFileNodeExtra>>,
-        private _mapOfLocalFile: Map<string, FileNode>
+        private _historicChanges: Map<string, HistoricFileNode>,
+        private _mapOfLocalFile: Map<string, LocalNode>
     ) {
         this.registerSaveSettingsTask();
     }
@@ -97,9 +90,9 @@ export class FirebaseHistory {
         firebaseApp: FirebaseApp,
         config: SyncerConfig,
         creds: UserCredential,
-        mapOfNodes: FileMapOfNodes
+        mapOfNodes: FileMapOfNodes<LocalNode>
     ): Promise<Result<FirebaseHistory, StatusError>> {
-        const db = getFirestore(firebaseApp);
+        const db = GetFirestore(firebaseApp);
 
         const fetchedHistory = await GetHistoryData(
             db,
@@ -112,19 +105,17 @@ export class FirebaseHistory {
         }
 
         // Get cached data.
-        const cachedNodes = new Map<string, FileNode<Some<string>, HistoryFileNodeExtra>>();
-        for (const node of config.storedFirebaseHistory.cache) {
-            if (node.extraData === undefined) {
-                continue;
-            }
-            cachedNodes.set(
-                node.extraData.historyDocId,
-                ConvertCacheToFileNode<HistoryFileNodeExtra>(node)
-            );
+        const getCacheResult = await GetHistoricNodesFromCache(config.storedFirebaseHistory);
+        if (getCacheResult.err) {
+            return getCacheResult;
+        }
+        const cachedNodes = new Map<string, HistoricFileNode>();
+        for (const node of getCacheResult.safeUnwrap()) {
+            cachedNodes.set(node.extra.historyDocId, node);
         }
         // Convert the docs to `FileNode` and combine with the cached data.
         fetchedHistory.safeUnwrap().forEach((document) => {
-            cachedNodes.set(document.extraData.historyDocId, document);
+            cachedNodes.set(document.extra.historyDocId, document);
         });
 
         return Ok(
@@ -147,8 +138,8 @@ export class FirebaseHistory {
     public initailizeRealTimeUpdates() {
         const queryOfFiles = query(
             collection(this.db, "hist"),
-            where("userId", "==", this.creds.user.uid),
-            where("vaultName", "==", this._config.vaultName)
+            where("file.userId", "==", this.creds.user.uid),
+            where("file.vaultName", "==", this._config.vaultName)
         ).withConverter(GetHistorySchemaConverter());
 
         this._unsubscribe = Some(
@@ -160,8 +151,8 @@ export class FirebaseHistory {
                     if (!snapshotDoc.exists()) {
                         return;
                     }
-                    const node = snapshotDoc.data() as FileNode<Some<string>, HistoryFileNodeExtra>;
-                    this._historicChanges.set(node.extraData.historyDocId, node);
+                    const node = snapshotDoc.data() as HistoricFileNode;
+                    this._historicChanges.set(node.extra.historyDocId, node);
                 });
                 this._debounceCleanUpHistory.call();
                 this.registerSaveSettingsTask();
@@ -201,12 +192,12 @@ export class FirebaseHistory {
     }
 
     /** Get the local nodes file path from a given id, if there is one. */
-    public getLocalFileNodeFromId(fileId: string): Option<FileNode> {
+    public getLocalFileNodeFromId(fileId: string): Option<LocalNode> {
         return WrapOptional(this._mapOfLocalFile.get(fileId));
     }
 
     /** Updates the history entry of file nodes. */
-    public updateMapOfLocalNodes(mapOfNodes: FileMapOfNodes) {
+    public updateMapOfLocalNodes(mapOfNodes: FileMapOfNodes<LocalNode>) {
         this._mapOfLocalFile = MapByFileId(FlattenFileNodes(mapOfNodes));
         if (this.activeHistoryView.some) {
             this.activeHistoryView.safeValue().updateView();
@@ -218,14 +209,21 @@ export class FirebaseHistory {
             this._savingSettings = true;
             queueMicrotask(() => {
                 this._savingSettings = false;
-                // Updates the stored firebase cache.
-                this._config.storedFirebaseHistory = ConvertFlatFileNodesToCache(
-                    [...this._historicChanges.entries()].map((n) => n[1])
-                );
-                this._plugin.saveSettings(/*startupSyncer=*/ false).catch((e: unknown) => {
-                    const error = ConvertToUnknownError("Saving settings")(e);
-                    LogError(error);
-                });
+                void (async () => {
+                    // Updates the stored firebase cache.
+                    const compressionResult = await ConvertHistoricNodesToCache(
+                        [...this._historicChanges.entries()].map((n) => n[1])
+                    );
+                    if (compressionResult.err) {
+                        LogError(compressionResult.val);
+                        return;
+                    }
+                    this._config.storedFirebaseHistory = compressionResult.safeUnwrap();
+                    this._plugin.saveSettings(/*startupSyncer=*/ false).catch((e: unknown) => {
+                        const error = ConvertToUnknownError("Saving settings")(e);
+                        LogError(error);
+                    });
+                })();
             });
         }
     }
@@ -247,20 +245,20 @@ export class FirebaseHistory {
 
     /** Cleans up the historical events that are old or too many for a single file id. */
     private async cleanUpOldHistoryEvents() {
-        const historyByFileId = new Map<string, FileNode<Some<string>, HistoryFileNodeExtra>[]>();
+        const historyByFileId = new Map<string, HistoricFileNode[]>();
         // First group up all the historic changes by file id.
         for (const [_, entry] of this._historicChanges) {
-            let fileNodes = historyByFileId.get(entry.data.fileId.safeValue());
+            let fileNodes = historyByFileId.get(entry.metadata.fileId.safeValue());
             if (fileNodes === undefined) {
                 fileNodes = [];
-                historyByFileId.set(entry.data.fileId.safeValue(), fileNodes);
+                historyByFileId.set(entry.metadata.fileId.safeValue(), fileNodes);
             }
             fileNodes.push(entry);
         }
 
         let hasChange = false;
         const batcher = writeBatch(this.db);
-        const keptHistoricChanges = new Map<string, FileNode<Some<string>, HistoryFileNodeExtra>>();
+        const keptHistoricChanges = new Map<string, HistoricFileNode>();
         // Now for the ones that have > max number of entries sort them and delete the old ones.
         for (const [_, changes] of historyByFileId) {
             // If no changes exit.
@@ -270,21 +268,21 @@ export class FirebaseHistory {
             // If there are less than max number add each change to the keep map.
             if (changes.length < MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT) {
                 for (const change of changes) {
-                    keptHistoricChanges.set(change.extraData.historyDocId, change);
+                    keptHistoricChanges.set(change.extra.historyDocId, change);
                 }
                 continue;
             }
             // Used to denote there was a batch deletion.
             hasChange = true;
             // Sort the changes.
-            changes.sort((a, b) => b.data.mtime - a.data.mtime);
+            changes.sort((a, b) => b.data.mTime - a.data.mTime);
             // Move the kept changes to the new array.
             for (const change of changes.slice(0, MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT)) {
-                keptHistoricChanges.set(change.extraData.historyDocId, change);
+                keptHistoricChanges.set(change.extra.historyDocId, change);
             }
             // Delete old changes.
             for (const deleteEntry of changes.slice(MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT)) {
-                batcher.delete(doc(this.db, "hist", deleteEntry.extraData.historyDocId));
+                batcher.delete(doc(this.db, "hist", deleteEntry.extra.historyDocId));
             }
         }
         if (hasChange) {

@@ -1,14 +1,14 @@
-import type { Option, Some } from "../../lib/option";
-import type { FileNode } from "../../sync/file_node";
-import type { HistoryFileNodeExtra } from "../history_schema";
+import type { Option } from "../../lib/option";
+import type { LocalNode } from "../../sync/file_node";
+import type { HistoricFileNode } from "../history_file_node";
 
 export interface HistoryEntryData {
     /** The file id of the given file. */
     fileId: string;
     /** The local file state if any exists. */
-    localFile: Option<FileNode>;
+    localFile: Option<LocalNode>;
     /** The historical nodes ordered to most recent state to earliest state. */
-    historyNodes: FileNode<Some<string>, HistoryFileNodeExtra>[];
+    historyNodes: HistoricFileNode[];
     /** The latest modification time (ms from unix epoch). */
     latestModification: number;
 }

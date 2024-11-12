@@ -41,15 +41,15 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "userId",
+          "fieldPath": "file.userId",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "vaultName",
+          "fieldPath": "file.vaultName",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "mTime",
+          "fieldPath": "entryTime",
           "order": "ASCENDING"
         }
       ]
@@ -67,7 +67,7 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "mTime",
+          "fieldPath": "entryTime",
           "order": "ASCENDING"
         }
       ]

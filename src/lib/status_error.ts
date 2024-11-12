@@ -49,6 +49,7 @@ export class StatusError {
         public message: string,
         error?: Error
     ) {
+        // const stackLines = (error ?? new Error()).stack!.split("\n");
         const stackLines = (error ?? new Error()).stack!.split("\n").slice(2);
         if (stackLines.length > 0 && stackLines[0]!.includes("StatusError")) {
             stackLines.shift();
@@ -58,8 +59,9 @@ export class StatusError {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    public setPayload(name: string, payload: any) {
+    public setPayload(name: string, payload: any): this {
         this._additionalData.set(name, payload);
+        return this;
     }
 
     public toString(): string {

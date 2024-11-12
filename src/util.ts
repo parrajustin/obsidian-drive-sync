@@ -1,3 +1,5 @@
+import type { Result } from "./lib/result";
+import { Ok } from "./lib/result";
 import { StatusError } from "./lib/status_error";
 import { UnknownError } from "./lib/status_error";
 
@@ -14,6 +16,17 @@ export function AsyncForEach<InputType, OutputType>(
     return data.map((innerData) => {
         return Promise.resolve(cb(innerData));
     });
+}
+
+export function CombineResults<T>(results: Result<T, StatusError>[]): Result<T[], StatusError> {
+    const returnee: T[] = [];
+    for (const result of results) {
+        if (result.err) {
+            return result;
+        }
+        returnee.push(result.safeUnwrap());
+    }
+    return Ok(returnee);
 }
 
 /** Converts unknown data to an unknown error. */

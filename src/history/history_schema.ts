@@ -5,115 +5,139 @@ import type {
     WithFieldValue
 } from "firebase/firestore";
 import { Bytes } from "firebase/firestore";
-import type { FileNodeParams } from "../sync/file_node";
-import { CloudDataType, FileNode } from "../sync/file_node";
 import type { UserCredential } from "firebase/auth";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import type FirestoreSyncPlugin from "../main";
 import { InternalError } from "../lib/status_error";
-import { uuidv7 } from "../lib/uuid";
+import type { HistoricNodeExtraType } from "./history_file_node";
+import { HistoricFileNode } from "./history_file_node";
+import type { FileDataDbModelV1 } from "../sync/firestore_schema";
 
-export interface HistoryDbModel {
-    // Full filepath.
-    path: string;
-    // The file creation time.
-    cTime: number;
-    // The file modification time.
-    mTime: number;
-    /** Size of the file in bytes. */
-    size: number;
-    /** File name without the extension. */
-    baseName: string;
-    /** File extension (example ".md"). */
-    ext: string;
-    /** The id of the user. */
-    userId: string;
-    /** If the file has been deleted. */
-    deleted: boolean;
-    /** The data of the file if less than 100Kb */
-    data: Bytes | null;
-    /** The location of the file in cloud storage if not in `data`. */
-    fileStorageRef: string | null;
-    /** The hash of the file contents. */
-    fileHash?: string | null;
-
-    /** The name of the vault. */
-    vaultName: string;
-    /** The id of the device. */
-    deviceId: string;
-    /** The syncer config id that pushed the update. */
-    syncerConfigId: string;
-
-    /** The file id of the historic node. */
+export interface HistoryDbModelV1 {
+    /** File data version. */
+    file: FileDataDbModelV1;
+    /** the uid of the file. */
     fileId: string;
+    /** The version of the schema. */
+    version: "v1";
+    /** Time of the creation of this entry, in ms from unix epoch. */
+    entryTime: number;
 }
 
-export interface HistoryFileNodeExtra {
-    historyDocId: string;
-}
+export type AllHistoryDbModels = HistoryDbModelV1;
+export type HistoryDbModel = HistoryDbModelV1;
 
 // Firestore history data converter
 export class HistorySchemaConverter
-    implements
-        FirestoreDataConverter<FileNode<Option<string>, HistoryFileNodeExtra>, HistoryDbModel>
+    implements FirestoreDataConverter<HistoricFileNode, HistoryDbModel>
 {
     constructor(
         private _plugin: FirestoreSyncPlugin,
         private _userCreds: UserCredential
     ) {}
 
-    public toFirestore(
-        node: WithFieldValue<FileNode<Option<string>, HistoryFileNodeExtra>>
-    ): WithFieldValue<HistoryDbModel> {
-        const fileNode = node as FileNode;
-        return {
-            path: fileNode.data.fullPath,
-            cTime: fileNode.data.ctime,
-            mTime: fileNode.data.mtime,
-            size: fileNode.data.size,
-            baseName: fileNode.data.baseName,
-            ext: fileNode.data.extension,
-            userId: this._userCreds.user.uid,
-            deleted: fileNode.data.deleted,
-            data: fileNode.data.data.andThen((text) => Bytes.fromUint8Array(text)).valueOr(null),
-            fileStorageRef: fileNode.data.fileStorageRef.valueOr(null),
-            vaultName: fileNode.data.vaultName,
-            deviceId: this._plugin.settings.clientId,
-            syncerConfigId: fileNode.data.syncerConfigId,
-            fileId: fileNode.data.fileId.valueOr(uuidv7()),
-            fileHash: fileNode.data.fileHash.valueOr(null)
-        };
+    public toFirestore(node: WithFieldValue<HistoricFileNode>): WithFieldValue<HistoryDbModel> {
+        const fileNode = node as HistoricFileNode;
+        switch (fileNode.extra.type) {
+            case "file_ref":
+                return {
+                    file: {
+                        path: fileNode.data.fullPath,
+                        cTime: fileNode.data.cTime,
+                        mTime: fileNode.data.mTime,
+                        size: fileNode.data.size,
+                        baseName: fileNode.data.baseName,
+                        ext: fileNode.data.extension,
+                        userId: this._userCreds.user.uid,
+                        deleted: fileNode.data.deleted,
+                        data: null,
+                        fileStorageRef: fileNode.extra.fileStorageRef,
+                        vaultName: fileNode.metadata.vaultName,
+                        deviceId: this._plugin.settings.clientId,
+                        syncerConfigId: fileNode.metadata.syncerConfigId,
+                        fileHash: fileNode.data.fileHash,
+                        version: "v1",
+                        entryTime: fileNode.metadata.firestoreTime.safeValue(),
+                        type: "Ref"
+                    },
+                    fileId: fileNode.metadata.fileId.safeValue(),
+                    version: "v1",
+                    entryTime: new Date().getTime()
+                };
+            case "raw_data":
+                return {
+                    file: {
+                        path: fileNode.data.fullPath,
+                        cTime: fileNode.data.cTime,
+                        mTime: fileNode.data.mTime,
+                        size: fileNode.data.size,
+                        baseName: fileNode.data.baseName,
+                        ext: fileNode.data.extension,
+                        userId: this._userCreds.user.uid,
+                        deleted: fileNode.data.deleted,
+                        data: Bytes.fromUint8Array(fileNode.extra.data),
+                        fileStorageRef: null,
+                        vaultName: fileNode.metadata.vaultName,
+                        deviceId: this._plugin.settings.clientId,
+                        syncerConfigId: fileNode.metadata.syncerConfigId,
+                        fileHash: fileNode.data.fileHash,
+                        version: "v1",
+                        entryTime: fileNode.metadata.firestoreTime.safeValue(),
+                        type: "Raw"
+                    },
+                    fileId: fileNode.metadata.fileId.safeValue(),
+                    version: "v1",
+                    entryTime: new Date().getTime()
+                };
+            case "cached_raw":
+                throw InternalError("Some how a historic node has no raw data or file storage ref");
+        }
     }
 
     public fromFirestore(
         _snapshot: QueryDocumentSnapshot<HistoryDbModel>,
         _options: SnapshotOptions
-    ): FileNode<Some<string>, HistoryFileNodeExtra> {
+    ): HistoricFileNode {
         const data = _snapshot.data();
-        const params: FileNodeParams<Some<string>> = {
-            fullPath: data.path,
-            ctime: data.cTime,
-            mtime: data.mTime,
-            size: data.size,
-            baseName: data.baseName,
-            extension: data.ext,
-            fileId: Some(data.fileId),
-            userId: Some(data.userId),
-            deleted: data.deleted,
-            vaultName: data.vaultName,
-            data: data.data !== null ? Some(data.data.toUint8Array()) : None,
-            fileStorageRef: data.fileStorageRef !== null ? Some(data.fileStorageRef) : None,
-            localDataType: None,
-            cloudDataType: Some(CloudDataType.HISTORIC),
-            deviceId: Some(data.deviceId),
-            syncerConfigId: data.syncerConfigId,
-            isFromCloudCache: false,
-            fileHash:
-                data.fileHash === undefined || data.fileHash === null ? None : Some(data.fileHash)
-        };
+        let extraData: HistoricNodeExtraType;
+        if (data.file.data !== null) {
+            extraData = {
+                type: "raw_data",
+                data: data.file.data.toUint8Array(),
+                historyDocId: _snapshot.id,
+                historyDocEntryTime: data.entryTime
+            };
+        } else {
+            extraData = {
+                type: "file_ref",
+                fileStorageRef: data.file.fileStorageRef,
+                historyDocId: _snapshot.id,
+                historyDocEntryTime: data.entryTime
+            };
+        }
 
-        return new FileNode(params, { historyDocId: _snapshot.ref.id });
+        return new HistoricFileNode(
+            {
+                fullPath: data.file.path,
+                cTime: data.file.cTime,
+                mTime: data.file.mTime,
+                size: data.file.size,
+                baseName: data.file.baseName,
+                extension: data.file.ext,
+                deleted: data.file.deleted,
+                fileHash: data.file.fileHash
+            },
+            {
+                deviceId: Some(data.file.deviceId),
+                syncerConfigId: data.file.syncerConfigId,
+                firestoreTime: Some(data.entryTime),
+                vaultName: data.file.vaultName,
+                fileId: Some(data.fileId),
+                userId: Some(data.file.userId)
+            },
+            extraData
+        );
     }
 }
 
@@ -124,7 +148,6 @@ export function SetHistorySchemaConverter(plugin: FirestoreSyncPlugin, creds: Us
 
 export function GetHistorySchemaConverter(): HistorySchemaConverter {
     if (FIRESTORE_HISTORY_CONVERTER.none) {
-        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw InternalError("FIRESTORE_HISTORY_CONVERTER is None.");
     }
     return FIRESTORE_HISTORY_CONVERTER.safeValue();

@@ -1,17 +1,17 @@
 import type { App, FuzzyMatch } from "obsidian";
 import { FuzzySuggestModal } from "obsidian";
-import type { FileNode } from "../sync/file_node";
 import { SearchString } from "../lib/search_string_parser";
 import { GetQueryString } from "../sync/query_util";
 import { LogError } from "../log";
 import { ConvertToUnknownError } from "../util";
+import type { LocalNode } from "../sync/file_node";
 
-export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
+export class SearchStringFuzzySearch extends FuzzySuggestModal<LocalNode> {
     private _searchString: SearchString;
     private _originalQuery: string;
     constructor(
         app: App,
-        private _files: FileNode[],
+        private _files: LocalNode[],
         private _query: string,
         private _cb: (str: string) => void
     ) {
@@ -27,7 +27,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
     /**
      * @public
      */
-    public override getSuggestions(query: string): FuzzyMatch<FileNode>[] {
+    public override getSuggestions(query: string): FuzzyMatch<LocalNode>[] {
         if (query === "") {
             query = this._originalQuery;
         }
@@ -46,9 +46,9 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
         ];
 
         // Create list of nodes.
-        const includedNodes: FuzzyMatch<FileNode>[] = [];
-        const excludedNodes: FuzzyMatch<FileNode>[] = [];
-        const restNodes: FuzzyMatch<FileNode>[] = [];
+        const includedNodes: FuzzyMatch<LocalNode>[] = [];
+        const excludedNodes: FuzzyMatch<LocalNode>[] = [];
+        const restNodes: FuzzyMatch<LocalNode>[] = [];
         for (const item of this.getItems()) {
             let excluded = false;
             for (const filter of fileExcludeFilters) {
@@ -116,7 +116,7 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
     /**
      * @public
      */
-    public override renderSuggestion(item: FuzzyMatch<FileNode>, el: HTMLElement): void {
+    public override renderSuggestion(item: FuzzyMatch<LocalNode>, el: HTMLElement): void {
         const text = el.createEl("span");
         text.innerText = item.item.data.fullPath;
 
@@ -132,19 +132,19 @@ export class SearchStringFuzzySearch extends FuzzySuggestModal<FileNode> {
     /**
      * @public
      */
-    public override getItems(): FileNode[] {
+    public override getItems(): LocalNode[] {
         return this._files;
     }
     /**
      * @public
      */
-    public override getItemText(item: FileNode): string {
+    public override getItemText(item: LocalNode): string {
         return item.data.fullPath;
     }
     /**
      * @public
      */
-    public override onChooseItem(_item: FileNode, _evt: MouseEvent | KeyboardEvent): void {
+    public override onChooseItem(_item: LocalNode, _evt: MouseEvent | KeyboardEvent): void {
         this._cb(this._query);
     }
 

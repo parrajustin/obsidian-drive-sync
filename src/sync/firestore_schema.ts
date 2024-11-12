@@ -5,15 +5,31 @@ import type {
     WithFieldValue
 } from "firebase/firestore";
 import { Bytes } from "firebase/firestore";
-import type { FileNodeParams } from "./file_node";
-import { CloudDataType, FileNode } from "./file_node";
+import type { CloudNode, FirestoreNodes, UploadFileNode } from "./file_node";
+import { CloudNodeFileRef, CloudNodeRaw } from "./file_node";
 import type { UserCredential } from "firebase/auth";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
 import type FirestoreSyncPlugin from "../main";
 import { InternalError } from "../lib/status_error";
 
-export interface FileDbModel {
+interface DataFieldModel {
+    type: "Raw";
+    /** The data of the file if less than 100Kb */
+    data: Bytes;
+    /** The location of the file in cloud storage if not in `data`. */
+    fileStorageRef: null;
+}
+interface StorageFieldModel {
+    type: "Ref";
+    /** The data of the file if less than 100Kb */
+    data: null;
+    /** The location of the file in cloud storage if not in `data`. */
+    fileStorageRef: string;
+}
+
+/** Data for the file. */
+export interface FileDataDbModel {
     // Full filepath.
     path: string;
     // The file creation time.
@@ -30,12 +46,12 @@ export interface FileDbModel {
     userId: string;
     /** If the file has been deleted. */
     deleted: boolean;
-    /** The data of the file if less than 100Kb */
-    data: Bytes | null;
-    /** The location of the file in cloud storage if not in `data`. */
-    fileStorageRef: string | null;
     /** The hash of the file contents. */
-    fileHash?: string | null;
+    fileHash: string;
+
+    //
+    // Metadata.
+    //
 
     /** The name of the vault. */
     vaultName: string;
@@ -43,66 +59,137 @@ export interface FileDbModel {
     deviceId: string;
     /** The syncer config id that pushed the update. */
     syncerConfigId: string;
+    /** Time of the change of this file, in ms from unix epoch. */
+    entryTime: number;
+
+    //
+    // Version
+    //
+
+    /** The version of the schema. */
+    version: "v1";
 }
 
+/** Version 1 of the firestore data model. */
+export type FileDataDbModelV1 = FileDataDbModel & (DataFieldModel | StorageFieldModel);
+
+/** All possible versions of firestore File collections. */
+export type AllFileDbModels = FileDataDbModelV1;
+
+/** Current version of the firestore data. */
+export type FileDbModel = FileDataDbModelV1;
+
 // Firestore data converter
-export class FileSchemaConverter implements FirestoreDataConverter<FileNode, FileDbModel> {
+export class FileSchemaConverter implements FirestoreDataConverter<FirestoreNodes, FileDbModel> {
     constructor(
         private _plugin: FirestoreSyncPlugin,
         private _userCreds: UserCredential
     ) {}
 
-    public toFirestore(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        node: WithFieldValue<FileNode<Option<string>, any>>
-    ): WithFieldValue<FileDbModel> {
-        const fileNode = node as FileNode;
-        return {
-            path: fileNode.data.fullPath,
-            cTime: fileNode.data.ctime,
-            mTime: fileNode.data.mtime,
-            size: fileNode.data.size,
-            baseName: fileNode.data.baseName,
-            ext: fileNode.data.extension,
-            userId: this._userCreds.user.uid,
-            deleted: fileNode.data.deleted,
-            data: fileNode.data.data.andThen((text) => Bytes.fromUint8Array(text)).valueOr(null),
-            fileStorageRef: fileNode.data.fileStorageRef.valueOr(null),
-            vaultName: fileNode.data.vaultName,
-            deviceId: this._plugin.settings.clientId,
-            syncerConfigId: fileNode.data.syncerConfigId,
-            fileHash: fileNode.data.fileHash.valueOr(null)
-        };
+    public toFirestore(node: WithFieldValue<UploadFileNode>): WithFieldValue<FileDbModel> {
+        const fileNode = node as UploadFileNode;
+        switch (fileNode.extra.type) {
+            case "RAW_DATA":
+                return {
+                    path: fileNode.data.fullPath,
+                    cTime: fileNode.data.cTime,
+                    mTime: fileNode.data.mTime,
+                    size: fileNode.data.size,
+                    baseName: fileNode.data.baseName,
+                    ext: fileNode.data.extension,
+                    userId: this._userCreds.user.uid,
+                    deleted: fileNode.data.deleted,
+                    data: Bytes.fromUint8Array(fileNode.extra.data),
+                    fileStorageRef: null,
+                    vaultName: fileNode.metadata.vaultName,
+                    deviceId: this._plugin.settings.clientId,
+                    syncerConfigId: fileNode.metadata.syncerConfigId,
+                    fileHash: fileNode.data.fileHash,
+                    entryTime: fileNode.metadata.firestoreTime.valueOr(Date.now()),
+                    version: "v1",
+                    type: "Raw"
+                };
+            case "FILE_REF":
+                return {
+                    path: fileNode.data.fullPath,
+                    cTime: fileNode.data.cTime,
+                    mTime: fileNode.data.mTime,
+                    size: fileNode.data.size,
+                    baseName: fileNode.data.baseName,
+                    ext: fileNode.data.extension,
+                    userId: this._userCreds.user.uid,
+                    deleted: fileNode.data.deleted,
+                    data: null,
+                    fileStorageRef: fileNode.extra.fileStorageRef,
+                    vaultName: fileNode.metadata.vaultName,
+                    deviceId: this._plugin.settings.clientId,
+                    syncerConfigId: fileNode.metadata.syncerConfigId,
+                    fileHash: fileNode.data.fileHash,
+                    entryTime: fileNode.metadata.firestoreTime.valueOr(Date.now()),
+                    version: "v1",
+                    type: "Ref"
+                };
+        }
     }
 
     public fromFirestore(
         _snapshot: QueryDocumentSnapshot<FileDbModel>,
         _options: SnapshotOptions
-    ): FileNode<Some<string>> {
+    ): CloudNode {
         const data = _snapshot.data();
-        const params: FileNodeParams<Some<string>> = {
-            fullPath: data.path,
-            ctime: data.cTime,
-            mtime: data.mTime,
-            size: data.size,
-            baseName: data.baseName,
-            extension: data.ext,
-            fileId: Some(_snapshot.id),
-            userId: Some(data.userId),
-            deleted: data.deleted,
-            vaultName: data.vaultName,
-            data: data.data !== null ? Some(data.data.toUint8Array()) : None,
-            fileStorageRef: data.fileStorageRef !== null ? Some(data.fileStorageRef) : None,
-            localDataType: None,
-            cloudDataType: Some(CloudDataType.FILE),
-            deviceId: Some(data.deviceId),
-            syncerConfigId: data.syncerConfigId,
-            isFromCloudCache: false,
-            fileHash:
-                data.fileHash === undefined || data.fileHash === null ? None : Some(data.fileHash)
-        };
 
-        return new FileNode(params);
+        switch (data.type) {
+            case "Raw":
+                return new CloudNodeRaw(
+                    {
+                        fullPath: data.path,
+                        cTime: data.cTime,
+                        mTime: data.mTime,
+                        size: data.size,
+                        baseName: data.baseName,
+                        extension: data.ext,
+                        deleted: data.deleted,
+                        fileHash: data.fileHash
+                    },
+                    {
+                        deviceId: Some(data.deviceId),
+                        syncerConfigId: data.syncerConfigId,
+                        firestoreTime: Some(data.entryTime),
+                        vaultName: data.vaultName,
+                        fileId: Some(_snapshot.id),
+                        userId: Some(data.userId)
+                    },
+                    {
+                        isFromCloudCache: false,
+                        data: Some(data.data.toUint8Array())
+                    }
+                );
+            case "Ref":
+                return new CloudNodeFileRef(
+                    {
+                        fullPath: data.path,
+                        cTime: data.cTime,
+                        mTime: data.mTime,
+                        size: data.size,
+                        baseName: data.baseName,
+                        extension: data.ext,
+                        deleted: data.deleted,
+                        fileHash: data.fileHash
+                    },
+                    {
+                        deviceId: Some(data.deviceId),
+                        syncerConfigId: data.syncerConfigId,
+                        firestoreTime: Some(data.entryTime),
+                        vaultName: data.vaultName,
+                        fileId: Some(_snapshot.id),
+                        userId: Some(data.userId)
+                    },
+                    {
+                        isFromCloudCache: false,
+                        fileStorageRef: data.fileStorageRef
+                    }
+                );
+        }
     }
 }
 

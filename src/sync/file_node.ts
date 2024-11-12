@@ -1,72 +1,258 @@
 import type { TFile } from "obsidian";
-import { None, Some, type Option } from "../lib/option";
+import type { Some } from "../lib/option";
+import { None, type Option } from "../lib/option";
 
-interface LocalObsidianFile {
-    type: "OBSIDIAN";
-}
-
-interface LocalRawFile {
-    type: "RAW";
-}
-
-export type LocalDataType = LocalObsidianFile | LocalRawFile;
-
-/** Denotes where the data came from. */
-export enum CloudDataType {
-    FILE = "file",
-    HISTORIC = "historic"
-}
-
-export interface FileNodeParams<TypeOfData extends Option<string> = Option<string>> {
-    /** Full filepath. */
+export interface FileData {
+    // Full filepath.
     fullPath: string;
-    /** The creation time. */
-    ctime: number;
-    /** The modification time. */
-    mtime: number;
+    // The file creation time.
+    cTime: number;
+    // The file modification time.
+    mTime: number;
     /** Size of the file in bytes. */
     size: number;
-    /** Filename without the extension. */
+    /** File name without the extension. */
     baseName: string;
     /** File extension (example ".md"). */
     extension: string;
-    /** Uid of the file. */
-    fileId: TypeOfData;
-    /** The user id of the authenticated user who made this file. */
-    userId: TypeOfData;
-    /** Only set by the firestore. */
+    /** If the file has been deleted. */
     deleted: boolean;
-    /** Name of the vault this belongs to. */
-    vaultName: string;
-    /** Data from the cloud storage compress with brotli encoded in uint8. */
-    data: Option<Uint8Array>;
-    /** Storage path on cloud storage if any. */
-    fileStorageRef: Option<string>;
-    /** If this is a local file this denotes where the data is. */
-    localDataType: Option<LocalDataType>;
-    /** The cloud data type if this is from the cloud. */
-    cloudDataType: Option<CloudDataType>;
-    /** The id of the device. */
+    /** The hash of the file contents. */
+    fileHash: string;
+}
+
+export interface FileMetadata {
+    /** The id of the device that pushed this change. */
     deviceId: Option<string>;
     /** The syncer config id that pushed the update. */
     syncerConfigId: string;
-    /** If this file node is vitual and just represents an entry from cache.  */
-    isFromCloudCache: boolean;
-    /** The hash of the file contents. */
-    fileHash: Option<string>;
+    /** The time for the firestore entry, in ms from unix epoch. */
+    firestoreTime: Option<number>;
+    /** Name of the vault this belongs to. */
+    vaultName: string;
+    /** Uid of the file. */
+    fileId: Option<string>;
+    /** The UId of the user that made the change. */
+    userId: Option<string>;
+}
+export interface CloudFileMetadata {
+    /** The id of the device that pushed this change. */
+    deviceId: Some<string>;
+    /** The syncer config id that pushed the update. */
+    syncerConfigId: string;
+    /** The time for the firestore entry, in ms from unix epoch. */
+    firestoreTime: Some<number>;
+    /** Name of the vault this belongs to. */
+    vaultName: string;
+    /** Uid of the file. */
+    fileId: Some<string>;
+    /** The UId of the user that made the change. */
+    userId: Some<string>;
 }
 
 /** File node for book keeping. */
+export class BaseMutableFileNode {
+    public type = "BASE_FILE_NODE";
+    public data: FileData;
+    public metadata: FileMetadata;
+    public extra: unknown = {};
 
-export class FileNode<
-    TypeOfData extends Option<string> = Option<string>,
-    ExtraData extends object = object
-> {
+    constructor(data: FileData, metadata: FileMetadata, extra: unknown) {
+        this.data = data;
+        this.metadata = metadata;
+        this.extra = extra;
+    }
+
+    /** Converts the file to string. */
+    public toString(): string {
+        const attributes: string[] = [
+            `File type: ${this.type}`,
+            this.metadata.fileId.andThen((val) => `Id: ${val}`).valueOr(""),
+            `Vault: ${this.metadata.vaultName}`,
+            this.metadata.firestoreTime
+                .andThen(
+                    (val) => `Time: ${window.moment(val).format("MMMM Do YYYY, h:mm:ss.SSS a")}`
+                )
+                .valueOr(""),
+            `Hash: ${this.data.fileHash}`,
+            `Deleted: ${this.data.deleted}`
+        ].filter((v) => v !== "");
+        return `File "${this.data.fullPath}" [${attributes.join(", ")}]`;
+    }
+
+    /** Checks if the data are equal in both file nodes. */
+    public equalsData(other: BaseMutableFileNode): boolean {
+        return (
+            this.data.fileHash === other.data.fileHash &&
+            this.metadata.firestoreTime.equals(other.metadata.firestoreTime) &&
+            this.data.fullPath === other.data.fullPath
+        );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+    public metadataAreEqual<T extends BaseMutableFileNode = BaseMutableFileNode>(node: T): boolean {
+        return (
+            this.metadata.deviceId.equals(node.metadata.deviceId) &&
+            this.metadata.fileId.equals(node.metadata.fileId) &&
+            this.metadata.firestoreTime.equals(node.metadata.firestoreTime) &&
+            this.metadata.syncerConfigId === node.metadata.syncerConfigId &&
+            this.metadata.userId.equals(node.metadata.userId) &&
+            this.metadata.vaultName === node.metadata.vaultName
+        );
+    }
+}
+
+type PrimitiveType = number | string | boolean;
+
+/** Object types that should never be mapped */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type, @typescript-eslint/no-explicit-any
+type AtomicObject = Function | Promise<any> | Date | RegExp;
+/**
+ * If the lib "ES2015.Collection" is not included in tsconfig.json,
+ * types like ReadonlyArray, WeakMap etc. fall back to `any` (specified nowhere)
+ * or `{}` (from the node types), in both cases entering an infinite recursion in
+ * pattern matching type mappings
+ * This type can be used to cast these types to `void` in these cases.
+ */
+export type IfAvailable<T, Fallback = void> =
+    // fallback if any
+    true | false extends (T extends never ? true : false)
+        ? Fallback // fallback if empty type
+        : keyof T extends never
+          ? Fallback // original type
+          : T;
+/**
+ * These should also never be mapped but must be tested after regular Map and
+ * Set
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type WeakReferences = IfAvailable<WeakMap<any, any>> | IfAvailable<WeakSet<any>>;
+/** Convert a mutable type into a readonly type */
+export type Immutable<T> = T extends PrimitiveType
+    ? T
+    : T extends AtomicObject
+      ? T
+      : T extends ReadonlyMap<infer K, infer V> // Map extends ReadonlyMap
+        ? ReadonlyMap<Immutable<K>, Immutable<V>>
+        : T extends ReadonlySet<infer V> // Set extends ReadonlySet
+          ? ReadonlySet<Immutable<V>>
+          : T extends WeakReferences
+            ? T
+            : T extends object
+              ? { readonly [K in keyof T]: Immutable<T[K]> }
+              : T;
+
+export type ImmutableBaseFileNode = Immutable<BaseMutableFileNode>;
+
+export interface CachedCloudCacheData {
+    /** If this file node is vitual and just represents an entry from cache.  */
+    isFromCloudCache: true;
+    /** Data from the cloud storage compressed with brotli encoded in uint8. */
+    data: None;
+}
+export interface NotCachedCloudData {
+    /** If this file node is vitual and just represents an entry from cache.  */
+    isFromCloudCache: false;
+    /** Data from the cloud storage compressed with brotli encoded in uint8. */
+    data: Some<Uint8Array>;
+}
+
+type TCloudFileNodeRawKey = "CLOUD_RAW";
+/** Represents a file node on cloud storage that contains the raw uint 8 data. */
+export class CloudNodeRaw extends BaseMutableFileNode {
+    public override readonly type: TCloudFileNodeRawKey = "CLOUD_RAW";
+    public override readonly metadata: CloudFileMetadata;
+    public override readonly extra: CachedCloudCacheData | NotCachedCloudData;
+
+    // eslint-disable-next-line @typescript-eslint/no-useless-constructor
     constructor(
-        public data: FileNodeParams<TypeOfData>,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-        public extraData: ExtraData = {} as any
-    ) {}
+        data: FileData,
+        metadata: FileMetadata,
+        extra: CachedCloudCacheData | NotCachedCloudData
+    ) {
+        super(data, metadata, extra);
+    }
+}
+
+export interface CloudFileStorageData {
+    /** If this file node is vitual and just represents an entry from cache.  */
+    isFromCloudCache: boolean;
+    /** Storage path on cloud storage if any. */
+    fileStorageRef: string;
+}
+
+type TCloudFileNodeStorageRefKey = "CLOUD_FILE_REF";
+/** Represents a file node on cloud storage that contains a File Storage reference. */
+export class CloudNodeFileRef extends BaseMutableFileNode {
+    public override readonly type: TCloudFileNodeStorageRefKey = "CLOUD_FILE_REF";
+    public override readonly metadata: CloudFileMetadata;
+    public override readonly extra: CloudFileStorageData;
+
+    // eslint-disable-next-line @typescript-eslint/no-useless-constructor
+    constructor(data: FileData, metadata: CloudFileMetadata, extra: CloudFileStorageData) {
+        super(data, metadata, extra);
+    }
+}
+
+export interface UploadRawData {
+    type: "RAW_DATA";
+    /** Data from the cloud storage compressed with brotli encoded in uint8. */
+    data: Uint8Array;
+}
+export interface UploadFileRefData {
+    type: "FILE_REF";
+    /** Storage path on cloud storage if any. */
+    fileStorageRef: string;
+}
+export type UploadNodeMetadata = UploadRawData | UploadFileRefData;
+
+/** Represent a node that had data to upload. */
+export class UploadFileNode extends BaseMutableFileNode {
+    public override readonly type: TLocalFileNodeRawDataKey = "LOCAL_RAW";
+    public override readonly metadata: FileMetadata;
+    public override readonly extra: UploadNodeMetadata;
+
+    // eslint-disable-next-line @typescript-eslint/no-useless-constructor
+    constructor(data: FileData, metadata: FileMetadata, extra: UploadNodeMetadata) {
+        super(data, metadata, extra);
+    }
+}
+
+type TLocalFileNodeRawDataKey = "LOCAL_RAW";
+/** Represents a file node on the local device that is a raw file. */
+export class LocalNodeRaw extends BaseMutableFileNode {
+    public override readonly type: TLocalFileNodeRawDataKey = "LOCAL_RAW";
+    public override readonly metadata: FileMetadata;
+
+    constructor(data: FileData, metadata: FileMetadata, extra: unknown = {}) {
+        super(data, metadata, extra);
+    }
+
+    public overwriteMetadataWithCloudNode(node: CloudNode | UploadFileNode): LocalNodeRaw {
+        return this.cloneWithChange({ metadata: node.metadata });
+    }
+
+    public cloneWithChange(changes?: {
+        data?: Partial<FileData>;
+        metadata?: Partial<FileMetadata>;
+    }): LocalNodeRaw {
+        return new LocalNodeRaw(
+            { ...this.data, ...(changes?.data ?? {}) },
+            { ...this.metadata, ...(changes?.metadata ?? {}) },
+            this.extra
+        );
+    }
+}
+
+type TLocalFileNodeObsidianDataKey = "LOCAL_OBSIDIAN_FILE";
+/** Represents a file node on the local device that is an obsidian file. */
+export class LocalNodeObsidian extends BaseMutableFileNode {
+    public override readonly type: TLocalFileNodeObsidianDataKey = "LOCAL_OBSIDIAN_FILE";
+    public override readonly metadata: FileMetadata;
+
+    constructor(data: FileData, metadata: FileMetadata, extra: unknown = {}) {
+        super(data, metadata, extra);
+    }
 
     /** Constructs the FileNode from TFiles. */
     public static constructFromTFile(
@@ -75,124 +261,52 @@ export class FileNode<
         fullPath: string,
         file: TFile,
         fileId: Option<string>,
-        fileHash: Option<string>
+        fileHash: string
     ) {
-        const backingdata: LocalDataType = {
-            type: "OBSIDIAN"
-        };
-        return new FileNode({
-            fullPath,
-            ctime: file.stat.ctime,
-            mtime: file.stat.mtime,
-            size: file.stat.size,
-            baseName: file.basename,
-            extension: file.extension,
-            fileId: fileId,
-            userId: None,
-            deleted: false,
-            vaultName,
-            data: None,
-            fileStorageRef: None,
-            localDataType: Some(backingdata),
-            cloudDataType: None,
-            deviceId: None,
-            syncerConfigId: syncerConfigId,
-            isFromCloudCache: false,
-            fileHash
-        });
-    }
-
-    /**
-     * Overwrite most entries except `localDataType`.
-     * @param other
-     * @returns true if there were any diffs
-     */
-    public overwrite(other: FileNode<TypeOfData>) {
-        this.data.fullPath = other.data.fullPath;
-        this.data.ctime = other.data.ctime;
-        this.data.mtime = other.data.mtime;
-        this.data.size = other.data.size;
-        this.data.baseName = other.data.baseName;
-        this.data.extension = other.data.extension;
-        if (other.data.fileId.some) {
-            this.data.fileId = other.data.fileId;
-        }
-        this.data.userId = other.data.userId;
-        this.data.deleted = other.data.deleted;
-        this.data.data = other.data.data;
-        this.data.fileStorageRef = other.data.fileStorageRef;
-        // localDataType not overwritten.
-        // vault name should not change so no need to overwrite it.
-        // this.data.vaultName = other.data.vaultName;
-        this.data.deviceId = other.data.deviceId;
-        this.data.syncerConfigId = other.data.syncerConfigId;
-        if (this.data.localDataType.none) {
-            this.data.isFromCloudCache = other.data.isFromCloudCache;
-        }
-        this.data.fileHash = other.data.fileHash;
-    }
-
-    /** Overwrite metadata from the cloud. */
-    public overwriteMetadata(other: FileNode<TypeOfData>) {
-        this.data.fileId = other.data.fileId;
-        this.data.userId = other.data.userId;
-        // Vault name is fixed.
-        // this.data.vaultName = other.data.vaultName;
-        // Device id is set from config.
-        // this.data.deviceId = other.data.deviceId;
-        // Syncer config should be set at creation.
-        // this.data.syncerConfigId = other.data.syncerConfigId;
-    }
-
-    public toString() {
-        const attributes: string[] = [
-            this.data.fileId.andThen((val) => `Id: ${val}`).valueOr(""),
-            this.data.localDataType.some
-                ? `LocalType: ${this.data.localDataType.safeValue().type}`
-                : this.data.cloudDataType
-                      .andThen((val) => `CloudType: ${val}`)
-                      .valueOr("Cloud UnknownType"),
-            this.data.fileHash.andThen((hash) => `Hash: ${hash}`).valueOr(""),
-            ...Object.keys(this.extraData).map(
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion
-                (key) => `${key}: ${JSON.stringify((this.extraData as any)[key as any] as any)}`
-            )
-        ].filter((v) => v !== "");
-        return `File "${this.data.fullPath}" [${attributes.join(", ")}]`;
-    }
-
-    /** Checks if the data are equal in both file nodes. */
-    public equalsData(other: FileNode): boolean {
-        return (
-            this.data.fullPath === other.data.fullPath &&
-            this.data.ctime === other.data.ctime &&
-            this.data.mtime === other.data.mtime &&
-            this.data.size === other.data.size &&
-            this.data.baseName === other.data.baseName &&
-            this.data.extension === other.data.extension &&
-            this.data.deleted === other.data.deleted &&
-            this.data.data.equals(other.data.data) &&
-            this.data.fileStorageRef.equals(other.data.fileStorageRef) &&
-            this.data.fileHash.equals(other.data.fileHash)
+        return new LocalNodeObsidian(
+            {
+                fullPath,
+                cTime: file.stat.ctime,
+                mTime: file.stat.mtime,
+                size: file.stat.size,
+                baseName: file.basename,
+                extension: file.extension,
+                deleted: false,
+                fileHash
+            },
+            {
+                deviceId: None,
+                syncerConfigId,
+                firestoreTime: None,
+                vaultName: vaultName,
+                fileId: fileId,
+                userId: None
+            },
+            {}
         );
     }
 
-    public cloneWithChange(
-        modification: Partial<{ data: Partial<FileNodeParams>; extra: Partial<ExtraData> }>
-    ): FileNode<TypeOfData, ExtraData> {
-        const node = new FileNode({ ...this.data }, { ...this.extraData });
-        if (modification.data !== undefined) {
-            for (const key in modification.data) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-                (node.data as any)[key] = (modification.data as any)[key];
-            }
-        }
-        if (modification.extra !== undefined) {
-            for (const key in modification.extra) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-                (node.extraData as any)[key] = (modification.extra as any)[key];
-            }
-        }
-        return node;
+    public overwriteMetadataWithCloudNode(node: CloudNode | UploadFileNode): LocalNodeObsidian {
+        return this.cloneWithChange({ metadata: node.metadata });
+    }
+
+    public cloneWithChange(changes?: {
+        data?: Partial<FileData>;
+        metadata?: Partial<FileMetadata>;
+    }): LocalNodeObsidian {
+        return new LocalNodeObsidian(
+            { ...this.data, ...(changes?.data ?? {}) },
+            { ...this.metadata, ...(changes?.metadata ?? {}) },
+            this.extra
+        );
     }
 }
+
+export type LocalNode = LocalNodeRaw | LocalNodeObsidian;
+
+/** File nodes that come from the cloud. */
+export type CloudNode = CloudNodeRaw | CloudNodeFileRef;
+/** File nodes that interact with the schema converter for firestore. */
+export type FirestoreNodes = CloudNode | UploadFileNode;
+
+export type AllFileNodeTypes = CloudNode | LocalNode;

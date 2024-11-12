@@ -13,7 +13,7 @@ import {
     FlattenFileNodes,
     GetFileMapOfNodes,
     GetNonDeletedByFilePath,
-    UpdateFileMapWithChanges
+    UpdateLocalFileMapWithLocalChanges
 } from "./file_node_util";
 import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
@@ -26,7 +26,7 @@ import { LogError } from "../log";
 import { CleanUpLeftOverLocalFiles } from "./syncer_update_util";
 import type { UnsubFunc } from "../watcher";
 import { AddWatchHandler } from "../watcher";
-import type { FileNode } from "./file_node";
+import type { LocalNode } from "./file_node";
 import type { ConvergenceUpdate, NullUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { uuidv7 } from "../lib/uuid";
@@ -42,9 +42,7 @@ export class FileSyncer {
     /** Identified file changes to check for changes. */
     private _touchedFilepaths = new Set<string>();
     /** Files that have been changed in some way. */
-    private _touchedFileNodes = new Set<FileNode>();
-    /** The following files need to be re read, ex: a file was renamed. */
-    private _needToOverrideSyncToUseLocal = new Set<FileNode>();
+    private _touchedFileNodes = new Set<LocalNode>();
     /** Function to handle unsubing the watch func. */
     private _unsubWatchHandler: Option<UnsubFunc> = None;
     /** timeid to kill the tick function. */
@@ -56,7 +54,7 @@ export class FileSyncer {
         private _plugin: FirestoreSyncPlugin,
         private _firebaseApp: FirebaseApp,
         private _config: SyncerConfig,
-        private _mapOfFileNodes: FileMapOfNodes
+        private _mapOfFileNodes: FileMapOfNodes<LocalNode>
     ) {}
 
     /** Constructs the file syncer. */
@@ -104,6 +102,10 @@ export class FileSyncer {
         );
     }
 
+    public getId(): string {
+        return this._config.syncerId;
+    }
+
     /** Initialize the file syncer. */
     public async init(): Promise<StatusResult<StatusError>> {
         return await this._plugin.loggedIn.then<StatusResult<StatusError>>(
@@ -115,7 +117,6 @@ export class FileSyncer {
                 this.listenForFileChanges();
 
                 view.setSyncerStatus(this._config.syncerId, "building firebase history");
-                console.log("history");
                 const buildFirebaseHistory = await FirebaseHistory.buildFirebaseHistory(
                     this._plugin,
                     this._firebaseApp,
@@ -165,6 +166,10 @@ export class FileSyncer {
     }
 
     public teardown() {
+        void (async () => {
+            const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
+            view.setSyncerStatus(this._config.syncerId, "TearDown!", "red");
+        });
         this._isDead = true;
         if (this._firebaseSyncer.some) {
             this._firebaseSyncer.safeValue().teardown();
@@ -180,6 +185,7 @@ export class FileSyncer {
     private listenForFileChanges() {
         this._unsubWatchHandler = Some(
             AddWatchHandler(this._plugin.app, (type, path, oldPath, _info) => {
+                console.log("Wathcer", type, path, oldPath, _info);
                 // Skip file paths outside nested root path.
                 if (
                     this._config.type === RootSyncType.FOLDER_TO_ROOT &&
@@ -204,10 +210,10 @@ export class FileSyncer {
                         this.handleRename(path, oldPath);
                         break;
                     case "closed":
-                        this._touchedFilepaths.add(path);
+                        this.handleModification(path, /*isRaw=*/ true);
                         break;
                     case "raw":
-                        this._touchedFilepaths.add(path);
+                        this.handleModification(path, /*isRaw=*/ true);
                         break;
                 }
                 return;
@@ -216,10 +222,13 @@ export class FileSyncer {
     }
 
     /** Handle the modification of a file. */
-    private handleModification(path: string) {
+    private handleModification(path: string, isRaw = false) {
         const nonDeleteNode = GetNonDeletedByFilePath(this._mapOfFileNodes, path);
-        if (nonDeleteNode.err) {
+        if (nonDeleteNode.err && !isRaw) {
             LogError(nonDeleteNode.val);
+            this._touchedFilepaths.add(path);
+            return;
+        } else if (nonDeleteNode.err) {
             this._touchedFilepaths.add(path);
             return;
         }
@@ -228,6 +237,7 @@ export class FileSyncer {
             this._touchedFilepaths.add(path);
             return;
         }
+        optNode.safeValue().metadata.firestoreTime = Some(Date.now());
         this._touchedFileNodes.add(optNode.safeValue());
     }
 
@@ -244,6 +254,7 @@ export class FileSyncer {
             this._touchedFilepaths.add(path);
             return;
         }
+        optNode.safeValue().metadata.firestoreTime = Some(Date.now());
         optNode.safeValue().data.deleted = true;
     }
 
@@ -270,6 +281,7 @@ export class FileSyncer {
             return;
         }
         const node = optNode.safeValue();
+        node.metadata.firestoreTime = Some(Date.now());
         this._touchedFileNodes.add(optNode.safeValue());
 
         const pathSplit = path.split("/");
@@ -278,11 +290,15 @@ export class FileSyncer {
         node.data.baseName = baseName;
         node.data.extension = extension ?? "";
         node.data.fullPath = path;
-        this._needToOverrideSyncToUseLocal.add(node);
     }
 
     /** Execute a filesyncer tick. */
     private async fileSyncerTick() {
+        if (this._isDead) {
+            const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
+            view.setSyncerStatus(this._config.syncerId, "TearDown!", "red");
+            return;
+        }
         const tickResult = await this.fileSyncerTickLogic();
         if (tickResult.err) {
             LogError(tickResult.val);
@@ -292,7 +308,10 @@ export class FileSyncer {
             return;
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (this._isDead) {
+            const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
+            view.setSyncerStatus(this._config.syncerId, "TearDown!", "red");
             return;
         }
         this._timeoutId = Some(
@@ -300,9 +319,15 @@ export class FileSyncer {
                 () => {
                     if (!this._isDead) {
                         void this.fileSyncerTick();
+                    } else {
+                        void GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false).then(
+                            (view) => {
+                                view.setSyncerStatus(this._config.syncerId, "TearDown!", "red");
+                            }
+                        );
                     }
                 },
-                Math.max(500 - tickResult.safeUnwrap(), 0)
+                Math.max(1000 - tickResult.safeUnwrap(), 0)
             )
         );
     }
@@ -325,9 +350,7 @@ export class FileSyncer {
         this._touchedFilepaths = new Set();
         const touchedFileNode = this._touchedFileNodes;
         this._touchedFileNodes = new Set();
-        const needToOverrideSyncToUseLocal = this._needToOverrideSyncToUseLocal;
-        this._needToOverrideSyncToUseLocal = new Set();
-        const mergeResult = await UpdateFileMapWithChanges(
+        const mergeResult = await UpdateLocalFileMapWithLocalChanges(
             this._plugin.app,
             this._config,
             this._mapOfFileNodes,
@@ -337,15 +360,15 @@ export class FileSyncer {
         if (mergeResult.err) {
             return mergeResult;
         }
-        this._mapOfFileNodes = mergeResult.safeUnwrap().valueOr(this._mapOfFileNodes);
-        if (this._firebaseHistory.some && mergeResult.safeUnwrap().some) {
+        this._mapOfFileNodes = mergeResult.safeUnwrap();
+        if (this._firebaseHistory.some) {
             this._firebaseHistory.safeValue().updateMapOfLocalNodes(this._mapOfFileNodes);
         }
 
         // Get the updates necessary.
         const convergenceUpdates = this._firebaseSyncer
             .safeValue()
-            .getConvergenceUpdates(this._mapOfFileNodes, needToOverrideSyncToUseLocal);
+            .getConvergenceUpdates(this._mapOfFileNodes);
         if (convergenceUpdates.err) {
             return convergenceUpdates;
         }
@@ -356,18 +379,29 @@ export class FileSyncer {
         }
 
         // Filter out and resolve the null updates.
-        const filteredUpdates = this.resolveNullUpdates(convergenceUpdates.safeUnwrap());
+        const [filteredUpdates, nullUpdates] = this.resolveNullUpdates(
+            convergenceUpdates.safeUnwrap()
+        );
         if (filteredUpdates.length === 0) {
             return Ok(0);
         }
 
+        // Only do a set number of updates per cycle.
         const limitUpdates = filteredUpdates.slice(0, this._config.maxUpdatePerSyncer);
+        // console.log("allFlatFiles", allFlatFiles);
+        console.log("limitUpdates", limitUpdates);
+        // return Err(InternalError("IDK"));
 
         // Build the operations necessary to sync.
         const buildConvergenceOperations = this._firebaseSyncer
             .safeValue()
             .resolveConvergenceUpdates(
-                { syncerId: this._config.syncerId, cycleId },
+                {
+                    syncerId: this._config.syncerId,
+                    cycleId,
+                    clientId: this._plugin.settings.clientId,
+                    vaultName: this._config.vaultName
+                },
                 this._plugin.app,
                 this._config,
                 limitUpdates
@@ -384,9 +418,42 @@ export class FileSyncer {
             }
         }
 
-        // Fix the local file map representation.
-        const flatFiles = FlattenFileNodes(this._mapOfFileNodes);
-        const resultOfMap = ConvertArrayOfNodesToMap(flatFiles);
+        // First filter out all the local nodes with updates.
+        const allFlatFiles = FlattenFileNodes(this._mapOfFileNodes);
+
+        // First filter out the files that have been modified. Filter out all local state files.
+        const finalFiles: LocalNode[] = [];
+        const filteredLocalFiles = new Set<LocalNode>();
+        for (const update of [...limitUpdates, ...nullUpdates]) {
+            switch (update.action) {
+                case ConvergenceAction.USE_CLOUD:
+                case ConvergenceAction.USE_CLOUD_DELETE_LOCAL:
+                    if (update.localState.some) {
+                        filteredLocalFiles.add(update.localState.safeValue());
+                    }
+                    if (update.newLocalFile !== undefined) {
+                        finalFiles.push(update.newLocalFile);
+                    }
+                    break;
+                case ConvergenceAction.USE_LOCAL:
+                case ConvergenceAction.USE_LOCAL_DELETE_CLOUD:
+                case ConvergenceAction.NULL_UPDATE:
+                    filteredLocalFiles.add(update.localState.safeValue());
+                    if (update.newLocalFile !== undefined) {
+                        finalFiles.push(update.newLocalFile);
+                    }
+                    break;
+            }
+        }
+        for (const file of allFlatFiles) {
+            if (!filteredLocalFiles.has(file)) {
+                finalFiles.push(file);
+            }
+        }
+        console.log("finalFiles", finalFiles, "filteredLocalFiles", filteredLocalFiles);
+        // ALso clean up local files.
+
+        const resultOfMap = ConvertArrayOfNodesToMap(finalFiles);
         if (resultOfMap.err) {
             return resultOfMap;
         }
@@ -416,24 +483,31 @@ export class FileSyncer {
     /** Resolve the logic for null updates removing them. */
     private resolveNullUpdates(
         updates: ConvergenceUpdate[]
-    ): Exclude<ConvergenceUpdate, NullUpdate>[] {
+    ): [Exclude<ConvergenceUpdate, NullUpdate>[], NullUpdate[]] {
         const results: Exclude<ConvergenceUpdate, NullUpdate>[] = [];
+        const nulls: NullUpdate[] = [];
         for (const update of updates) {
             switch (update.action) {
                 case ConvergenceAction.USE_CLOUD:
                 case ConvergenceAction.USE_CLOUD_DELETE_LOCAL:
                 case ConvergenceAction.USE_LOCAL:
-                case ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID:
                 case ConvergenceAction.USE_LOCAL_DELETE_CLOUD:
                     results.push(update);
                     break;
                 case ConvergenceAction.NULL_UPDATE:
-                    update.localState.safeValue().data.fileId =
-                        update.cloudState.safeValue().data.fileId;
-                    update.localState.safeValue().data.userId =
-                        update.cloudState.safeValue().data.userId;
+                    if (
+                        !update.localState
+                            .safeValue()
+                            .metadataAreEqual(update.cloudState.safeValue())
+                    ) {
+                        update.newLocalFile = update.localState
+                            .safeValue()
+                            .overwriteMetadataWithCloudNode(update.cloudState.safeValue());
+                        nulls.push(update);
+                    }
+                    break;
             }
         }
-        return results;
+        return [results, nulls];
     }
 }

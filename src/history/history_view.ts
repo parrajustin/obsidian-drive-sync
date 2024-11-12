@@ -10,9 +10,9 @@ import { createContext } from "@lit/context";
 import type { Firestore } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
 import { Signal, signal } from "@lit-labs/signals";
-import type { FileNode } from "../sync/file_node";
+import type { LocalNode } from "../sync/file_node";
 import { DiffModal } from "./components/diff_modal/diff_modal";
-import type { HistoryFileNodeExtra } from "./history_schema";
+import { HistoricFileNode } from "./history_file_node";
 import "./components/history_container";
 import "./components/history_entry";
 import "./components/history_change_entry";
@@ -21,10 +21,7 @@ let CURRENT_HISTORY_VIEW: Option<WorkspaceLeaf> = None;
 export const HISTORY_VIEW_TYPE = "drive-sync-history-view";
 
 export const DIFF_SIGNAL = signal<
-    [
-        Option<FileNode<Some<string>, HistoryFileNodeExtra>>,
-        Option<FileNode<Some<string>, HistoryFileNodeExtra>>
-    ]
+    [Option<LocalNode | HistoricFileNode>, Option<LocalNode | HistoricFileNode>]
 >([None, None]);
 
 export interface AppContext {
@@ -37,6 +34,7 @@ export interface AppContext {
 const CONTEXT_KEY = Symbol.for("AppContext");
 export const appContext = createContext<AppContext, typeof CONTEXT_KEY>(CONTEXT_KEY);
 
+/** The right leaf history view. */
 export class HistoryProgressView extends ItemView {
     private _container: HTMLElement;
     private _history: Option<FirebaseHistory> = None;
@@ -49,22 +47,26 @@ export class HistoryProgressView extends ItemView {
 
             const data = DIFF_SIGNAL.get();
             if (this._history.some && data[0].some && data[1].some && this._entries.some) {
-                const fileId = data[0].safeValue().data.fileId.valueOr("");
-                const historyIds = [
-                    data[0].safeValue().extraData.historyDocId,
-                    data[1].safeValue().extraData.historyDocId
-                ];
+                const fileId = data[0].safeValue().metadata.fileId.valueOr("");
+                const historyIds = data
+                    .map((n) => {
+                        if (n instanceof HistoricFileNode) {
+                            return n.extra.historyDocId;
+                        }
+                        return "";
+                    })
+                    .filter((n) => n !== "");
                 let countFound = 0;
-                let baseNode: Option<FileNode<Option<string>, HistoryFileNodeExtra>> = None;
+                let baseNode: Option<HistoricFileNode> = None;
                 const thisHistoryDocNodes = this._entries
                     .safeValue()
                     .find((v) => v.fileId === fileId);
                 for (const entry of thisHistoryDocNodes?.historyNodes ?? []) {
-                    if (countFound === 2) {
+                    if (countFound === historyIds.length) {
                         baseNode = Some(entry);
                         break;
                     }
-                    if (historyIds.contains(entry.extraData.historyDocId)) {
+                    if (historyIds.contains(entry.extra.historyDocId)) {
                         countFound++;
                     }
                 }
@@ -124,6 +126,7 @@ export class HistoryProgressView extends ItemView {
         return Promise.resolve();
     }
 
+    /** Update the history view content. */
     public updateView() {
         if (this._rootPart.some) {
             this._rootPart.safeValue().setConnected(false);
@@ -138,25 +141,25 @@ export class HistoryProgressView extends ItemView {
         const history = this._history.safeValue().getHistoricNodes();
         const mapFileIdToNodes = new Map<string, HistoryEntryData>();
         for (const [_, entry] of history) {
-            let mapEntry = mapFileIdToNodes.get(entry.data.fileId.safeValue());
+            let mapEntry = mapFileIdToNodes.get(entry.metadata.fileId.safeValue());
             if (mapEntry === undefined) {
                 const localFileNode = this._history
                     .safeValue()
-                    .getLocalFileNodeFromId(entry.data.fileId.safeValue());
+                    .getLocalFileNodeFromId(entry.metadata.fileId.safeValue());
                 mapEntry = {
-                    fileId: entry.data.fileId.safeValue(),
+                    fileId: entry.metadata.fileId.safeValue(),
                     localFile: localFileNode,
                     historyNodes: [entry],
                     latestModification: Math.max(
-                        localFileNode.andThen((n) => n.data.mtime).valueOr(0),
-                        entry.data.mtime
+                        localFileNode.andThen((n) => n.metadata.firestoreTime).valueOr(0),
+                        entry.metadata.firestoreTime.safeValue()
                     )
                 };
-                mapFileIdToNodes.set(entry.data.fileId.safeValue(), mapEntry);
+                mapFileIdToNodes.set(entry.metadata.fileId.safeValue(), mapEntry);
             } else {
                 mapEntry.latestModification = Math.max(
                     mapEntry.latestModification,
-                    entry.data.mtime
+                    entry.metadata.firestoreTime.safeValue()
                 );
                 mapEntry.historyNodes.push(entry);
             }
@@ -165,7 +168,10 @@ export class HistoryProgressView extends ItemView {
         // Sorts descending by latest modification time.
         this._entries.safeValue().sort((a, b) => b.latestModification - a.latestModification);
         this._entries.safeValue().forEach((n) => {
-            n.historyNodes.sort((a, b) => b.data.mtime - a.data.mtime);
+            n.historyNodes.sort(
+                (a, b) =>
+                    b.metadata.firestoreTime.safeValue() - a.metadata.firestoreTime.safeValue()
+            );
         });
 
         const context: AppContext = {

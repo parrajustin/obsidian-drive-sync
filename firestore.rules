@@ -8,21 +8,21 @@ service cloud.firestore {
     // Match any document in the 'file' collection
     match /file/{file} {
         allow delete: if false;
-        allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
-        allow create: if request.auth != null && request.resource.data.keys().hasOnly(
-        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileHash"]) && request.auth.uid == request.resource.data.userId;
+        allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+        allow create, update: if request.auth != null && request.resource.data.keys().hasOnly(
+        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileHash", "version", "entryTime", "type"]) && request.auth.uid == request.resource.data.userId;
     }
     match /hist/{file} {
         allow update: if false;
-        allow read, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+        allow read, delete: if request.auth != null && request.auth.uid == resource.data.file.userId;
         allow create: if request.auth != null && request.resource.data.keys().hasOnly(
-        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileId", "fileHash"]) && request.auth.uid == request.resource.data.userId;
+        ["file", "fileId", "version", "entryTime"]) && request.auth.uid == request.resource.data.file.userId;
     }
     match /{uid}/{document=**} {
         allow delete: if false;
         allow read, update: if request.auth != null && request.auth.uid == uid && request.auth.uid == resource.data.userId;
         allow create: if request.auth != null && request.auth.uid == uid && request.resource.data.keys().hasOnly(
-        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileHash"]) && request.auth.uid == request.resource.data.userId;
+        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileHash", "version", "entryTime", "type"]) && request.auth.uid == request.resource.data.userId;
     }
 
     match /{document=**} {
@@ -30,5 +30,3 @@ service cloud.firestore {
     }
   }
 }
-
-

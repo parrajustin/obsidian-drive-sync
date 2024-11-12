@@ -24,6 +24,7 @@ export async function WrapPromise<TInput>(
                         `${textForUnknown} [${e.message}]`,
                         e
                     );
+                    outputError.setPayload("error", e);
                 } else {
                     outputError = ConvertToUnknownError(textForUnknown)(e);
                 }

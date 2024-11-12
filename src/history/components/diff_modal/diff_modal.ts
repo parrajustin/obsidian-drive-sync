@@ -1,21 +1,22 @@
 import type { App } from "obsidian";
 import { Modal } from "obsidian";
-import type { FileNode } from "../../../sync/file_node";
+import type { LocalNode } from "../../../sync/file_node";
 import { ReadFileNode } from "../../../sync/file_util";
 import type { Firestore } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
 import { DiffMatchPatch } from "../../../lib/diff_merge_patch";
 import { LogError } from "../../../log";
 import { None, Some, type Option } from "../../../lib/option";
+import type { HistoricFileNode } from "../../history_file_node";
 
 export class DiffModal extends Modal {
     constructor(
         app: App,
         private _db: Firestore,
         private _creds: UserCredential,
-        private _baseNode: Option<FileNode>,
-        private _aFileNode: FileNode,
-        private _bFileNode: FileNode
+        private _baseNode: Option<HistoricFileNode>,
+        private _aFileNode: LocalNode | HistoricFileNode,
+        private _bFileNode: LocalNode | HistoricFileNode
     ) {
         super(app);
         this.setTitle(`Diff Viewer`);
@@ -86,7 +87,6 @@ export class DiffModal extends Modal {
             }
             const diff = diffResult.safeUnwrap();
             patcher.diffCleanupSemantic(diff);
-            console.log(diff);
             this.contentEl.createSpan().innerHTML = patcher.diffPrettyHtml(diff);
             this.contentEl.createDiv().innerText = "TEST";
             const patchResult = patcher.patchMake(diff);
@@ -94,7 +94,7 @@ export class DiffModal extends Modal {
                 LogError(patchResult.val);
                 return;
             }
-            console.log("patchResult", patchResult);
+            console.log("patchResult", patchResult, baseFileContent);
             this.contentEl.createSpan().innerText = JSON.stringify(patchResult.safeUnwrap());
 
             //   var dmp = new diff_match_patch();

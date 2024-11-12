@@ -5,6 +5,7 @@ import { None, Some, type Option } from "./lib/option";
 import { ErrorCode, type StatusError } from "./lib/status_error";
 import type { SyncerConfig } from "./settings/syncer_config_data";
 import type { FirebaseHistory } from "./history/firebase_hist";
+import type FirestoreSyncPlugin from "./main";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
 const MAX_NUMBER_OF_CYCLES = 50;
@@ -79,6 +80,8 @@ export class SyncProgressView extends ItemView {
     private _syncerHistory = new Map<string, FirebaseHistory>();
     /** The buttons to click to see a syncer history panel. */
     private _syncerHistBtn = new Map<string, HTMLDivElement>();
+    /** firestore sync plugin. */
+    private _plugin: FirestoreSyncPlugin;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -94,6 +97,10 @@ export class SyncProgressView extends ItemView {
         this._historicalDiv = container.createEl("div", "hsitorical-div");
         this._progressListContainer = this._progressContainer.createDiv("progress-list");
         this.updateProgressView();
+    }
+
+    public setSyncPlugin(plugin: FirestoreSyncPlugin) {
+        this._plugin = plugin;
     }
 
     public getViewType() {
@@ -467,7 +474,6 @@ export class SyncProgressView extends ItemView {
                 iconName = "trash-2";
                 break;
             case ConvergenceAction.USE_LOCAL:
-            case ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID:
                 iconName = "hard-drive-upload";
                 break;
         }
@@ -491,7 +497,6 @@ export class SyncProgressView extends ItemView {
                 iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
                 break;
             case ConvergenceAction.USE_LOCAL:
-            case ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID:
                 iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hard-drive-upload"><path d="m16 6-4-4-4 4"/><path d="M12 2v8"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 18h.01"/><path d="M10 18h.01"/></svg>`;
                 break;
         }
@@ -529,6 +534,12 @@ export class SyncProgressView extends ItemView {
             container.style.flexDirection = "column";
             container.style.width = "100%";
             this._syncerStatuses.set(config.syncerId, container.createSpan());
+            const btnEl = container.createEl("button");
+            btnEl.onclick = () => {
+                console.log("Killing syncer");
+                this._plugin.killSyncer(config.syncerId);
+            };
+            btnEl.innerText = "Kill Syncer";
             this._syncerHistBtn.set(config.syncerId, container.createDiv());
         }
         for (const config of this._syncerConfigs) {

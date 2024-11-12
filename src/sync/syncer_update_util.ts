@@ -6,10 +6,9 @@
 import type { Firestore, Transaction } from "firebase/firestore";
 import { doc, getDoc, runTransaction } from "firebase/firestore";
 import type { App } from "obsidian";
-import { TFile } from "obsidian";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
-import type { StatusResult } from "../lib/result";
+import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { ErrorCode, InternalError, UnknownError } from "../lib/status_error";
@@ -22,28 +21,23 @@ import type {
     CloudDeleteLocalConvergenceUpdate,
     ConvergenceUpdate,
     LocalConvergenceUpdate,
-    LocalDeleteCloudConvergenceUpdate,
-    LocalReplaceIdConvergenceUpdate
+    LocalDeleteCloudConvergenceUpdate
 } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
-import { WriteUidToFile } from "./file_id_util";
+import type { FileDbModel } from "./firestore_schema";
 import { GetFileSchemaConverter } from "./firestore_schema";
 import type { UserCredential } from "firebase/auth";
 import type { SyncProgressView } from "../progressView";
 import { GetOrCreateSyncProgressView } from "../progressView";
 import type { FileMapOfNodes } from "./file_node_util";
-import { GetNonDeletedByFilePath } from "./file_node_util";
+import { GetLocalFileNode, GetNonDeletedByFilePath } from "./file_node_util";
 import { DeleteFile, ReadFile, WriteFile } from "./file_util";
 import type { SyncerConfig } from "../settings/syncer_config_data";
-import {
-    ConvertFileNodeToLocalDataType,
-    ConvertFilePathToLocalDataType,
-    IsLocalFileRaw
-} from "./query_util";
-import type { FileNodeParams, LocalDataType } from "./file_node";
-import { FileNode } from "./file_node";
-import type { HistoryFileNodeExtra } from "../history/history_schema";
-import { GetHistorySchemaConverter } from "../history/history_schema";
+import type { CloudNode, FirestoreNodes, LocalNode, UploadNodeMetadata } from "./file_node";
+import { LocalNodeObsidian, LocalNodeRaw, UploadFileNode } from "./file_node";
+import { CloudNodeFileRef, CloudNodeRaw } from "./file_node";
+import { MarkFirestoreAsDeleted, UploadFileToFirestore } from "./firestore_util";
+import { GetFileCollectionPath } from "../firestore/file_db_util";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
@@ -52,38 +46,15 @@ export interface Identifiers {
     syncerId: string;
     /** The id of the cycle. */
     cycleId: string;
+    /** The id of the client. */
+    clientId: string;
+    /** The name of the vault. */
+    vaultName: string;
 }
 
-/** Upload the file to firestore. Also uploads the data to history. */
-async function UploadFileToFirestore(
-    db: Firestore,
-    transaction: Transaction,
-    node: FileNode,
-    cloudNode: Option<FileNode<Some<string>>>,
-    userId: string,
-    fileId: string
-) {
-    const entry = `${userId}/${fileId}`;
-    // Upload the cloud node which is the old one, to the history. If any.
-    if (cloudNode.some) {
-        const result = await transaction.get(
-            doc(db, entry).withConverter(GetFileSchemaConverter())
-        );
-        const fetchedCloudNode = result.data() as FileNode<Some<string>>;
-        const histEntry = `hist/${uuidv7()}`;
-        const histDocumentRef = doc(db, histEntry).withConverter(GetHistorySchemaConverter());
-        transaction.set(
-            histDocumentRef,
-            fetchedCloudNode.cloneWithChange({ data: { mtime: Date.now() } }) as FileNode<
-                Some<string>,
-                HistoryFileNodeExtra
-            >
-        );
-    }
-
-    // Upload the new file.
-    const documentRef = doc(db, entry).withConverter(GetFileSchemaConverter());
-    transaction.set(documentRef, node);
+export interface ExecuteUpdateReturn {
+    /** Local node updates keyed by the file ID. */
+    localNode: Map<string, Option<LocalNode>>;
 }
 
 /**
@@ -94,14 +65,9 @@ async function UploadFileToFirestore(
  * @returns the array of operations taking place.
  */
 export function CreateOperationsToUpdateCloud(
-    userId: string,
     ids: Identifiers,
     db: Firestore,
-    localUpdates: (
-        | LocalConvergenceUpdate
-        | LocalReplaceIdConvergenceUpdate
-        | LocalDeleteCloudConvergenceUpdate
-    )[],
+    localUpdates: (LocalConvergenceUpdate | LocalDeleteCloudConvergenceUpdate)[],
     app: App,
     syncConfig: SyncerConfig,
     creds: UserCredential
@@ -112,150 +78,164 @@ export function CreateOperationsToUpdateCloud(
             const view = await GetOrCreateSyncProgressView(app, /*reveal=*/ false);
             // Get the file id.
             const fileId = update.cloudState.some
-                ? update.cloudState.safeValue().data.fileId.safeValue()
-                : update.localState.safeValue().data.fileId.valueOr(uuidv7());
+                ? update.cloudState.safeValue().metadata.fileId.safeValue()
+                : update.localState.safeValue().metadata.fileId.valueOr(uuidv7());
             const localState = update.localState.safeValue();
             const tooBigForFirestore = localState.data.size > ONE_HUNDRED_KB_IN_BYTES;
-            const writeData = update.action !== ConvergenceAction.USE_LOCAL_DELETE_CLOUD;
-
-            // For times we have to replace id do that first.
-            if (update.action === ConvergenceAction.USE_LOCAL_BUT_REPLACE_ID) {
-                const file = app.vault.getAbstractFileByPath(localState.data.fullPath);
-                if (file === null || !(file instanceof TFile)) {
-                    return Err(
-                        InternalError(
-                            `USE_LOCAL_BUT_REPLACE_ID expect "${localState.data.fullPath}" to be obsidian file`
-                        )
+            switch (update.action) {
+                case ConvergenceAction.USE_LOCAL_DELETE_CLOUD: {
+                    const transactionResult = await WrapPromise(
+                        runTransaction(
+                            db,
+                            async (transaction: Transaction): Promise<void> =>
+                                MarkFirestoreAsDeleted(db, transaction, creds, fileId)
+                        ),
+                        /*textForUnkown=*/ `Failed transaction for "${fileId}"`
                     );
+                    return transactionResult;
                 }
-                const writeUid = await WriteUidToFile(app, syncConfig, file, fileId, {
-                    mtime: update.cloudState.safeValue().data.mtime
-                });
-                if (writeUid.err) {
-                    return writeUid;
-                }
-            }
+                case ConvergenceAction.USE_LOCAL: {
+                    // Metadata for upload file.
+                    let uploadNodeMetadata: UploadNodeMetadata;
 
-            const node: FileNodeParams<Some<string>> = {
-                fullPath: localState.data.fullPath,
-                ctime: localState.data.ctime,
-                mtime: localState.data.mtime,
-                size: localState.data.size,
-                baseName: localState.data.baseName,
-                extension: localState.data.extension,
-                fileId: Some(fileId),
-                userId: Some(creds.user.uid),
-                deleted: update.localState.safeValue().data.deleted,
-                vaultName: syncConfig.vaultName,
-                // Metadata.
-                data: None,
-                fileStorageRef: None,
-                localDataType: None,
-                cloudDataType: None,
-                deviceId: None,
-                syncerConfigId: syncConfig.syncerId,
-                isFromCloudCache: false,
-                fileHash: localState.data.fileHash
-            };
-
-            const initalFileName: Option<string> = update.cloudState.andThen<string>(
-                (cloudStateNode) => {
-                    if (cloudStateNode.data.fullPath !== localState.data.fullPath) {
-                        return Some(cloudStateNode.data.fullPath);
-                    }
-                    return None;
-                }
-            );
-            view.addEntry(
-                ids.syncerId,
-                fileId,
-                initalFileName,
-                localState.data.fullPath,
-                update.action
-            );
-            view.setEntryProgress(ids.syncerId, fileId, 0.1);
-
-            // Handle how the data is stored.
-            if (writeData && !tooBigForFirestore) {
-                // When the data is small enough compress it and upload to
-                const readDataResult = await ReadFile(
-                    app,
-                    localState.data.fullPath,
-                    ConvertFileNodeToLocalDataType(update.localState.safeValue(), syncConfig)
-                );
-                view.setEntryProgress(ids.syncerId, fileId, 0.2);
-                if (readDataResult.err) {
-                    return readDataResult;
-                }
-                // Create the read stream and compress the data.
-                const compressedReadableStream = await WrapPromise(
-                    Promise.resolve(
-                        new ReadableStream({
-                            start(controller) {
-                                controller.enqueue(readDataResult.safeUnwrap());
-                                controller.close();
+                    const initalFileName: Option<string> = update.cloudState.andThen<string>(
+                        (cloudStateNode) => {
+                            if (cloudStateNode.data.fullPath !== localState.data.fullPath) {
+                                return Some(cloudStateNode.data.fullPath);
                             }
-                        }).pipeThrough(new CompressionStream("gzip"))
-                    ),
-                    /*textForUnknown=*/ `Failed to create stream and compress ${localState.data.fullPath}`
-                );
-                if (compressedReadableStream.err) {
-                    return compressedReadableStream;
-                }
-
-                // Convert data to uint8array.
-                const wrappedResponse = new Response(compressedReadableStream.safeUnwrap());
-                const dataCompresssed = await WrapPromise(
-                    wrappedResponse.arrayBuffer(),
-                    /*textForUnknown=*/ `Failed to convert to array buffer`
-                );
-                view.setEntryProgress(ids.syncerId, fileId, 0.4);
-                if (dataCompresssed.err) {
-                    return dataCompresssed;
-                }
-
-                node.data = Some(new Uint8Array(dataCompresssed.safeUnwrap()));
-            } else if (writeData) {
-                const uploadCloudStoreResult = await UploadFileToStorage(
-                    app,
-                    syncConfig,
-                    localState.data.fullPath,
-                    creds,
-                    /*fileId=*/ uuidv7()
-                );
-                view.setEntryProgress(ids.syncerId, fileId, 0.6);
-                if (uploadCloudStoreResult.err) {
-                    return uploadCloudStoreResult;
-                }
-                node.fileStorageRef = Some(uploadCloudStoreResult.safeUnwrap());
-            }
-
-            // Upload the data to firestore.
-            const uploadNode = new FileNode<Some<string>>(node);
-            const transactionResult = await WrapPromise(
-                runTransaction(db, async (transaction: Transaction): Promise<void> => {
-                    await UploadFileToFirestore(
-                        db,
-                        transaction,
-                        uploadNode,
-                        update.cloudState,
-                        userId,
-                        fileId
+                            return None;
+                        }
                     );
-                    return Promise.resolve();
-                }),
-                /*textForUnkown=*/ `Failed transaction for "${fileId}"`
-            );
-            view.setEntryProgress(ids.syncerId, fileId, 0.7);
-            if (transactionResult.err) {
-                return transactionResult;
+                    view.addEntry(
+                        ids.syncerId,
+                        fileId,
+                        initalFileName,
+                        localState.data.fullPath,
+                        update.action
+                    );
+                    view.setEntryProgress(ids.syncerId, fileId, 0.1);
+
+                    // Handle how the data is stored.
+                    if (!tooBigForFirestore) {
+                        // When the data is small enough compress it and upload to
+                        const readDataResult = await ReadFile(
+                            app,
+                            localState.data.fullPath,
+                            update.localState.safeValue()
+                        );
+                        view.setEntryProgress(ids.syncerId, fileId, 0.2);
+                        if (readDataResult.err) {
+                            return readDataResult;
+                        }
+                        // Create the read stream and compress the data.
+                        const compressedReadableStream = await WrapPromise(
+                            Promise.resolve(
+                                new ReadableStream({
+                                    start(controller) {
+                                        controller.enqueue(readDataResult.safeUnwrap());
+                                        controller.close();
+                                    }
+                                }).pipeThrough(new CompressionStream("gzip"))
+                            ),
+                            /*textForUnknown=*/ `Failed to create stream and compress ${localState.data.fullPath}`
+                        );
+                        if (compressedReadableStream.err) {
+                            return compressedReadableStream;
+                        }
+
+                        // Convert data to uint8array.
+                        const wrappedResponse = new Response(compressedReadableStream.safeUnwrap());
+                        const dataCompresssed = await WrapPromise(
+                            wrappedResponse.arrayBuffer(),
+                            /*textForUnknown=*/ `Failed to convert to array buffer`
+                        );
+                        view.setEntryProgress(ids.syncerId, fileId, 0.4);
+                        if (dataCompresssed.err) {
+                            return dataCompresssed;
+                        }
+
+                        uploadNodeMetadata = {
+                            type: "RAW_DATA",
+                            data: new Uint8Array(dataCompresssed.safeUnwrap())
+                        };
+                    } else {
+                        const uploadCloudStoreResult = await UploadFileToStorage(
+                            app,
+                            syncConfig,
+                            localState.data.fullPath,
+                            creds,
+                            /*fileId=*/ uuidv7(), // Use random file id for cloud storage.
+                            update.localState.safeValue()
+                        );
+                        view.setEntryProgress(ids.syncerId, fileId, 0.6);
+                        if (uploadCloudStoreResult.err) {
+                            return uploadCloudStoreResult;
+                        }
+                        uploadNodeMetadata = {
+                            type: "FILE_REF",
+                            fileStorageRef: uploadCloudStoreResult.safeUnwrap()
+                        };
+                    }
+
+                    // Upload the data to firestore.
+                    const uploadNode = new UploadFileNode(
+                        update.localState.safeValue().data,
+                        {
+                            deviceId: Some(ids.clientId),
+                            fileId: Some(fileId),
+                            firestoreTime: Some(
+                                update.localState
+                                    .safeValue()
+                                    .metadata.firestoreTime.valueOr(Date.now())
+                            ),
+                            syncerConfigId: ids.syncerId,
+                            userId: Some(creds.user.uid),
+                            vaultName: ids.vaultName
+                        },
+                        uploadNodeMetadata
+                    );
+                    console.log("uploadNode", uploadNode.toString());
+                    const transactionResult = await WrapPromise(
+                        runTransaction(db, async (transaction: Transaction): Promise<void> => {
+                            await UploadFileToFirestore(
+                                db,
+                                transaction,
+                                uploadNode,
+                                update.cloudState,
+                                creds,
+                                fileId
+                            );
+                            return Promise.resolve();
+                        }),
+                        /*textForUnkown=*/ `Failed transaction for "${fileId}"`
+                    );
+                    view.setEntryProgress(ids.syncerId, fileId, 0.7);
+                    if (transactionResult.err) {
+                        return transactionResult;
+                    }
+
+                    // Update the local file node.
+                    switch (update.localState.safeValue().type) {
+                        case "LOCAL_RAW": {
+                            update.newLocalFile = new LocalNodeRaw(
+                                uploadNode.data,
+                                uploadNode.metadata
+                            );
+                            break;
+                        }
+                        case "LOCAL_OBSIDIAN_FILE": {
+                            update.newLocalFile = new LocalNodeObsidian(
+                                uploadNode.data,
+                                uploadNode.metadata
+                            );
+                            break;
+                        }
+                    }
+
+                    view.setEntryProgress(ids.syncerId, fileId, 1.0);
+                    return Ok();
+                }
             }
-
-            // Update the local file node.
-            update.localState.safeValue().overwriteMetadata(uploadNode);
-
-            view.setEntryProgress(ids.syncerId, fileId, 1.0);
-            return Ok();
         }
     );
     return localOperations;
@@ -264,48 +244,56 @@ export function CreateOperationsToUpdateCloud(
 /** Does the update by downloading the cloud file to local files. */
 async function DownloadCloudUpdate(
     db: Firestore,
-    userId: string,
     ids: Identifiers,
     app: App,
     syncConfig: SyncerConfig,
     update: CloudConvergenceUpdate,
     view: SyncProgressView,
-    fileId: string
-): Promise<StatusResult<StatusError>> {
+    fileId: string,
+    creds: UserCredential
+): Promise<Result<LocalNode, StatusError>> {
     let dataToWrite: Option<Uint8Array> = None;
 
-    if (
-        update.cloudState.safeValue().data.isFromCloudCache &&
-        update.cloudState.safeValue().data.fileStorageRef.none &&
-        update.cloudState.safeValue().data.data.none
-    ) {
+    let cloudNode = update.cloudState.safeValue();
+    if (cloudNode instanceof CloudNodeRaw && cloudNode.extra.isFromCloudCache) {
         // The cloud state if from the cloud cache and has no file storage so we need to fetch the
         // data.
         const documentRef = doc(
             db,
-            `${userId}/${update.cloudState.safeValue().data.fileId.safeValue()}`
-        ).withConverter(GetFileSchemaConverter());
+            `${GetFileCollectionPath(creds)}/${cloudNode.metadata.fileId.safeValue()}`
+        ).withConverter<FirestoreNodes, FileDbModel>(GetFileSchemaConverter());
 
         const fetchResult = await WrapPromise(
             getDoc(documentRef),
-            /*textForUnknown=*/ `Failed to get cached doc ${update.cloudState.safeValue().data.fileId.safeValue()}`
+            /*textForUnknown=*/ `[DownloadCloudUpdate] Failed to get cached doc data "${cloudNode.metadata.fileId.safeValue()}"`
         );
         if (fetchResult.err) {
             return fetchResult;
         }
-        const fileNode = fetchResult.safeUnwrap().data() as FileNode<Some<string>>;
-        update.cloudState.safeValue().overwrite(fileNode);
+        cloudNode = fetchResult.safeUnwrap().data() as CloudNode;
     }
 
-    // First check the easy path. The file was small enough to fit into firestore.
-    const textData = update.cloudState.safeValue().data.data;
-    if (textData.some) {
+    if (cloudNode instanceof CloudNodeRaw) {
+        if (cloudNode.extra.isFromCloudCache) {
+            return Err(
+                UnknownError(`Somehow reached [DownloadCloudUpdate] impossible cache error.`)
+            );
+        }
+        const cloudNodeData = cloudNode.extra.data;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (cloudNodeData.none) {
+            return Err(
+                UnknownError(
+                    `[DownloadCloudUpdate] Somehow "${cloudNode.metadata.fileId.safeValue()}" empty data.`
+                )
+            );
+        }
         // Create the read stream and decompress the data.
         const compressedReadableStream = await WrapPromise(
             Promise.resolve(
                 new ReadableStream({
                     start(controller) {
-                        controller.enqueue(textData.safeValue());
+                        controller.enqueue(cloudNodeData.safeValue());
                         controller.close();
                     }
                 }).pipeThrough(new DecompressionStream("gzip"))
@@ -329,9 +317,8 @@ async function DownloadCloudUpdate(
         dataToWrite = Some(new Uint8Array(dataDecompressed.safeUnwrap()));
     }
     // Now check if the file was uploaded to cloud storage.
-    const cloudStorageRef = update.cloudState.safeValue().data.fileStorageRef;
-    if (cloudStorageRef.some) {
-        const getDataResult = await DownloadFileFromStorage(cloudStorageRef.safeValue());
+    if (cloudNode instanceof CloudNodeFileRef) {
+        const getDataResult = await DownloadFileFromStorage(cloudNode.extra.fileStorageRef);
         view.setEntryProgress(ids.syncerId, fileId, 0.5);
         if (getDataResult.err) {
             return getDataResult;
@@ -344,18 +331,14 @@ async function DownloadCloudUpdate(
     }
     view.setEntryProgress(ids.syncerId, fileId, 0.5);
 
-    const localDataType: LocalDataType = ConvertFilePathToLocalDataType(
-        update.cloudState.safeValue().data.fullPath,
-        syncConfig
-    );
     const writeResult = await WriteFile(
         app,
         update.cloudState.safeValue().data.fullPath,
         dataToWrite.safeValue(),
-        localDataType,
+        syncConfig,
         {
-            ctime: update.cloudState.safeValue().data.ctime,
-            mtime: update.cloudState.safeValue().data.mtime
+            ctime: update.cloudState.safeValue().data.cTime,
+            mtime: update.cloudState.safeValue().data.mTime
         }
     );
     view.setEntryProgress(ids.syncerId, fileId, 0.75);
@@ -363,7 +346,22 @@ async function DownloadCloudUpdate(
         return writeResult;
     }
 
-    return Ok();
+    const readFile = await GetLocalFileNode(app, syncConfig, cloudNode.data.fullPath);
+    if (readFile.err) {
+        return readFile;
+    }
+    const optFile = readFile.safeUnwrap();
+    if (optFile.none) {
+        return Err(
+            InternalError(
+                `Couldn't find the new downloaded file node for "${cloudNode.data.fullPath}".`
+            )
+        );
+    }
+    view.setEntryProgress(ids.syncerId, fileId, 0.8);
+
+    // Set the metadata for the file.
+    return Ok(optFile.safeValue().overwriteMetadataWithCloudNode(cloudNode));
 }
 
 /**
@@ -375,15 +373,15 @@ async function DownloadCloudUpdate(
  */
 export function CreateOperationsToUpdateLocal(
     db: Firestore,
-    userId: string,
     ids: Identifiers,
     cloudUpdates: (CloudConvergenceUpdate | CloudDeleteLocalConvergenceUpdate)[],
     app: App,
-    syncConfig: SyncerConfig
+    syncConfig: SyncerConfig,
+    creds: UserCredential
 ): Promise<StatusResult<StatusError>>[] {
     const ops = AsyncForEach(cloudUpdates, async (update): Promise<StatusResult<StatusError>> => {
         const view = await GetOrCreateSyncProgressView(app, /*reveal=*/ false);
-        const fileId = update.cloudState.safeValue().data.fileId.safeValue();
+        const fileId = update.cloudState.safeValue().metadata.fileId.safeValue();
 
         const initalFileName: Option<string> = update.localState.andThen<string>((localState) => {
             if (localState.data.fullPath !== update.cloudState.safeValue().data.fullPath) {
@@ -405,16 +403,27 @@ export function CreateOperationsToUpdateLocal(
             case ConvergenceAction.USE_CLOUD: {
                 const downloadResult = await DownloadCloudUpdate(
                     db,
-                    userId,
                     ids,
                     app,
                     syncConfig,
                     update,
                     view,
-                    fileId
+                    fileId,
+                    creds
                 );
                 if (downloadResult.err) {
                     return downloadResult;
+                }
+                // Set the side effect to update the new local file.
+                update.newLocalFile = downloadResult.safeUnwrap();
+                // If there is a local file and the new file and it don't match paths, mark a left
+                // over local file.
+                if (
+                    update.localState.some &&
+                    update.localState.safeValue().data.fullPath !==
+                        update.newLocalFile.data.fullPath
+                ) {
+                    update.leftOverLocalFile = Some(update.localState.safeValue().data.fullPath);
                 }
                 break;
             }
@@ -422,12 +431,10 @@ export function CreateOperationsToUpdateLocal(
                 // For `USE_CLOUD_DELETE_LOCAL` update leave it to the delete left over file system.
                 update.leftOverLocalFile = Some(update.localState.safeValue().data.fullPath);
                 view.setEntryProgress(ids.syncerId, fileId, 0.5);
+                update.newLocalFile = update.localState
+                    .safeValue()
+                    .cloneWithChange({ data: { deleted: true } });
             }
-        }
-
-        // Update local file if there is one.
-        if (update.localState.some) {
-            update.localState.safeValue().overwrite(update.cloudState.safeValue());
         }
 
         // Update progress view.
@@ -449,7 +456,7 @@ export async function CleanUpLeftOverLocalFiles(
     app: App,
     syncConfig: SyncerConfig,
     updates: ConvergenceUpdate[],
-    localFileNodes: FileMapOfNodes
+    localFileNodes: FileMapOfNodes<LocalNode>
 ): Promise<StatusResult<StatusError>> {
     for (const update of updates) {
         if (
@@ -476,17 +483,29 @@ export async function CleanUpLeftOverLocalFiles(
 
         // check if the option has a value.
         const fileOption = realLocalFileResult.safeUnwrap();
-        if (fileOption.some) {
+        if (fileOption.none) {
             // Another file is using the directory
+            continue;
+        }
+
+        const getFileResult = await GetLocalFileNode(
+            app,
+            syncConfig,
+            possibleLocalFile.safeValue()
+        );
+        if (getFileResult.err) {
+            return getFileResult;
+        }
+        const getFileOpt = getFileResult.safeUnwrap();
+        if (getFileOpt.none) {
+            // No file found just continue.
             continue;
         }
 
         const deleteFileResult = await DeleteFile(
             app,
             possibleLocalFile.safeValue(),
-            IsLocalFileRaw(possibleLocalFile.safeValue(), syncConfig)
-                ? { type: "RAW" }
-                : { type: "OBSIDIAN" }
+            getFileOpt.safeValue()
         );
         if (deleteFileResult.err && deleteFileResult.val.errorCode !== ErrorCode.NOT_FOUND) {
             // We let the not found error move on as if the file is somehow missing we don't care.

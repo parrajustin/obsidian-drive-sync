@@ -10,8 +10,8 @@ import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import { ReadFile } from "./file_util";
-import { ConvertFilePathToLocalDataType } from "./query_util";
 import type { SyncerConfig } from "../settings/syncer_config_data";
+import type { LocalNode } from "./file_node";
 
 /** uploads a file to storage using a resumable upload task. Returns storage ref path. */
 export async function UploadFileToStorage(
@@ -19,16 +19,13 @@ export async function UploadFileToStorage(
     syncConfig: SyncerConfig,
     filePath: string,
     userCreds: UserCredential,
-    fileId: string
+    fileId: string,
+    node: LocalNode
 ): Promise<Result<string, StatusError>> {
     const storage = getStorage();
     const outputPath = `${userCreds.user.uid}/${syncConfig.vaultName}/${fileId}`;
     const storageRef = ref(storage, outputPath);
-    const readResult = await ReadFile(
-        app,
-        filePath,
-        ConvertFilePathToLocalDataType(filePath, syncConfig)
-    );
+    const readResult = await ReadFile(app, filePath, node);
     if (readResult.err) {
         return readResult;
     }

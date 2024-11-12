@@ -53,7 +53,8 @@ export default class FirestoreSyncPlugin extends Plugin {
         this.registerView(HISTORY_VIEW_TYPE, (leaf) => new HistoryProgressView(leaf));
         this.registerView(PROGRESS_VIEW_TYPE, (leaf) => new SyncProgressView(leaf));
         this.addRibbonIcon("cloud", "Show sync view", async () => {
-            await GetOrCreateSyncProgressView(this.app, /*reveal=*/ true);
+            const view = await GetOrCreateSyncProgressView(this.app, /*reveal=*/ true);
+            view.setSyncPlugin(this);
         });
         // Your web app's Firebase configuration
         // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -166,12 +167,23 @@ export default class FirestoreSyncPlugin extends Plugin {
         );
     }
 
+    public killSyncer(syncerId: string) {
+        console.log("Killing syncer 2");
+        for (const syncer of this._syncers) {
+            console.log("Killing syncer 3", syncer.getId());
+            if (syncer.getId() === syncerId) {
+                syncer.teardown();
+            }
+        }
+    }
+
     private async teardownSyncers(): Promise<void> {
         for (const syncer of this._syncers) {
             syncer.teardown();
         }
         const view = await GetOrCreateSyncProgressView(this.app, /*reveal=*/ false);
         view.resetView();
+        view.setSyncPlugin(this);
     }
 
     /**
@@ -186,6 +198,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         const timeoutId = window.setTimeout(async () => {
             const view = await GetOrCreateSyncProgressView(this.app, /*reveal=*/ false);
+            view.setSyncPlugin(this);
             view.setStatus("Waiting for login");
             await this.loggedIn;
 

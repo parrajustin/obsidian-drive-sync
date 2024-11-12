@@ -1,18 +1,16 @@
 import type { App } from "obsidian";
 import { Modal } from "obsidian";
-import type { FileNode } from "../../sync/file_node";
-import type { HistoryFileNodeExtra } from "../history_schema";
-import type { Option } from "../../lib/option";
 import { ReadFileNode } from "../../sync/file_util";
 import type { Firestore } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
+import type { HistoricFileNode } from "../history_file_node";
 
 export class ViewModal extends Modal {
     constructor(
         app: App,
         private _db: Firestore,
         private _creds: UserCredential,
-        private _fileNode: FileNode<Option<string>, HistoryFileNodeExtra>
+        private _fileNode: HistoricFileNode
     ) {
         super(app);
         this.setTitle(`Viewing ${_fileNode.data.fullPath}`);

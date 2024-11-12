@@ -1,139 +1,233 @@
-import { None, Some } from "../lib/option";
-import type { CloudDataType } from "./file_node";
-import { FileNode } from "./file_node";
+import { Bytes } from "firebase/firestore";
+import { Ok, type Result } from "../lib/result";
+import type { StatusError } from "../lib/status_error";
+import { WrapPromise } from "../lib/wrap_promise";
+import { CloudNodeFileRef, CloudNodeRaw, type CloudNode } from "./file_node";
 import type { FileMapOfNodes } from "./file_node_util";
 import { FlattenFileNodes } from "./file_node_util";
+import type { FileDbModel } from "./firestore_schema";
+import { reduce } from "remeda";
+import { None, Some } from "../lib/option";
 
-/** Cached information from firestore data. */
-export interface CacheModel<TExtraData extends object = object> {
-    // Full filepath.
-    path: string;
-    // The file creation time.
-    cTime: number;
-    // The file modification time.
-    mTime: number;
-    /** Size of the file in bytes. */
-    size: number;
-    /** File name without the extension. */
-    baseName: string;
-    /** File extension (example ".md"). */
-    ext: string;
-    /** The id of the user. */
-    fileId: string;
-    /** The id of the user. */
-    userId: string;
-    /** If the file has been deleted. */
-    deleted: boolean;
-    /** The location of the file in cloud storage if not in `data`. */
-    fileStorageRef: string | null;
-    /** The name of the vault. */
-    vaultName: string;
-    /** The id of the device. */
-    deviceId: string;
-    /** The syncer config id that pushed the update. */
-    syncerConfigId: string;
-    /** Any filenode extra data. */
-    extraData?: TExtraData;
-    /** The hash of the file contents. */
-    fileHash?: string | null;
-    /** The cloud data type if this is from the cloud. */
-    cloudDataType?: CloudDataType | null;
-}
+type FileDbModelWithId = { fileId: string } & Omit<FileDbModel, "data">;
 
-export interface FirebaseStoredData<TExtraData extends object = object> {
+export interface FirebaseStoredData {
     /** The date of the latest update. */
     lastUpdate: number;
     /** Cached data has everything but the actual file data. */
-    cache: CacheModel<TExtraData>[];
+    cache: string;
+    /** Number of entries in the cache. */
+    length: number;
 }
 
-/**
- * Converts the cached model data to a file node.
- * @param model the cache data to turn to a fileNode
- * @returns a file node
- */
-export function ConvertCacheToFileNode<TExtraData extends object = object>(
-    model: CacheModel<TExtraData>
-): FileNode<Some<string>, TExtraData> {
-    return new FileNode<Some<string>, TExtraData>(
-        {
-            fullPath: model.path,
-            ctime: model.cTime,
-            mtime: model.mTime,
-            size: model.size,
-            baseName: model.baseName,
-            extension: model.ext,
-            fileId: Some(model.fileId),
-            userId: Some(model.userId),
-            deleted: model.deleted,
-            data: None,
-            fileStorageRef: model.fileStorageRef !== null ? Some(model.fileStorageRef) : None,
-            vaultName: model.vaultName,
-            deviceId: Some(model.deviceId),
-            syncerConfigId: model.syncerConfigId,
-            isFromCloudCache: true,
-            localDataType: None,
-            cloudDataType:
-                model.cloudDataType === undefined || model.cloudDataType === null
-                    ? None
-                    : Some(model.cloudDataType),
-            fileHash:
-                model.fileHash !== undefined && model.fileHash !== null
-                    ? Some(model.fileHash)
-                    : None
-        },
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-        model.extraData ?? ({} as any)
+/** Compress string data to base64 gzip data. */
+export async function CompressStringData(
+    data: string,
+    reason: string
+): Promise<Result<string, StatusError>> {
+    console.log("Compress");
+    // Create the read stream and compress the data.
+    const readableStream = await WrapPromise(
+        Promise.resolve(
+            new ReadableStream({
+                start(controller) {
+                    // Convert the input string into a Uint8Array (binary form)
+                    const encoder = new TextEncoder();
+                    const chunk = encoder.encode(data);
+
+                    // Push the chunk into the stream
+                    controller.enqueue(chunk);
+
+                    // Close the stream
+                    controller.close();
+                }
+            }).pipeThrough(new CompressionStream("gzip"))
+        ),
+        /*textForUnknown=*/ `Failed to create stream and compress "${reason}"`
     );
+    if (readableStream.err) {
+        return readableStream;
+    }
+
+    // Convert data to uint8array.
+    const wrappedResponse = new Response(readableStream.safeUnwrap());
+    const outData = await WrapPromise(
+        wrappedResponse.arrayBuffer(),
+        /*textForUnknown=*/ `[CompressStringData] Failed to convert to array buffer "${reason}"`
+    );
+    return outData.map((n) => Bytes.fromUint8Array(new Uint8Array(n)).toBase64());
 }
 
-/** Converts the cache data to FileNodes. in flat array form. */
-export function GetFlatFileNodesFromCache<TExtraData extends object = object>(
-    cache: CacheModel<TExtraData>[]
-): FileNode<Some<string>, TExtraData>[] {
-    const nodes: FileNode<Some<string>, TExtraData>[] = [];
-    for (const node of cache) {
-        nodes.push(ConvertCacheToFileNode<TExtraData>(node));
+/** Decompress string data. */
+export async function DecompressStringData(
+    data: string,
+    reason: string
+): Promise<Result<string, StatusError>> {
+    const encodedData = Bytes.fromBase64String(data);
+
+    // Create the read stream and decompress the data.
+    const readableStream = await WrapPromise(
+        Promise.resolve(
+            new ReadableStream<Uint8Array>({
+                start(controller) {
+                    controller.enqueue(encodedData.toUint8Array());
+                    controller.close();
+                }
+            }).pipeThrough(new DecompressionStream("gzip"))
+        ),
+        /*textForUnknown=*/ `Failed to create stream and decompress "${reason}"`
+    );
+    if (readableStream.err) {
+        return readableStream;
     }
-    return nodes;
+
+    // Convert data to uint8array.
+    const wrappedResponse = new Response(readableStream.safeUnwrap());
+    const outData = await WrapPromise(
+        wrappedResponse.arrayBuffer(),
+        /*textForUnknown=*/ `[DecompressStringData] Failed to convert to array buffer "${reason}"`
+    );
+    return outData
+        .map((n) => new Uint8Array(n))
+        .map((n) => new window.TextDecoder("utf-8").decode(n));
 }
 
-/** Converts a flat array of file nodes to the cache entry. */
-export function ConvertFlatFileNodesToCache<TExtraData extends object = object>(
-    flatNodes: FileNode<Some<string>, TExtraData>[]
-): FirebaseStoredData<TExtraData> {
-    const cache: CacheModel<TExtraData>[] = [];
-    let lastUpdate = 0;
-    for (const node of flatNodes) {
-        const entry: CacheModel<TExtraData> = {
-            path: node.data.fullPath,
-            cTime: node.data.ctime,
-            mTime: node.data.mtime,
-            size: node.data.size,
-            baseName: node.data.baseName,
-            ext: node.data.extension,
-            fileId: node.data.fileId.safeValue(),
-            userId: node.data.userId.safeValue(),
-            deleted: node.data.deleted,
-            fileStorageRef: node.data.fileStorageRef.some
-                ? node.data.fileStorageRef.safeValue()
-                : null,
-            vaultName: node.data.vaultName,
-            deviceId: node.data.deviceId.some ? node.data.deviceId.safeValue() : "CACHED NONE",
-            syncerConfigId: node.data.syncerConfigId,
-            extraData: node.extraData,
-            fileHash: node.data.fileHash.valueOr(null),
-            cloudDataType: node.data.cloudDataType.valueOr(null)
-        };
-        lastUpdate = Math.max(lastUpdate, node.data.mtime);
-        cache.push(entry);
+function ConvertCloudNodesToFirestoreDbModel(node: CloudNode): FileDbModelWithId {
+    switch (node.type) {
+        case "CLOUD_RAW":
+            return {
+                path: node.data.fullPath,
+                cTime: node.data.cTime,
+                mTime: node.data.mTime,
+                size: node.data.size,
+                baseName: node.data.baseName,
+                ext: node.data.extension,
+                userId: node.metadata.userId.safeValue(),
+                deleted: node.data.deleted,
+                vaultName: node.metadata.vaultName,
+                deviceId: node.metadata.deviceId.safeValue(),
+                syncerConfigId: node.metadata.syncerConfigId,
+                fileHash: node.data.fileHash,
+                entryTime: node.metadata.firestoreTime.safeValue(),
+                version: "v1",
+                fileId: node.metadata.fileId.safeValue(),
+                fileStorageRef: null,
+                type: "Raw"
+            };
+        case "CLOUD_FILE_REF":
+            return {
+                path: node.data.fullPath,
+                cTime: node.data.cTime,
+                mTime: node.data.mTime,
+                size: node.data.size,
+                baseName: node.data.baseName,
+                ext: node.data.extension,
+                userId: node.metadata.userId.safeValue(),
+                deleted: node.data.deleted,
+                fileStorageRef: node.extra.fileStorageRef,
+                vaultName: node.metadata.vaultName,
+                deviceId: node.metadata.deviceId.safeValue(),
+                syncerConfigId: node.metadata.syncerConfigId,
+                fileHash: node.data.fileHash,
+                entryTime: node.metadata.firestoreTime.safeValue(),
+                version: "v1",
+                fileId: node.metadata.fileId.safeValue(),
+                type: "Ref"
+            };
     }
-    return { lastUpdate, cache };
 }
 
 /** Converts a map of file nodes to the cache entry. */
-export function ConvertMapOfFileNodesToCache(
-    fileNodes: FileMapOfNodes<Some<string>>
-): FirebaseStoredData {
-    return ConvertFlatFileNodesToCache(FlattenFileNodes(fileNodes));
+export async function ConvertCloudNodesToCache(
+    fileNodes: FileMapOfNodes<CloudNode>
+): Promise<Result<FirebaseStoredData, StatusError>> {
+    const cloudNodes = FlattenFileNodes(fileNodes);
+    console.log("ConvertCloudNodesToCache", fileNodes, cloudNodes.length);
+    if (cloudNodes.length === 0) {
+        return Ok({ lastUpdate: 0, cache: "", length: 0 });
+    }
+    const cacheData = cloudNodes.map(ConvertCloudNodesToFirestoreDbModel);
+    const lastUpdate = reduce<FileDbModelWithId, number>(
+        cacheData,
+        (prev, current) => {
+            return Math.max(prev, current.entryTime);
+        },
+        0
+    );
+
+    return (
+        await CompressStringData(JSON.stringify(cacheData), "Converting Cloud Nodes to Cache")
+    ).map<FirebaseStoredData>((v: string): FirebaseStoredData => {
+        return { lastUpdate, cache: v, length: cacheData.length };
+    });
+}
+
+/** Get cloud nodes from the given cache. */
+export async function GetCloudNodesFromCache(
+    cache: FirebaseStoredData
+): Promise<Result<CloudNode[], StatusError>> {
+    if (cache.cache === "") {
+        return Ok([]);
+    }
+    const decompressedData = await DecompressStringData(
+        cache.cache,
+        "Converting Cloud Node from cache"
+    );
+    if (decompressedData.err) {
+        return decompressedData;
+    }
+    const dataModel = JSON.parse(decompressedData.safeUnwrap()) as FileDbModelWithId[];
+    const constructedNode = dataModel.map((data) => {
+        if (data.fileStorageRef !== null) {
+            return new CloudNodeFileRef(
+                {
+                    fullPath: data.path,
+                    cTime: data.cTime,
+                    mTime: data.mTime,
+                    size: data.size,
+                    baseName: data.baseName,
+                    extension: data.ext,
+                    deleted: data.deleted,
+                    fileHash: data.fileHash
+                },
+                {
+                    deviceId: Some(data.deviceId),
+                    syncerConfigId: data.syncerConfigId,
+                    firestoreTime: Some(data.entryTime),
+                    vaultName: data.vaultName,
+                    fileId: Some(data.fileId),
+                    userId: Some(data.userId)
+                },
+                {
+                    isFromCloudCache: false,
+                    fileStorageRef: data.fileStorageRef
+                }
+            );
+        }
+        return new CloudNodeRaw(
+            {
+                fullPath: data.path,
+                cTime: data.cTime,
+                mTime: data.mTime,
+                size: data.size,
+                baseName: data.baseName,
+                extension: data.ext,
+                deleted: data.deleted,
+                fileHash: data.fileHash
+            },
+            {
+                deviceId: Some(data.deviceId),
+                syncerConfigId: data.syncerConfigId,
+                firestoreTime: Some(data.entryTime),
+                vaultName: data.vaultName,
+                fileId: Some(data.fileId),
+                userId: Some(data.userId)
+            },
+            {
+                isFromCloudCache: true,
+                data: None
+            }
+        );
+    });
+    return Ok(constructedNode);
 }

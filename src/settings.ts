@@ -27,9 +27,9 @@ function CreateAllFileConfig(): SyncerConfig {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
         vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
-        storedFirebaseCache: { lastUpdate: 0, cache: [] },
+        storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0 },
         nestedRootPath: "",
-        storedFirebaseHistory: { lastUpdate: 0, cache: [] }
+        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0 }
     };
 }
 
@@ -47,9 +47,9 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
         vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
-        storedFirebaseCache: { lastUpdate: 0, cache: [] },
+        storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0 },
         nestedRootPath: "",
-        storedFirebaseHistory: { lastUpdate: 0, cache: [] }
+        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0 }
     };
 }
 
@@ -434,25 +434,25 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                         });
                     });
                 const cacheSize = liContainer.createEl("span");
-                cacheSize.innerText = `Cache size: ${elem.storedFirebaseCache.cache.length}`;
+                cacheSize.innerText = `Cache size: ${elem.storedFirebaseCache.length}`;
                 new Setting(liContainer)
                     .setName("Clear firestore cache")
                     .setDesc("Clear the cache of firestore entries")
                     .addButton((cb) => {
                         cb.setIcon("eraser").onClick(() => {
-                            elem.storedFirebaseCache = { lastUpdate: 0, cache: [] };
-                            cacheSize.innerText = `Cache size: ${elem.storedFirebaseCache.cache.length}`;
+                            elem.storedFirebaseCache = { lastUpdate: 0, cache: "", length: 0 };
+                            cacheSize.innerText = `Cache size: ${elem.storedFirebaseCache.length}`;
                         });
                     });
                 const cacheHistorySize = liContainer.createEl("span");
-                cacheHistorySize.innerText = `Cache size: ${elem.storedFirebaseHistory.cache.length}`;
+                cacheHistorySize.innerText = `Cache size: ${elem.storedFirebaseHistory.length}`;
                 new Setting(liContainer)
                     .setName("Clear firestore history cache")
                     .setDesc("Clear the cache of firestore history entries")
                     .addButton((cb) => {
                         cb.setIcon("eraser").onClick(() => {
-                            elem.storedFirebaseHistory = { lastUpdate: 0, cache: [] };
-                            cacheHistorySize.innerText = `Cache size: ${elem.storedFirebaseHistory.cache.length}`;
+                            elem.storedFirebaseHistory = { lastUpdate: 0, cache: "", length: 0 };
+                            cacheHistorySize.innerText = `Cache size: ${elem.storedFirebaseHistory.length}`;
                         });
                     });
             };

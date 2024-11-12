@@ -118,11 +118,14 @@ const config = tseslint.config({
         "@typescript-eslint/no-magic-numbers": "off",
         // Note: you must disable the base rule as it can report incorrect errors
         "no-shadow": "off",
+        "@typescript-eslint/only-throw-error": "off",
         "@typescript-eslint/no-shadow": "error",
         "@typescript-eslint/switch-exhaustiveness-check": "error",
         "@typescript-eslint/strict-boolean-expressions": "error",
         // Note: you must disable the base rule as it can report incorrect errors
         "no-return-await": "off",
+        "no-unused-expressions": "off",
+        "@typescript-eslint/no-unused-expressions": "error",
         "@typescript-eslint/return-await": "error",
         "@typescript-eslint/restrict-template-expressions": [
             "error",
