@@ -29,15 +29,13 @@ const MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT = 20;
 async function GetHistoryData(
     db: Firestore,
     creds: UserCredential,
-    config: SyncerConfig,
-    startTimestamp = 0
+    config: SyncerConfig
 ): Promise<Result<Map<string, HistoricFileNode>, StatusError>> {
     // Get the file metadata from firestore.
     const queryOfFiles = query(
         collection(db, "hist"),
         where("file.userId", "==", creds.user.uid),
-        where("file.vaultName", "==", config.vaultName),
-        where("entryTime", ">=", startTimestamp)
+        where("file.vaultName", "==", config.vaultName)
     ).withConverter(GetHistorySchemaConverter());
     const querySnapshotResult = await WrapPromise(
         getDocs(queryOfFiles),
@@ -94,12 +92,7 @@ export class FirebaseHistory {
     ): Promise<Result<FirebaseHistory, StatusError>> {
         const db = GetFirestore(firebaseApp);
 
-        const fetchedHistory = await GetHistoryData(
-            db,
-            creds,
-            config,
-            config.storedFirebaseHistory.lastUpdate
-        );
+        const fetchedHistory = await GetHistoryData(db, creds, config);
         if (fetchedHistory.err) {
             return fetchedHistory;
         }
@@ -229,12 +222,7 @@ export class FirebaseHistory {
     }
 
     private async resetHistoryData() {
-        const newNodes = await GetHistoryData(
-            this.db,
-            this.creds,
-            this._config,
-            /*startTimestamp=*/ 0
-        );
+        const newNodes = await GetHistoryData(this.db, this.creds, this._config);
         if (newNodes.err) {
             LogError(newNodes.val);
             return;
