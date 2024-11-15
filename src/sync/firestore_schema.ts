@@ -13,6 +13,10 @@ import { None, Some } from "../lib/option";
 import type FirestoreSyncPlugin from "../main";
 import { InternalError } from "../lib/status_error";
 
+type LatestFirestoreSchema = "v1";
+/** Latest firestore schema. */
+export const LATEST_FIRESTORE_SCHEMA: LatestFirestoreSchema = "v1";
+
 interface DataFieldModel {
     type: "Raw";
     /** The data of the file if less than 100Kb */
@@ -67,7 +71,7 @@ export interface FileDataDbModel {
     //
 
     /** The version of the schema. */
-    version: "v1";
+    version: LatestFirestoreSchema;
 }
 
 /** Version 1 of the firestore data model. */
@@ -161,7 +165,8 @@ export class FileSchemaConverter implements FirestoreDataConverter<FirestoreNode
                     },
                     {
                         isFromCloudCache: false,
-                        data: Some(data.data.toUint8Array())
+                        data: Some(data.data.toUint8Array()),
+                        versionString: data.version
                     }
                 );
             case "Ref":
@@ -186,7 +191,8 @@ export class FileSchemaConverter implements FirestoreDataConverter<FirestoreNode
                     },
                     {
                         isFromCloudCache: false,
-                        fileStorageRef: data.fileStorageRef
+                        fileStorageRef: data.fileStorageRef,
+                        versionString: data.version
                     }
                 );
         }
@@ -200,7 +206,6 @@ export function SetFileSchemaConverter(plugin: FirestoreSyncPlugin, creds: UserC
 
 export function GetFileSchemaConverter(): FileSchemaConverter {
     if (FIRESTORE_CONVERTER.none) {
-        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw InternalError("FIRESTORE_CONVERTER is None.");
     }
     return FIRESTORE_CONVERTER.safeValue();

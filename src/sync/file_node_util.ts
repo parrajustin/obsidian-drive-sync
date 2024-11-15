@@ -154,12 +154,6 @@ export async function UpdateLocalFileMapWithLocalChanges(
     changedNodes: Set<LocalNode>,
     changedPath: Set<string>
 ): Promise<Result<FileMapOfNodes<LocalNode>, StatusError>> {
-    console.log("changedPath", [
-        ...new Set([
-            ...[...changedNodes.entries()].map((n) => n[1].data.fullPath),
-            ...changedPath.entries()
-        ])
-    ]);
     if (changedNodes.size === 0 && changedPath.size === 0) {
         return Ok(fileMap);
     }

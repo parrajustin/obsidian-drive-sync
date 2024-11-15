@@ -18,6 +18,8 @@ export interface FirebaseStoredData {
     cache: string;
     /** Number of entries in the cache. */
     length: number;
+    /** The latest version of data in cache. */
+    versionOfData: string | null;
 }
 
 /** Compress string data to base64 gzip data. */
@@ -25,7 +27,6 @@ export async function CompressStringData(
     data: string,
     reason: string
 ): Promise<Result<string, StatusError>> {
-    console.log("Compress");
     // Create the read stream and compress the data.
     const readableStream = await WrapPromise(
         Promise.resolve(
@@ -142,11 +143,11 @@ export async function ConvertCloudNodesToCache(
     fileNodes: FileMapOfNodes<CloudNode>
 ): Promise<Result<FirebaseStoredData, StatusError>> {
     const cloudNodes = FlattenFileNodes(fileNodes);
-    console.log("ConvertCloudNodesToCache", fileNodes, cloudNodes.length);
     if (cloudNodes.length === 0) {
-        return Ok({ lastUpdate: 0, cache: "", length: 0 });
+        return Ok({ lastUpdate: 0, cache: "", length: 0, versionOfData: null });
     }
     const cacheData = cloudNodes.map(ConvertCloudNodesToFirestoreDbModel);
+    const versionData = cacheData[0]!.version;
     const lastUpdate = reduce<FileDbModelWithId, number>(
         cacheData,
         (prev, current) => {
@@ -158,7 +159,7 @@ export async function ConvertCloudNodesToCache(
     return (
         await CompressStringData(JSON.stringify(cacheData), "Converting Cloud Nodes to Cache")
     ).map<FirebaseStoredData>((v: string): FirebaseStoredData => {
-        return { lastUpdate, cache: v, length: cacheData.length };
+        return { lastUpdate, cache: v, length: cacheData.length, versionOfData: versionData };
     });
 }
 

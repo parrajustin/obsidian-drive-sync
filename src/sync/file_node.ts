@@ -144,13 +144,17 @@ export type Immutable<T> = T extends PrimitiveType
 
 export type ImmutableBaseFileNode = Immutable<BaseMutableFileNode>;
 
-export interface CachedCloudCacheData {
+export interface SharedCloudData {
+    /** Firestore version data. */
+    versionString: string;
+}
+export interface CachedCloudCacheData extends SharedCloudData {
     /** If this file node is vitual and just represents an entry from cache.  */
     isFromCloudCache: true;
     /** Data from the cloud storage compressed with brotli encoded in uint8. */
     data: None;
 }
-export interface NotCachedCloudData {
+export interface NotCachedCloudData extends SharedCloudData {
     /** If this file node is vitual and just represents an entry from cache.  */
     isFromCloudCache: false;
     /** Data from the cloud storage compressed with brotli encoded in uint8. */
@@ -174,7 +178,7 @@ export class CloudNodeRaw extends BaseMutableFileNode {
     }
 }
 
-export interface CloudFileStorageData {
+export interface CloudFileStorageData extends SharedCloudData {
     /** If this file node is vitual and just represents an entry from cache.  */
     isFromCloudCache: boolean;
     /** Storage path on cloud storage if any. */

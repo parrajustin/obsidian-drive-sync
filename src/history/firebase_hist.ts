@@ -97,15 +97,16 @@ export class FirebaseHistory {
             return fetchedHistory;
         }
 
+        // TODO: Enable local history cache.
         // Get cached data.
-        const getCacheResult = await GetHistoricNodesFromCache(config.storedFirebaseHistory);
-        if (getCacheResult.err) {
-            return getCacheResult;
-        }
+        // const getCacheResult = await GetHistoricNodesFromCache(config.storedFirebaseHistory);
+        // if (getCacheResult.err) {
+        //     return getCacheResult;
+        // }
         const cachedNodes = new Map<string, HistoricFileNode>();
-        for (const node of getCacheResult.safeUnwrap()) {
-            cachedNodes.set(node.extra.historyDocId, node);
-        }
+        // for (const node of getCacheResult.safeUnwrap()) {
+        //     cachedNodes.set(node.extra.historyDocId, node);
+        // }
         // Convert the docs to `FileNode` and combine with the cached data.
         fetchedHistory.safeUnwrap().forEach((document) => {
             cachedNodes.set(document.extra.historyDocId, document);

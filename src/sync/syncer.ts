@@ -185,7 +185,6 @@ export class FileSyncer {
     private listenForFileChanges() {
         this._unsubWatchHandler = Some(
             AddWatchHandler(this._plugin.app, (type, path, oldPath, _info) => {
-                console.log("Wathcer", type, path, oldPath, _info);
                 // Skip file paths outside nested root path.
                 if (
                     this._config.type === RootSyncType.FOLDER_TO_ROOT &&

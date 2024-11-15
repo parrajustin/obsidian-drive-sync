@@ -11,7 +11,7 @@ import {
     MapByFileId,
     type FileMapOfNodes
 } from "./file_node_util";
-import type { Firestore, Unsubscribe } from "firebase/firestore";
+import type { Firestore, QuerySnapshot, Unsubscribe } from "firebase/firestore";
 import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
 import type { Result } from "../lib/result";
@@ -19,8 +19,8 @@ import { Err, Ok, type StatusResult } from "../lib/result";
 import { ErrorCode, InternalError, StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
 import { None, Some } from "../lib/option";
-import type { FileDbModel } from "./firestore_schema";
-import { GetFileSchemaConverter } from "./firestore_schema";
+import type { FileDataDbModelV1, FileDbModel } from "./firestore_schema";
+import { GetFileSchemaConverter, LATEST_FIRESTORE_SCHEMA } from "./firestore_schema";
 import { WrapPromise } from "../lib/wrap_promise";
 import type {
     CloudConvergenceUpdate,
@@ -36,11 +36,27 @@ import type { Identifiers } from "./syncer_update_util";
 import { CreateOperationsToUpdateCloud, CreateOperationsToUpdateLocal } from "./syncer_update_util";
 import { LogError } from "../log";
 import type { SyncerConfig } from "../settings/syncer_config_data";
-import { ConvertCloudNodesToCache, GetCloudNodesFromCache } from "./firebase_cache";
-import type FirestoreSyncPlugin from "../main";
-import { ConvertToUnknownError } from "../util";
 import { GetFileCollectionPath } from "../firestore/file_db_util";
 import { GetFirestore } from "../firestore/get_firestore";
+import type { FileSyncer } from "./syncer";
+
+function ForEachSnapshot(
+    snapshot: QuerySnapshot<FirestoreNodes, FileDataDbModelV1>,
+    cb: (node: CloudNode) => void
+): StatusResult<StatusError> {
+    for (const document of snapshot.docChanges()) {
+        const node = document.doc.data() as CloudNode;
+        if (node.extra.versionString !== LATEST_FIRESTORE_SCHEMA) {
+            return Err(
+                InternalError(
+                    `Firestore version is "${node.extra.versionString}" but we only support to "${LATEST_FIRESTORE_SCHEMA}"`
+                )
+            );
+        }
+        cb(node);
+    }
+    return Ok();
+}
 
 /**
  * Syncer that maintains the firebase file map state.
@@ -51,10 +67,10 @@ export class FirebaseSyncer {
     /** If this firebase syncer is ready to get updates. */
     private _isValid = false;
     /** If there is a save setting microtask already running. */
-    private _savingSettings = false;
+    // private _savingSettings = false;
 
     private constructor(
-        private _plugin: FirestoreSyncPlugin,
+        private _syncer: FileSyncer,
         private _config: SyncerConfig,
         private _creds: UserCredential,
         private _db: Firestore,
@@ -63,7 +79,7 @@ export class FirebaseSyncer {
 
     /** Build the firebase syncer. */
     public static async buildFirebaseSyncer(
-        plugin: FirestoreSyncPlugin,
+        syncer: FileSyncer,
         firebaseApp: FirebaseApp,
         config: SyncerConfig,
         creds: UserCredential
@@ -74,8 +90,7 @@ export class FirebaseSyncer {
         const queryOfFiles = query(
             collection(db, GetFileCollectionPath(creds)),
             where("userId", "==", creds.user.uid),
-            where("vaultName", "==", config.vaultName),
-            where("entryTime", ">=", config.storedFirebaseCache.lastUpdate)
+            where("vaultName", "==", config.vaultName)
         ).withConverter<FirestoreNodes, FileDbModel>(GetFileSchemaConverter());
         const querySnapshotResult = await WrapPromise(
             getDocs(queryOfFiles),
@@ -85,17 +100,21 @@ export class FirebaseSyncer {
             return querySnapshotResult;
         }
 
+        // TODO: re-enable cahce when fixed.
         // Get cached data.
-        const cachedNodes = await GetCloudNodesFromCache(config.storedFirebaseCache);
-        if (cachedNodes.err) {
-            return cachedNodes;
-        }
-        const mapFileIdToNode = MapByFileId(cachedNodes.safeUnwrap());
+        // const cachedNodes = await GetCloudNodesFromCache(config.storedFirebaseCache);
+        // if (cachedNodes.err) {
+        //     return cachedNodes;
+        // }
+        // const mapFileIdToNode = MapByFileId(cachedNodes.safeUnwrap());
+        const mapFileIdToNode = new Map<string, CloudNode>();
         // Convert the docs to `FileNode` and combine with the cached data.
-        querySnapshotResult.safeUnwrap().forEach((document) => {
-            const node = document.data() as CloudNode;
+        const iterateResult = ForEachSnapshot(querySnapshotResult.safeUnwrap(), (node) => {
             mapFileIdToNode.set(node.metadata.fileId.safeValue(), node);
         });
+        if (iterateResult.err) {
+            return iterateResult;
+        }
 
         const fileMap = ConvertArrayOfNodesToMap(
             FilterFileNodes(
@@ -108,12 +127,12 @@ export class FirebaseSyncer {
         }
 
         // Updates the stored firebase cache.
-        const cacheResult = await ConvertCloudNodesToCache(fileMap.safeUnwrap());
-        if (cacheResult.err) {
-            return cacheResult;
-        }
-        config.storedFirebaseCache = cacheResult.safeUnwrap();
-        return Ok(new FirebaseSyncer(plugin, config, creds, db, fileMap.safeUnwrap()));
+        // const cacheResult = await ConvertCloudNodesToCache(fileMap.safeUnwrap());
+        // if (cacheResult.err) {
+        //     return cacheResult;
+        // }
+        // config.storedFirebaseCache = cacheResult.safeUnwrap();
+        return Ok(new FirebaseSyncer(syncer, config, creds, db, fileMap.safeUnwrap()));
     }
 
     /** Initializes the real time subscription on firestore data. */
@@ -132,11 +151,18 @@ export class FirebaseSyncer {
                     const flatFiles = FlattenFileNodes(this._cloudNodes);
                     const mapOfFiles = MapByFileId(flatFiles);
                     let hasChanges = false;
-                    querySnapshot.docChanges().forEach((doc) => {
+                    // Convert the docs to `FileNode` and combine with the cached data.
+                    const iterateResult = ForEachSnapshot(querySnapshot, (node) => {
                         hasChanges = true;
-                        const node = doc.doc.data() as CloudNode;
                         mapOfFiles.set(node.metadata.fileId.safeValue(), node);
                     });
+                    if (iterateResult.err) {
+                        LogError(iterateResult.val);
+                        this._syncer.teardown();
+                        this._isValid = false;
+                        this.teardown();
+                        return;
+                    }
                     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                     if (!hasChanges) {
                         return;
@@ -153,30 +179,30 @@ export class FirebaseSyncer {
                         return;
                     }
                     this._cloudNodes = convertToNodesResult.safeUnwrap();
-                    if (!this._savingSettings) {
-                        this._savingSettings = true;
-                        queueMicrotask(() => {
-                            void (async () => {
-                                this._savingSettings = false;
-                                // Updates the stored firebase cache.
-                                const convertToCacheResult = await ConvertCloudNodesToCache(
-                                    this._cloudNodes
-                                );
-                                if (convertToCacheResult.err) {
-                                    LogError(convertToCacheResult.val);
-                                    return;
-                                }
-                                this._config.storedFirebaseCache =
-                                    convertToCacheResult.safeUnwrap();
-                                this._plugin
-                                    .saveSettings(/*startupSyncer=*/ false)
-                                    .catch((e: unknown) => {
-                                        const error = ConvertToUnknownError("Saving settings")(e);
-                                        LogError(error);
-                                    });
-                            })();
-                        });
-                    }
+                    // if (!this._savingSettings) {
+                    //     this._savingSettings = true;
+                    //     queueMicrotask(() => {
+                    //         void (async () => {
+                    //             this._savingSettings = false;
+                    //             // Updates the stored firebase cache.
+                    //             const convertToCacheResult = await ConvertCloudNodesToCache(
+                    //                 this._cloudNodes
+                    //             );
+                    //             if (convertToCacheResult.err) {
+                    //                 LogError(convertToCacheResult.val);
+                    //                 return;
+                    //             }
+                    //             this._config.storedFirebaseCache =
+                    //                 convertToCacheResult.safeUnwrap();
+                    //             this._plugin
+                    //                 .saveSettings(/*startupSyncer=*/ false)
+                    //                 .catch((e: unknown) => {
+                    //                     const error = ConvertToUnknownError("Saving settings")(e);
+                    //                     LogError(error);
+                    //                 });
+                    //         })();
+                    //     });
+                    // }
                 },
                 (e) => {
                     const outputError = new StatusError(
