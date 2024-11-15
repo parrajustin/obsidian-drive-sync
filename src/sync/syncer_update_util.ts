@@ -84,6 +84,14 @@ export function CreateOperationsToUpdateCloud(
             const tooBigForFirestore = localState.data.size > ONE_HUNDRED_KB_IN_BYTES;
             switch (update.action) {
                 case ConvergenceAction.USE_LOCAL_DELETE_CLOUD: {
+                    view.addEntry(
+                        ids.syncerId,
+                        fileId,
+                        /*initalFileName=*/ None,
+                        localState.data.fullPath,
+                        update.action
+                    );
+                    view.setEntryProgress(ids.syncerId, fileId, 0.1);
                     const transactionResult = await WrapPromise(
                         runTransaction(
                             db,
@@ -92,6 +100,7 @@ export function CreateOperationsToUpdateCloud(
                         ),
                         /*textForUnkown=*/ `Failed transaction for "${fileId}"`
                     );
+                    view.setEntryProgress(ids.syncerId, fileId, 1.0);
                     return transactionResult;
                 }
                 case ConvergenceAction.USE_LOCAL: {
@@ -194,7 +203,6 @@ export function CreateOperationsToUpdateCloud(
                         },
                         uploadNodeMetadata
                     );
-                    console.log("uploadNode", uploadNode.toString());
                     const transactionResult = await WrapPromise(
                         runTransaction(db, async (transaction: Transaction): Promise<void> => {
                             await UploadFileToFirestore(
