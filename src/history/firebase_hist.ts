@@ -20,7 +20,7 @@ import { GetHistorySchemaConverter } from "./history_schema";
 import { FlattenFileNodes, MapByFileId, type FileMapOfNodes } from "../sync/file_node_util";
 import { debounce } from "remeda";
 import type { HistoricFileNode } from "./history_file_node";
-import { ConvertHistoricNodesToCache, GetHistoricNodesFromCache } from "./history_cache";
+import { ConvertHistoricNodesToCache } from "./history_cache";
 import { GetFirestore } from "../firestore/get_firestore";
 
 const MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT = 20;

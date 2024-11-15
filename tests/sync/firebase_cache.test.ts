@@ -42,7 +42,8 @@ describe("Firebase Cache", () => {
                 },
                 {
                     isFromCloudCache: true,
-                    data: None
+                    data: None,
+                    versionString: "v1"
                 }
             ),
             new CloudNodeRaw(
@@ -66,7 +67,8 @@ describe("Firebase Cache", () => {
                 },
                 {
                     isFromCloudCache: false,
-                    data: Some(new Uint8Array([1, 2, 3, 4]))
+                    data: Some(new Uint8Array([1, 2, 3, 4])),
+                    versionString: "v1"
                 }
             ),
             new CloudNodeFileRef(
@@ -90,7 +92,8 @@ describe("Firebase Cache", () => {
                 },
                 {
                     isFromCloudCache: false,
-                    fileStorageRef: "Storage_Ref"
+                    fileStorageRef: "Storage_Ref",
+                    versionString: "v1"
                 }
             )
         ];
@@ -109,7 +112,8 @@ describe("Firebase Cache", () => {
         expect(convertToCache.val).toStrictEqual({
             lastUpdate: 1000,
             cache: "H4sIAAAAAAAAA82Qu07EMBBF/+XWA+RB5ZYGGopdOoQiE493LTnOynYCAe2/IzvhIWjISkhUM3fec+5fcZBxDwHdW8X+QhvLTXneKRDaO9MxRFkUBaH7ECUhmJfkEx5l4FuZEpg7QeDnCIE8YQjsbxQEBqNyTrHlyApCSxuYMMrBxmVA9nPNaFrObbMLQphcy/6qd9rscmYONG2OgPL2axnSJ/tkCOyin75+MLIPpndpU7l05FHLaUlvY+/ljjesIdxgLSFOh3TbRj7hSJ+w0q/V7yhd/qRU/RNKZ9VKTtUpnOqTOdUrOX0/DYtokvpDjPVKjKn+HRhrHB/eAK4vsxeHAwAA",
-            length: 3
+            length: 3,
+            versionOfData: "v1"
         });
 
         const getFromCache = await GetCloudNodesFromCache(convertToCache.safeUnwrap());
@@ -139,7 +143,8 @@ describe("Firebase Cache", () => {
                 },
                 {
                     isFromCloudCache: true,
-                    data: None
+                    data: None,
+                    versionString: "v1"
                 }
             ),
             new CloudNodeRaw(
@@ -163,7 +168,8 @@ describe("Firebase Cache", () => {
                 },
                 {
                     isFromCloudCache: true,
-                    data: None
+                    data: None,
+                    versionString: "v1"
                 }
             ),
             new CloudNodeFileRef(
@@ -187,7 +193,8 @@ describe("Firebase Cache", () => {
                 },
                 {
                     isFromCloudCache: false,
-                    fileStorageRef: "Storage_Ref"
+                    fileStorageRef: "Storage_Ref",
+                    versionString: "v1"
                 }
             )
         ]);

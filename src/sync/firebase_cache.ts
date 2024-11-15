@@ -201,7 +201,8 @@ export async function GetCloudNodesFromCache(
                 },
                 {
                     isFromCloudCache: false,
-                    fileStorageRef: data.fileStorageRef
+                    fileStorageRef: data.fileStorageRef,
+                    versionString: data.version
                 }
             );
         }
@@ -226,7 +227,8 @@ export async function GetCloudNodesFromCache(
             },
             {
                 isFromCloudCache: true,
-                data: None
+                data: None,
+                versionString: data.version
             }
         );
     });

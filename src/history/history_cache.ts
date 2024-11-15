@@ -75,7 +75,7 @@ export async function ConvertHistoricNodesToCache(
 ): Promise<Result<FirebaseStoredData, StatusError>> {
     const cacheData = nodes.map(ConvertToCacheModel);
     if (nodes.length === 0) {
-        return Ok({ lastUpdate: 0, cache: "", length: 0 });
+        return Ok({ lastUpdate: 0, cache: "", length: 0, versionOfData: null });
     }
     const lastUpdate = reduce<HistoryCacheV1, number>(
         cacheData,
@@ -88,7 +88,7 @@ export async function ConvertHistoricNodesToCache(
     return (
         await CompressStringData(JSON.stringify(cacheData), "Converting Historic Nodes to Cache")
     ).map<FirebaseStoredData>((v: string): FirebaseStoredData => {
-        return { lastUpdate, cache: v, length: cacheData.length };
+        return { lastUpdate, cache: v, length: cacheData.length, versionOfData: null };
     });
 }
 

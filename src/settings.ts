@@ -30,9 +30,9 @@ function CreateAllFileConfig(): SyncerConfig {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
         vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
-        storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0 },
+        storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
         nestedRootPath: "",
-        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0 }
+        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null }
     };
 }
 
@@ -50,9 +50,9 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
         vaultName: ((window as any).app as App).vault.getName(),
         maxUpdatePerSyncer: 50,
-        storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0 },
+        storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
         nestedRootPath: "",
-        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0 }
+        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null }
     };
 }
 
@@ -452,7 +452,12 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     .setDesc("Clear the cache of firestore entries")
                     .addButton((cb) => {
                         cb.setIcon("eraser").onClick(() => {
-                            elem.storedFirebaseCache = { lastUpdate: 0, cache: "", length: 0 };
+                            elem.storedFirebaseCache = {
+                                lastUpdate: 0,
+                                cache: "",
+                                length: 0,
+                                versionOfData: null
+                            };
                             cacheSize.innerText = `Cache size: ${elem.storedFirebaseCache.length}`;
                         });
                     });
@@ -463,7 +468,12 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     .setDesc("Clear the cache of firestore history entries")
                     .addButton((cb) => {
                         cb.setIcon("eraser").onClick(() => {
-                            elem.storedFirebaseHistory = { lastUpdate: 0, cache: "", length: 0 };
+                            elem.storedFirebaseHistory = {
+                                lastUpdate: 0,
+                                cache: "",
+                                length: 0,
+                                versionOfData: null
+                            };
                             cacheHistorySize.innerText = `Cache size: ${elem.storedFirebaseHistory.length}`;
                         });
                     });

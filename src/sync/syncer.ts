@@ -138,7 +138,7 @@ export class FileSyncer {
                 view.setSyncerStatus(this._config.syncerId, "building firebase syncer");
                 // Build the firebase syncer and init it.
                 const buildFirebaseSyncer = await FirebaseSyncer.buildFirebaseSyncer(
-                    this._plugin,
+                    this,
                     this._firebaseApp,
                     this._config,
                     creds

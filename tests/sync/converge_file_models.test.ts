@@ -64,7 +64,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 },
                 {
                     isFromCloudCache: true,
-                    data: None
+                    data: None,
+                    versionString: "v1"
                 }
             )
         ];
@@ -132,7 +133,8 @@ describe("ConvergeMapsToUpdateStates", () => {
                 },
                 {
                     isFromCloudCache: true,
-                    data: None
+                    data: None,
+                    versionString: "v1"
                 }
             )
         ];

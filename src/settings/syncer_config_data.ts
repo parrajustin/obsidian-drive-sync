@@ -64,6 +64,6 @@ export function UpdateSchemaV3ToV4(prevSchema: SyncerConfigV3): SyncerConfigV4 {
     return {
         ...prevSchema,
         version: "v4",
-        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0 }
+        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null }
     };
 }
