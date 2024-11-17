@@ -8,7 +8,7 @@ import {
     ConvertArrayOfNodesToMap,
     FilterFileNodes,
     FlattenFileNodes,
-    MapByFileId,
+    MapByFilePath,
     type FileMapOfNodes
 } from "./file_node_util";
 import type { Firestore, QuerySnapshot, Unsubscribe } from "firebase/firestore";
@@ -107,10 +107,10 @@ export class FirebaseSyncer {
         //     return cachedNodes;
         // }
         // const mapFileIdToNode = MapByFileId(cachedNodes.safeUnwrap());
-        const mapFileIdToNode = new Map<string, CloudNode>();
+        const mapFilePathToNode = new Map<string, CloudNode>();
         // Convert the docs to `FileNode` and combine with the cached data.
         const iterateResult = ForEachSnapshot(querySnapshotResult.safeUnwrap(), (node) => {
-            mapFileIdToNode.set(node.metadata.fileId.safeValue(), node);
+            mapFilePathToNode.set(node.data.fullPath, node);
         });
         if (iterateResult.err) {
             return iterateResult;
@@ -119,7 +119,7 @@ export class FirebaseSyncer {
         const fileMap = ConvertArrayOfNodesToMap(
             FilterFileNodes(
                 config,
-                [...mapFileIdToNode.entries()].map((n) => n[1])
+                [...mapFilePathToNode.entries()].map((n) => n[1])
             )
         );
         if (fileMap.err) {
@@ -149,12 +149,12 @@ export class FirebaseSyncer {
                 { includeMetadataChanges: true, source: "default" },
                 (querySnapshot) => {
                     const flatFiles = FlattenFileNodes(this._cloudNodes);
-                    const mapOfFiles = MapByFileId(flatFiles);
+                    const mapOfFiles = MapByFilePath(flatFiles);
                     let hasChanges = false;
                     // Convert the docs to `FileNode` and combine with the cached data.
                     const iterateResult = ForEachSnapshot(querySnapshot, (node) => {
                         hasChanges = true;
-                        mapOfFiles.set(node.metadata.fileId.safeValue(), node);
+                        mapOfFiles.set(node.data.fullPath, node);
                     });
                     if (iterateResult.err) {
                         LogError(iterateResult.val);

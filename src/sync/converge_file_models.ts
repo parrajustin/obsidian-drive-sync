@@ -11,8 +11,8 @@ import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { AlreadyExistsError, InvalidArgumentError, UnknownError } from "../lib/status_error";
 import type { FileMapOfNodes } from "./file_node_util";
-import { FlattenFileNodes, GetNonDeletedByFilePath, MapByFileId } from "./file_node_util";
-import type { CloudNode, LocalNode, AllFileNodeTypes } from "./file_node";
+import { FlattenFileNodes, GetNonDeletedByFilePath, MapByFilePath } from "./file_node_util";
+import type { CloudNode, LocalNode, AllFileNodeTypes, FilePathType } from "./file_node";
 
 // Denotes the action that should be taken to sync the two states.
 export enum ConvergenceAction {
@@ -66,7 +66,7 @@ export interface CloudDeleteLocalConvergenceUpdate extends SharedUpdateData {
     action: ConvergenceAction.USE_CLOUD_DELETE_LOCAL;
     localState: Some<LocalNode>;
     cloudState: Some<CloudNode>;
-    leftOverLocalFile: Option<string>;
+    leftOverLocalFile: Option<FilePathType>;
 }
 
 export type ConvergenceUpdate =
@@ -134,17 +134,17 @@ function CreateConvergenceForOnlyLocalNode(
  * Creates the convergence update for the case where there is only a cloud node to consider. Can
  * return None if the cloud node has already been used in another convergence update.
  * @param cloudNode the node to create convergence update from
- * @param cloudVisitedByFileId set to keep track of visited nodes.
+ * @param cloudVisitedByFilePath set to keep track of visited nodes.
  * @param reservedFullPath set to keep track of used output paths.
  * @returns Convergence update if an update is needed.
  */
 function CreateConvergenceForOnlyCloudNode(
     cloudNode: CloudNode,
-    cloudVisitedByFileId: Set<string>,
+    cloudVisitedByFilePath: Set<string>,
     reservedFullPath: Set<string>
 ): Result<Option<ConvergenceUpdate>, StatusError> {
     // The local node has been visited
-    if (cloudVisitedByFileId.has(cloudNode.metadata.fileId.safeValue())) {
+    if (cloudVisitedByFilePath.has(cloudNode.data.fullPath)) {
         return Ok(None);
     }
 
@@ -154,7 +154,7 @@ function CreateConvergenceForOnlyCloudNode(
         return result;
     }
 
-    cloudVisitedByFileId.add(cloudNode.metadata.fileId.safeValue());
+    cloudVisitedByFilePath.add(cloudNode.data.fullPath);
     const update: CloudConvergenceUpdate = {
         action: ConvergenceAction.USE_CLOUD,
         localState: None,
@@ -168,7 +168,7 @@ function CreateConvergenceForOnlyCloudNode(
  * Compares the two nodes and creats an update action if necessary to converge the states.
  * @param localNode the possible local node
  * @param cloudNode the possible cloud node
- * @param cloudVisitedByFileId set of visited cloud nodes
+ * @param cloudVisitedByFilePath set of visited cloud nodes
  * @param localVisisted set of visited local nodes
  * @param reservedFullPath set of the paths used by an update or existing files
  * @returns Result of a possible update if necessary or error
@@ -176,7 +176,7 @@ function CreateConvergenceForOnlyCloudNode(
 export function CompareNodesAndGetUpdate(
     localNode: Option<LocalNode>,
     cloudNode: Option<CloudNode>,
-    cloudVisitedByFileId: Set<string>,
+    cloudVisitedByFilePath: Set<string>,
     localVisisted: Set<LocalNode>,
     reservedFullPath: Set<string>
 ): Result<Option<ConvergenceUpdate>, StatusError> {
@@ -190,7 +190,7 @@ export function CompareNodesAndGetUpdate(
         // Only cloud node not empty.
         return CreateConvergenceForOnlyCloudNode(
             cloudNode.safeValue(),
-            cloudVisitedByFileId,
+            cloudVisitedByFilePath,
             reservedFullPath
         );
     } else if (localNode.some && cloudNode.none) {
@@ -209,9 +209,7 @@ export function CompareNodesAndGetUpdate(
 
     // Now check cases where only a single node hasn't been used.
     const localVisited = localVisisted.has(localNode.safeValue());
-    const cloudVisited = cloudVisitedByFileId.has(
-        cloudNode.safeValue().metadata.fileId.safeValue()
-    );
+    const cloudVisited = cloudVisitedByFilePath.has(cloudNode.safeValue().data.fullPath);
     if (localVisited && cloudVisited) {
         // Both nodes have been visited and already in some type of update.
         return Ok(None);
@@ -219,7 +217,7 @@ export function CompareNodesAndGetUpdate(
         // Only local node has been used so we create a cloud convergence update.
         return CreateConvergenceForOnlyCloudNode(
             cloudNode.safeValue(),
-            cloudVisitedByFileId,
+            cloudVisitedByFilePath,
             reservedFullPath
         );
     } else if (!localVisited && cloudVisited) {
@@ -236,17 +234,16 @@ export function CompareNodesAndGetUpdate(
     // Cloud node removing the option.
     const cNode = cloudNode.safeValue();
 
-    // Case where everything is the same but it is missing the firestore time and/or fileid.
+    // Case where everything is the same but it is missing the firestore time.
     if (
         lNode.metadata.firestoreTime.none &&
         lNode.data.fullPath === cNode.data.fullPath &&
         lNode.data.deleted === cNode.data.deleted &&
-        lNode.data.fileHash === cNode.data.fileHash &&
-        (lNode.metadata.fileId.equals(cNode.metadata.fileId) || lNode.metadata.fileId.none)
+        lNode.data.fileHash === cNode.data.fileHash
     ) {
         // No update needed, everything is almost the same.
         localVisisted.add(lNode);
-        cloudVisitedByFileId.add(cNode.metadata.fileId.safeValue());
+        cloudVisitedByFilePath.add(cNode.data.fullPath);
         const pathResult = EnsureReservedPathValidity(reservedFullPath, cNode);
         if (pathResult.err) {
             return pathResult;
@@ -260,13 +257,13 @@ export function CompareNodesAndGetUpdate(
     }
 
     const hasLeftOverLocalFile = lNode.data.fullPath !== cNode.data.fullPath;
-    // Case where the data on device does not have a firestore id or is older.
+    // Case where the data on device does not have a firestore time or is older.
     if (
         lNode.metadata.firestoreTime.none ||
         lNode.metadata.firestoreTime.safeValue() < cNode.metadata.firestoreTime.safeValue()
     ) {
         localVisisted.add(lNode);
-        cloudVisitedByFileId.add(cNode.metadata.fileId.safeValue());
+        cloudVisitedByFilePath.add(cNode.data.fullPath);
         const pathResult = EnsureReservedPathValidity(reservedFullPath, cNode);
         if (pathResult.err) {
             return pathResult;
@@ -288,12 +285,11 @@ export function CompareNodesAndGetUpdate(
         lNode.metadata.firestoreTime.equals(cNode.metadata.firestoreTime) &&
         lNode.data.fullPath === cNode.data.fullPath &&
         lNode.data.deleted === cNode.data.deleted &&
-        lNode.data.fileHash === cNode.data.fileHash &&
-        (lNode.metadata.fileId.equals(cNode.metadata.fileId) || lNode.metadata.fileId.none)
+        lNode.data.fileHash === cNode.data.fileHash
     ) {
         // No update needed, everything is the same.
         localVisisted.add(lNode);
-        cloudVisitedByFileId.add(cNode.metadata.fileId.safeValue());
+        cloudVisitedByFilePath.add(cNode.data.fullPath);
         const pathResult = EnsureReservedPathValidity(reservedFullPath, cNode);
         if (pathResult.err) {
             return pathResult;
@@ -310,7 +306,7 @@ export function CompareNodesAndGetUpdate(
     // cloud node.
     if (lNode.data.deleted && lNode.data.deleted !== cNode.data.deleted) {
         localVisisted.add(lNode);
-        cloudVisitedByFileId.add(cNode.metadata.fileId.safeValue());
+        cloudVisitedByFilePath.add(cNode.data.fullPath);
         const action: ConvergenceUpdate = {
             action: ConvergenceAction.USE_LOCAL_DELETE_CLOUD,
             localState: localNode,
@@ -321,7 +317,7 @@ export function CompareNodesAndGetUpdate(
 
     // Default to using local to update the cloud.
     localVisisted.add(lNode);
-    cloudVisitedByFileId.add(cNode.metadata.fileId.safeValue());
+    cloudVisitedByFilePath.add(cNode.data.fullPath);
     const pathResult = EnsureReservedPathValidity(reservedFullPath, cNode);
     if (pathResult.err) {
         return pathResult;
@@ -350,11 +346,10 @@ export function ConvergeMapsToUpdateStates({
 }: ConvergeMapsToUpdateStatesOpts): Result<ConvergenceUpdate[], StatusError> {
     const cloudFlatNodes = FlattenFileNodes(cloudMapRep);
     const localFlatNodes = FlattenFileNodes(localMapRep);
-    const localMapOfFileId = MapByFileId(localFlatNodes);
+    const localMapOfFilePath = MapByFilePath(localFlatNodes);
 
-    // These are the cloud nodes that have been reviewed, all cloud nodes are expected to have a
-    // file id.
-    const cloudVisitedByFileId = new Set<string>();
+    // These are the cloud nodes that have been reviewed.
+    const cloudVisitedByFilePath = new Set<string>();
     // These are the local nodes that have been reviewed. They may not have a file id so we use obj
     // reference instead.
     const localVisisted = new Set<LocalNode>();
@@ -366,22 +361,21 @@ export function ConvergeMapsToUpdateStates({
     const convergenceUpdates: ConvergenceUpdate[] = [];
 
     //
-    // First do comparison of internal vs external by `fileId`. This is the only stage where
+    // First do comparison of internal vs external by `fulpath`. This is the only stage where
     // deletion of files can happen. We only delete a file locally if we have matching ids
     // otherwise the local file will be kept. This is due to use following files by id instead
     // of file path.
     //
 
-    // we expect all internal files to have a fileId.
     for (const cloudNode of cloudFlatNodes) {
-        const localNode = localMapOfFileId.get(cloudNode.metadata.fileId.valueOr(""));
+        const localNode = localMapOfFilePath.get(cloudNode.data.fullPath);
         if (localNode === undefined) {
             continue;
         }
         const compareResult = CompareNodesAndGetUpdate(
             Some(localNode),
             Some(cloudNode),
-            cloudVisitedByFileId,
+            cloudVisitedByFilePath,
             localVisisted,
             reservedFullPath
         );
@@ -407,7 +401,7 @@ export function ConvergeMapsToUpdateStates({
     const getFilePaths = (node: AllFileNodeTypes): string => node.data.fullPath;
     const isNonDeleted = (node: AllFileNodeTypes): boolean => !node.data.deleted;
     const isInternalUnvisited = (node: CloudNode): boolean =>
-        !cloudVisitedByFileId.has(node.metadata.fileId.valueOr(""));
+        !cloudVisitedByFilePath.has(node.data.fullPath);
     const isExternalUnvisited = (node: LocalNode): boolean => !localVisisted.has(node);
     const allUniqPaths = new Set<string>([
         ...cloudFlatNodes.filter(isInternalUnvisited).filter(isNonDeleted).map(getFilePaths),
@@ -438,7 +432,7 @@ export function ConvergeMapsToUpdateStates({
         const compareResult = CompareNodesAndGetUpdate(
             localNode,
             cloudNode,
-            cloudVisitedByFileId,
+            cloudVisitedByFilePath,
             localVisisted,
             reservedFullPath
         );

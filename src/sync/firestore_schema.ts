@@ -5,7 +5,7 @@ import type {
     WithFieldValue
 } from "firebase/firestore";
 import { Bytes } from "firebase/firestore";
-import type { CloudNode, FirestoreNodes, UploadFileNode } from "./file_node";
+import type { CloudNode, FilePathType, FirestoreNodes, UploadFileNode } from "./file_node";
 import { CloudNodeFileRef, CloudNodeRaw } from "./file_node";
 import type { UserCredential } from "firebase/auth";
 import type { Option } from "../lib/option";
@@ -146,7 +146,7 @@ export class FileSchemaConverter implements FirestoreDataConverter<FirestoreNode
             case "Raw":
                 return new CloudNodeRaw(
                     {
-                        fullPath: data.path,
+                        fullPath: data.path as FilePathType,
                         cTime: data.cTime,
                         mTime: data.mTime,
                         size: data.size,
@@ -172,7 +172,7 @@ export class FileSchemaConverter implements FirestoreDataConverter<FirestoreNode
             case "Ref":
                 return new CloudNodeFileRef(
                     {
-                        fullPath: data.path,
+                        fullPath: data.path as FilePathType,
                         cTime: data.cTime,
                         mTime: data.mTime,
                         size: data.size,

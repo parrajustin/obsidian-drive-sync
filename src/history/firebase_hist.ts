@@ -11,13 +11,13 @@ import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import type FirestoreSyncPlugin from "../main";
 import type { SyncerConfig } from "../settings/syncer_config_data";
-import type { LocalNode } from "../sync/file_node";
+import type { FilePathType, LocalNode } from "../sync/file_node";
 import { LogError } from "../log";
 import { ConvertToUnknownError } from "../util";
 import type { HistoryProgressView } from "./history_view";
 import { GetOrCreateHistoryProgressView } from "./history_view";
 import { GetHistorySchemaConverter } from "./history_schema";
-import { FlattenFileNodes, MapByFileId, type FileMapOfNodes } from "../sync/file_node_util";
+import { FlattenFileNodes, MapByFilePath, type FileMapOfNodes } from "../sync/file_node_util";
 import { debounce } from "remeda";
 import type { HistoricFileNode } from "./history_file_node";
 import { ConvertHistoricNodesToCache } from "./history_cache";
@@ -77,7 +77,7 @@ export class FirebaseHistory {
         public creds: UserCredential,
         public db: Firestore,
         private _historicChanges: Map<string, HistoricFileNode>,
-        private _mapOfLocalFile: Map<string, LocalNode>
+        private _mapOfLocalFile: Map<FilePathType, LocalNode>
     ) {
         this.registerSaveSettingsTask();
     }
@@ -119,7 +119,7 @@ export class FirebaseHistory {
                 creds,
                 db,
                 cachedNodes,
-                MapByFileId(FlattenFileNodes(mapOfNodes))
+                MapByFilePath(FlattenFileNodes(mapOfNodes))
             )
         );
     }
@@ -185,14 +185,14 @@ export class FirebaseHistory {
         return this._config.vaultName;
     }
 
-    /** Get the local nodes file path from a given id, if there is one. */
-    public getLocalFileNodeFromId(fileId: string): Option<LocalNode> {
-        return WrapOptional(this._mapOfLocalFile.get(fileId));
+    /** Get the local nodes file path from a given file path, if there is one. */
+    public getLocalFileNodeFromFilePath(filePath: FilePathType): Option<LocalNode> {
+        return WrapOptional(this._mapOfLocalFile.get(filePath));
     }
 
     /** Updates the history entry of file nodes. */
     public updateMapOfLocalNodes(mapOfNodes: FileMapOfNodes<LocalNode>) {
-        this._mapOfLocalFile = MapByFileId(FlattenFileNodes(mapOfNodes));
+        this._mapOfLocalFile = MapByFilePath(FlattenFileNodes(mapOfNodes));
         if (this.activeHistoryView.some) {
             this.activeHistoryView.safeValue().updateView();
         }

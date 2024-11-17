@@ -133,10 +133,10 @@ export class HistoryChangeEntry extends SignalWatcher(LitElement) {
 
     private modifyDiffSignal() {
         const diffs = DIFF_SIGNAL.get();
-        const hasDiffFileId =
+        const hasDiffOfDifferentPath =
             diffs[0].some &&
-            !diffs[0].safeValue().metadata.fileId.equals(this.changeFileNode.metadata.fileId);
-        if (hasDiffFileId) {
+            diffs[0].safeValue().data.fullPath !== this.changeFileNode.data.fullPath;
+        if (hasDiffOfDifferentPath) {
             DIFF_SIGNAL.set([Some(this.changeFileNode), None]);
             return;
         }

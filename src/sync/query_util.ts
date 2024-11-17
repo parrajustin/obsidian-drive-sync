@@ -1,6 +1,7 @@
 import { SearchString } from "../lib/search_string_parser";
 import type { SyncerConfig } from "../settings/syncer_config_data";
 import { RootSyncType } from "../settings/syncer_config_data";
+import type { FilePathType } from "./file_node";
 
 const SEARCH_STRING_CACHE = new Map<string, SearchString>();
 
@@ -45,13 +46,13 @@ export function ChecksPassedFilter(data: string, searchString: SearchString): bo
 }
 
 /** Checks if the file should have a file id. */
-export function ShouldHaveFileId(filePath: string, config: SyncerConfig): boolean {
+export function ShouldHaveFileId(filePath: FilePathType, config: SyncerConfig): boolean {
     const searchString = GetQueryString(config.fileIdFileQuery);
     return ChecksPassedFilter(filePath, searchString);
 }
 
 /** Checks if the file path is acceptable to even be included.  */
-export function IsAcceptablePath(filePath: string, config: SyncerConfig): boolean {
+export function IsAcceptablePath(filePath: FilePathType, config: SyncerConfig): boolean {
     if (config.type === RootSyncType.FOLDER_TO_ROOT && config.nestedRootPath === "") {
         return false;
     }
@@ -66,13 +67,13 @@ export function IsAcceptablePath(filePath: string, config: SyncerConfig): boolea
 }
 
 /** Checks if the file path leads to an acceptable file on the device. */
-export function IsObsidianFile(filePath: string, config: SyncerConfig): boolean {
+export function IsObsidianFile(filePath: FilePathType, config: SyncerConfig): boolean {
     const searchString = GetQueryString(config.obsidianFileSyncQuery);
     return ChecksPassedFilter(filePath, searchString);
 }
 
 /** Checks if the file path lead to a raw file on the device. */
-export function IsLocalFileRaw(filePath: string, config: SyncerConfig): boolean {
+export function IsLocalFileRaw(filePath: FilePathType, config: SyncerConfig): boolean {
     const searchString = GetQueryString(config.rawFileSyncQuery);
     return ChecksPassedFilter(filePath, searchString);
 }

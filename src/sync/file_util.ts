@@ -5,7 +5,8 @@ import type {
     AllFileNodeTypes,
     ImmutableBaseFileNode,
     FirestoreNodes,
-    LocalNode
+    LocalNode,
+    FilePathType
 } from "./file_node";
 import { CloudNodeRaw } from "./file_node";
 import { CloudNodeFileRef, LocalNodeObsidian, LocalNodeRaw } from "./file_node";
@@ -30,7 +31,7 @@ import type { SyncerConfig } from "../settings/syncer_config_data";
 /** Reads a file through the raw apis. */
 export async function ReadFile(
     app: App,
-    filePath: string,
+    filePath: FilePathType,
     node: LocalNode
 ): Promise<Result<Uint8Array, StatusError>> {
     switch (node.type) {
@@ -44,7 +45,7 @@ export async function ReadFile(
 /** Write the `data` to the raw file at `filePath`. */
 export async function WriteFile(
     app: App,
-    filePath: string,
+    filePath: FilePathType,
     data: Uint8Array,
     syncConfig: SyncerConfig,
     opts?: DataWriteOptions
@@ -61,7 +62,7 @@ export async function WriteFile(
 /** Deletes the raw file at `filePath`, works for any file. */
 export async function DeleteFile(
     app: App,
-    filePath: string,
+    filePath: FilePathType,
     node: LocalNode
 ): Promise<StatusResult<StatusError>> {
     switch (node.type) {

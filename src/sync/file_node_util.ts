@@ -4,10 +4,9 @@ import type { Result, StatusResult } from "../lib/result";
 import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { InternalError, InvalidArgumentError } from "../lib/status_error";
-import { None, Some, type Option } from "../lib/option";
-import { GetFileUidFromFrontmatter } from "./file_id_util";
+import { None, Some, WrapOptional, type Option } from "../lib/option";
 import { WrapPromise } from "../lib/wrap_promise";
-import type { LocalNode, AllFileNodeTypes, ImmutableBaseFileNode } from "./file_node";
+import type { LocalNode, AllFileNodeTypes, ImmutableBaseFileNode, FilePathType } from "./file_node";
 import { LocalNodeObsidian, LocalNodeRaw } from "./file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
 import type { SyncerConfig } from "../settings/syncer_config_data";
@@ -31,16 +30,17 @@ export type FileMapOfNodes<TypeOfData extends ImmutableBaseFileNode = AllFileNod
 export async function GetObsidianNode(
     app: App,
     config: SyncerConfig,
-    fileName: string
+    fileName: FilePathType
 ): Promise<Result<Option<LocalNodeObsidian>, StatusError>> {
     const file = app.vault.fileMap[fileName]!;
     if (!(file instanceof TFile)) {
         return Ok(None);
     }
-    const fileIdResult = await GetFileUidFromFrontmatter(app, config, file);
-    if (fileIdResult.err) {
-        return fileIdResult;
-    }
+    // TODO: look into using file id again.
+    // const fileIdResult = await GetFileUidFromFrontmatter(app, config, file);
+    // if (fileIdResult.err) {
+    //     return fileIdResult;
+    // }
 
     const fileContents = await ReadObsidianFile(app, fileName);
     const fileHash = fileContents.map((f) =>
@@ -54,7 +54,7 @@ export async function GetObsidianNode(
         config.syncerId,
         fileName,
         file,
-        fileIdResult.safeUnwrap(),
+        /*fileId=*/ None,
         fileHash.safeUnwrap()
     );
     return Ok(Some(node));
@@ -64,7 +64,7 @@ export async function GetObsidianNode(
 export async function GetRawNode(
     app: App,
     config: SyncerConfig,
-    fileName: string
+    fileName: FilePathType
 ): Promise<Result<Option<LocalNodeRaw>, StatusError>> {
     const fileStat = await WrapPromise(
         app.vault.adapter.stat(fileName),
@@ -116,7 +116,7 @@ export async function GetRawNode(
     return Ok(Some(node));
 }
 
-export function IsFilePathValid(config: SyncerConfig, fullPath: string) {
+export function IsFilePathValid(config: SyncerConfig, fullPath: FilePathType) {
     return (
         IsAcceptablePath(fullPath, config) &&
         (IsLocalFileRaw(fullPath, config) || IsObsidianFile(fullPath, config))
@@ -127,7 +127,7 @@ export function IsFilePathValid(config: SyncerConfig, fullPath: string) {
 export async function GetLocalFileNode(
     app: App,
     config: SyncerConfig,
-    fullPath: string
+    fullPath: FilePathType
 ): Promise<Result<Option<LocalNode>, StatusError>> {
     if (IsAcceptablePath(fullPath, config) && IsLocalFileRaw(fullPath, config)) {
         return GetRawNode(app, config, fullPath);
@@ -151,59 +151,20 @@ export async function UpdateLocalFileMapWithLocalChanges(
     app: App,
     config: SyncerConfig,
     fileMap: FileMapOfNodes<LocalNode>,
-    changedNodes: Set<LocalNode>,
-    changedPath: Set<string>
+    changedPath: Set<FilePathType>
 ): Promise<Result<FileMapOfNodes<LocalNode>, StatusError>> {
-    if (changedNodes.size === 0 && changedPath.size === 0) {
+    if (changedPath.size === 0) {
         return Ok(fileMap);
     }
     // These are all paths that have been checked.
-    const checkedPaths = new Set<string>();
+    const checkedPaths = new Set<FilePathType>();
 
-    // Update the data of the file nodes that were "changed".
-    const changedNodeCheckResult = CombineResults(
-        await Promise.all(
-            AsyncForEach(
-                [...changedNodes],
-                async (node: LocalNode): Promise<StatusResult<StatusError>> => {
-                    if (!IsFilePathValid(config, node.data.fullPath)) {
-                        return Ok();
-                    }
-
-                    // Attempt to get the new data for a specified path.
-                    const newNodeResult = await GetLocalFileNode(app, config, node.data.fullPath);
-                    if (newNodeResult.err) {
-                        // We can ignore file fetch errors.
-                        changedPath.add(node.data.fullPath);
-                        return Ok();
-                    }
-                    const optNode = newNodeResult.safeUnwrap();
-                    if (optNode.none) {
-                        changedPath.add(node.data.fullPath);
-                        return Ok();
-                    }
-
-                    checkedPaths.add(node.data.fullPath);
-                    // Check if there is any data difference.
-                    if (!node.equalsData(optNode.safeValue())) {
-                        node.data = optNode.safeValue().data;
-                        node.metadata.firestoreTime = Some(Date.now());
-                    }
-                    return Ok();
-                }
-            )
-        )
-    );
-    if (changedNodeCheckResult.err) {
-        return changedNodeCheckResult;
-    }
-
-    let allFileNodes = FlattenFileNodes(fileMap);
+    const filesByFilePath = MapByFilePath(FlattenFileNodes(fileMap));
     const changedPathResult = CombineResults(
         await Promise.all(
             AsyncForEach(
                 [...changedPath],
-                async (path: string): Promise<StatusResult<StatusError>> => {
+                async (path: FilePathType): Promise<StatusResult<StatusError>> => {
                     if (!IsFilePathValid(config, path)) {
                         return Ok();
                     }
@@ -212,12 +173,7 @@ export async function UpdateLocalFileMapWithLocalChanges(
                     }
                     checkedPaths.add(path);
                     // The current node.
-                    const foundNode = GetNonDeletedByFilePath(fileMap, path);
-                    if (foundNode.err) {
-                        // We don't care about errors here. all errors are just files not found.
-                        return Ok();
-                    }
-                    const origNode = foundNode.safeUnwrap();
+                    const origNode = WrapOptional(filesByFilePath.get(path));
                     const newNodeResult = await GetLocalFileNode(app, config, path);
                     if (newNodeResult.err) {
                         return newNodeResult;
@@ -228,17 +184,17 @@ export async function UpdateLocalFileMapWithLocalChanges(
                         // Perfect no nodes!
                         return Ok();
                     } else if (origNode.some && newNode.none) {
-                        // Couldn't get new file information, maybe the file is gone? just remove the file node.
-                        allFileNodes = allFileNodes.filter((n) => n !== origNode.safeValue());
+                        // Couldn't get new file information, maybe the file is gone? just marked the file node deleted.
+                        origNode.safeValue().data.deleted = true;
                     } else if (origNode.none && newNode.some) {
                         // Only found the new file.
-                        allFileNodes.push(newNode.safeValue());
+                        filesByFilePath.set(path, newNode.safeValue());
                     } else if (
                         origNode.some &&
                         newNode.some &&
                         !origNode.safeValue().equalsData(newNode.safeValue())
                     ) {
-                        // Just update the node's metadata.
+                        // Just update the node's data.
                         origNode.safeValue().data = newNode.safeValue().data;
                     }
                     return Ok();
@@ -250,7 +206,9 @@ export async function UpdateLocalFileMapWithLocalChanges(
         return changedPathResult;
     }
 
-    return ConvertArrayOfNodesToMap(allFileNodes).mapErr((e) => e.setPayload("label", "return"));
+    return ConvertArrayOfNodesToMap([...filesByFilePath.entries()].map((n) => n[1])).mapErr((e) =>
+        e.setPayload("label", "return")
+    );
 }
 
 /** Filters file nodes to make sure they should be kept. */
@@ -281,7 +239,7 @@ export async function GetAllFileNodes(
             return fileNamesResult;
         }
 
-        for (const fullPath of fileNamesResult.safeUnwrap().files) {
+        for (const fullPath of fileNamesResult.safeUnwrap().files as FilePathType[]) {
             if (!IsAcceptablePath(fullPath, config)) {
                 continue;
             }
@@ -429,17 +387,13 @@ export function FlattenFileNodes<TypeOfData extends ImmutableBaseFileNode = AllF
     return fileNodes;
 }
 
-/** Gets a map of the nodes keyed by their file-id. */
-export function MapByFileId<TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes>(
+/** Gets a map of the nodes keyed by their full path. */
+export function MapByFilePath<TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes>(
     arry: TypeOfData[]
-): Map<string, TypeOfData> {
-    const map = new Map<string, TypeOfData>();
+): Map<FilePathType, TypeOfData> {
+    const map = new Map<FilePathType, TypeOfData>();
     for (const node of arry) {
-        if (node.metadata.fileId.none) {
-            continue;
-        }
-
-        map.set(node.metadata.fileId.safeValue(), node);
+        map.set(node.data.fullPath, node);
     }
     return map;
 }

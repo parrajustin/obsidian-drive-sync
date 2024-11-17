@@ -6,14 +6,13 @@ import { ErrorCode, type StatusError } from "./lib/status_error";
 import type { SyncerConfig } from "./settings/syncer_config_data";
 import type { FirebaseHistory } from "./history/firebase_hist";
 import type FirestoreSyncPlugin from "./main";
+import type { FilePathType } from "./sync/file_node";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
 const MAX_NUMBER_OF_CYCLES = 50;
 
 interface SyncProgress {
-    fileId: string;
-    initalFileName: Option<string>;
-    finalFileName: string;
+    filePath: FilePathType;
     actionTaken: Exclude<ConvergenceAction, ConvergenceAction.NULL_UPDATE>;
     progress: number;
     updateProgress?: (amount: number) => void;
@@ -42,8 +41,8 @@ interface CycleProgress {
     publishedEntry: Option<SyncerPublishedCycle>;
     /** Changes that have been published. */
     changesInCycle: (SyncProgress | SyncerError)[];
-    /** File id to progress of upload. */
-    mapOfCurrentCycleChanges: Map<string, SyncProgress>;
+    /** File Path to progress of upload. */
+    mapOfCurrentCycleChanges: Map<FilePathType, SyncProgress>;
     /** Container for the entire element. */
     progressContainerDiv?: HTMLDivElement;
     /** The div of the list. */
@@ -230,16 +229,12 @@ export class SyncProgressView extends ItemView {
     /**
      * Adds a progress entry to the view.
      * @param syncerId the syncer id
-     * @param fileId the file id
-     * @param initalFileName the initial file path if it differs
-     * @param finalFileName the final file path
+     * @param filePath the file full path
      * @param actionTaken the action that is taken to converge
      */
     public addEntry(
         syncerId: string,
-        fileId: string,
-        initalFileName: Option<string>,
-        finalFileName: string,
+        filePath: FilePathType,
         actionTaken: Exclude<ConvergenceAction, ConvergenceAction.NULL_UPDATE>
     ) {
         const cycle = this._mapSyncerCycleToCurrentProgress.get(syncerId);
@@ -247,14 +242,12 @@ export class SyncProgressView extends ItemView {
             return;
         }
         const syncProgress: SyncProgress = {
-            fileId,
-            initalFileName,
-            finalFileName,
+            filePath,
             actionTaken,
             progress: 0
         };
         cycle.changesInCycle.unshift(syncProgress);
-        cycle.mapOfCurrentCycleChanges.set(syncProgress.fileId, syncProgress);
+        cycle.mapOfCurrentCycleChanges.set(filePath, syncProgress);
         cycle.lastUpdate = Date.now();
 
         const listDiv = cycle.listDiv;
@@ -267,15 +260,15 @@ export class SyncProgressView extends ItemView {
 
     /**
      * Sets an entries progress on the view.
-     * @param fileId the file id of the entry
+     * @param filePath
      * @param progress the progress [0, 1] to set it to.
      */
-    public setEntryProgress(syncerId: string, fileId: string, progress: number) {
+    public setEntryProgress(syncerId: string, filePath: FilePathType, progress: number) {
         const cycle = this._mapSyncerCycleToCurrentProgress.get(syncerId);
         if (cycle === undefined) {
             return;
         }
-        const progressEntry = cycle.mapOfCurrentCycleChanges.get(fileId);
+        const progressEntry = cycle.mapOfCurrentCycleChanges.get(filePath);
         if (progressEntry === undefined) {
             return;
         }
@@ -467,6 +460,8 @@ export class SyncProgressView extends ItemView {
         let iconName = "file-question";
         switch (syncProgress.actionTaken) {
             case ConvergenceAction.USE_LOCAL_DELETE_CLOUD:
+                iconName = "trash-2";
+                break;
             case ConvergenceAction.USE_CLOUD:
                 iconName = "cloud-download";
                 break;
@@ -481,7 +476,7 @@ export class SyncProgressView extends ItemView {
             cls: "progress-icons",
             attr: {
                 // eslint-disable-next-line @typescript-eslint/naming-convention
-                "aria-label": syncProgress.fileId,
+                "aria-label": syncProgress.filePath,
                 // eslint-disable-next-line @typescript-eslint/naming-convention
                 "data-icon": iconName,
                 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -490,6 +485,8 @@ export class SyncProgressView extends ItemView {
         });
         switch (syncProgress.actionTaken) {
             case ConvergenceAction.USE_LOCAL_DELETE_CLOUD:
+                iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
+                break;
             case ConvergenceAction.USE_CLOUD:
                 iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cloud-download"><path d="M12 13v8l-4-4"/><path d="m12 21 4-4"/><path d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"/></svg>`;
                 break;
@@ -507,7 +504,7 @@ export class SyncProgressView extends ItemView {
         progressFields.style.flexDirection = "column";
         progressFields.style.width = "100%";
         progressFields.createEl("span", {
-            text: `${syncProgress.finalFileName}${syncProgress.initalFileName.andThen((v) => ` from: ${v}`).valueOr("")}`
+            text: syncProgress.filePath
         });
 
         if (!noProgress) {
@@ -536,7 +533,6 @@ export class SyncProgressView extends ItemView {
             this._syncerStatuses.set(config.syncerId, container.createSpan());
             const btnEl = container.createEl("button");
             btnEl.onclick = () => {
-                console.log("Killing syncer");
                 this._plugin.killSyncer(config.syncerId);
             };
             btnEl.innerText = "Kill Syncer";

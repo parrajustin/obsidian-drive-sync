@@ -13,6 +13,7 @@ import { InternalError } from "../lib/status_error";
 import type { HistoricNodeExtraType } from "./history_file_node";
 import { HistoricFileNode } from "./history_file_node";
 import type { FileDataDbModelV1 } from "../sync/firestore_schema";
+import type { FilePathType } from "../sync/file_node";
 
 export interface HistoryDbModelV1 {
     /** File data version. */
@@ -119,7 +120,7 @@ export class HistorySchemaConverter
 
         return new HistoricFileNode(
             {
-                fullPath: data.file.path,
+                fullPath: data.file.path as FilePathType,
                 cTime: data.file.cTime,
                 mTime: data.file.mTime,
                 size: data.file.size,

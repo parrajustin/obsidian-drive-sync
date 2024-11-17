@@ -7,6 +7,7 @@ import type { FileDataDbModelV1 } from "../sync/firestore_schema";
 import { HistoricFileNode } from "./history_file_node";
 import type { HistoryDbModelV1 } from "./history_schema";
 import { Some } from "../lib/option";
+import type { FilePathType } from "../sync/file_node";
 
 interface HistoryCacheV1 extends Omit<HistoryDbModelV1, "file"> {
     /** File data version. */
@@ -111,7 +112,7 @@ export async function GetHistoricNodesFromCache(
         if (data.file.fileStorageRef !== null) {
             return new HistoricFileNode(
                 {
-                    fullPath: data.file.path,
+                    fullPath: data.file.path as FilePathType,
                     cTime: data.file.cTime,
                     mTime: data.file.mTime,
                     size: data.file.size,
@@ -138,7 +139,7 @@ export async function GetHistoricNodesFromCache(
         }
         return new HistoricFileNode(
             {
-                fullPath: data.file.path,
+                fullPath: data.file.path as FilePathType,
                 cTime: data.file.cTime,
                 mTime: data.file.mTime,
                 size: data.file.size,

@@ -10,7 +10,7 @@ import { createContext } from "@lit/context";
 import type { Firestore } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
 import { Signal, signal } from "@lit-labs/signals";
-import type { LocalNode } from "../sync/file_node";
+import type { FilePathType, LocalNode } from "../sync/file_node";
 import { DiffModal } from "./components/diff_modal/diff_modal";
 import { HistoricFileNode } from "./history_file_node";
 import "./components/history_container";
@@ -47,7 +47,7 @@ export class HistoryProgressView extends ItemView {
 
             const data = DIFF_SIGNAL.get();
             if (this._history.some && data[0].some && data[1].some && this._entries.some) {
-                const fileId = data[0].safeValue().metadata.fileId.valueOr("");
+                const filePath = data[0].safeValue().data.fullPath;
                 const historyIds = data
                     .map((n) => {
                         if (n instanceof HistoricFileNode) {
@@ -60,7 +60,7 @@ export class HistoryProgressView extends ItemView {
                 let baseNode: Option<HistoricFileNode> = None;
                 const thisHistoryDocNodes = this._entries
                     .safeValue()
-                    .find((v) => v.fileId === fileId);
+                    .find((v) => v.filePath === filePath);
                 for (const entry of thisHistoryDocNodes?.historyNodes ?? []) {
                     if (countFound === historyIds.length) {
                         baseNode = Some(entry);
@@ -139,15 +139,15 @@ export class HistoryProgressView extends ItemView {
 
         // Convert history nodes to a format for the lit html.
         const history = this._history.safeValue().getHistoricNodes();
-        const mapFileIdToNodes = new Map<string, HistoryEntryData>();
+        const nodesByFilePath = new Map<FilePathType, HistoryEntryData>();
         for (const [_, entry] of history) {
-            let mapEntry = mapFileIdToNodes.get(entry.metadata.fileId.safeValue());
+            let mapEntry = nodesByFilePath.get(entry.data.fullPath);
             if (mapEntry === undefined) {
                 const localFileNode = this._history
                     .safeValue()
-                    .getLocalFileNodeFromId(entry.metadata.fileId.safeValue());
+                    .getLocalFileNodeFromFilePath(entry.data.fullPath);
                 mapEntry = {
-                    fileId: entry.metadata.fileId.safeValue(),
+                    filePath: entry.data.fullPath,
                     localFile: localFileNode,
                     historyNodes: [entry],
                     latestModification: Math.max(
@@ -155,7 +155,7 @@ export class HistoryProgressView extends ItemView {
                         entry.metadata.firestoreTime.safeValue()
                     )
                 };
-                mapFileIdToNodes.set(entry.metadata.fileId.safeValue(), mapEntry);
+                nodesByFilePath.set(entry.data.fullPath, mapEntry);
             } else {
                 mapEntry.latestModification = Math.max(
                     mapEntry.latestModification,
@@ -164,7 +164,7 @@ export class HistoryProgressView extends ItemView {
                 mapEntry.historyNodes.push(entry);
             }
         }
-        this._entries = Some([...mapFileIdToNodes.entries()].map((x) => x[1]));
+        this._entries = Some([...nodesByFilePath.entries()].map((x) => x[1]));
         // Sorts descending by latest modification time.
         this._entries.safeValue().sort((a, b) => b.latestModification - a.latestModification);
         this._entries.safeValue().forEach((n) => {

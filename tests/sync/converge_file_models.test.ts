@@ -2,7 +2,7 @@ import { describe, expect, jest, test } from "@jest/globals";
 import { None, Some } from "../../src/lib/option";
 import { ConvertArrayOfNodesToMap } from "../../src/sync/file_node_util";
 import { ConvergeMapsToUpdateStates } from "../../src/sync/converge_file_models";
-import type { CloudNode, LocalNode } from "../../src/sync/file_node";
+import type { CloudNode, FilePathType, LocalNode } from "../../src/sync/file_node";
 import { CloudNodeRaw, LocalNodeObsidian, LocalNodeRaw } from "../../src/sync/file_node";
 
 jest.mock(
@@ -23,7 +23,7 @@ describe("ConvergeMapsToUpdateStates", () => {
         const localNodes: LocalNode[] = [
             new LocalNodeRaw(
                 {
-                    fullPath: "folder/file_1.md",
+                    fullPath: "folder/file_1.md" as FilePathType,
                     cTime: 1000,
                     mTime: 1001,
                     size: 1,
@@ -45,7 +45,7 @@ describe("ConvergeMapsToUpdateStates", () => {
         const cloudNodes: CloudNode[] = [
             new CloudNodeRaw(
                 {
-                    fullPath: "folder/file_1.md",
+                    fullPath: "folder/file_1.md" as FilePathType,
                     cTime: 1000,
                     mTime: 1001,
                     size: 1,
@@ -92,7 +92,7 @@ describe("ConvergeMapsToUpdateStates", () => {
         const localNodes: LocalNode[] = [
             new LocalNodeObsidian(
                 {
-                    fullPath: "2024-01-29.md",
+                    fullPath: "2024-01-29.md" as FilePathType,
                     cTime: 1727567232197,
                     mTime: 1727154540112,
                     size: 269,
@@ -114,7 +114,7 @@ describe("ConvergeMapsToUpdateStates", () => {
         const cloudNodes: CloudNode[] = [
             new CloudNodeRaw(
                 {
-                    fullPath: "2024-01-29.md",
+                    fullPath: "2024-01-29.md" as FilePathType,
                     cTime: 1727567232197,
                     mTime: 1727154540112,
                     size: 269,

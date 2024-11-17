@@ -1,7 +1,7 @@
 import { describe, expect, jest, test } from "@jest/globals";
 import { None, Some } from "../../src/lib/option";
 import { ConvertArrayOfNodesToMap } from "../../src/sync/file_node_util";
-import type { CloudNode } from "../../src/sync/file_node";
+import type { CloudNode, FilePathType } from "../../src/sync/file_node";
 import { CloudNodeFileRef, CloudNodeRaw } from "../../src/sync/file_node";
 import { ConvertCloudNodesToCache, GetCloudNodesFromCache } from "../../src/sync/firebase_cache";
 
@@ -23,7 +23,7 @@ describe("Firebase Cache", () => {
         const cloudNodes: CloudNode[] = [
             new CloudNodeRaw(
                 {
-                    fullPath: "folder/file_1.md",
+                    fullPath: "folder/file_1.md" as FilePathType,
                     cTime: 1000,
                     mTime: 1001,
                     size: 1,
@@ -48,7 +48,7 @@ describe("Firebase Cache", () => {
             ),
             new CloudNodeRaw(
                 {
-                    fullPath: "file_2.md",
+                    fullPath: "file_2.md" as FilePathType,
                     cTime: 1000,
                     mTime: 1001,
                     size: 4,
@@ -73,7 +73,7 @@ describe("Firebase Cache", () => {
             ),
             new CloudNodeFileRef(
                 {
-                    fullPath: "file_3.md",
+                    fullPath: "file_3.md" as FilePathType,
                     cTime: 1000,
                     mTime: 1001,
                     size: 4,
@@ -124,7 +124,7 @@ describe("Firebase Cache", () => {
         expect(getFromCache.val).toStrictEqual([
             new CloudNodeRaw(
                 {
-                    fullPath: "folder/file_1.md",
+                    fullPath: "folder/file_1.md" as FilePathType,
                     cTime: 1000,
                     mTime: 1001,
                     size: 1,
@@ -149,7 +149,7 @@ describe("Firebase Cache", () => {
             ),
             new CloudNodeRaw(
                 {
-                    fullPath: "file_2.md",
+                    fullPath: "file_2.md" as FilePathType,
                     cTime: 1000,
                     mTime: 1001,
                     size: 4,
@@ -174,7 +174,7 @@ describe("Firebase Cache", () => {
             ),
             new CloudNodeFileRef(
                 {
-                    fullPath: "file_3.md",
+                    fullPath: "file_3.md" as FilePathType,
                     cTime: 1000,
                     mTime: 1001,
                     size: 4,

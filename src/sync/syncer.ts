@@ -12,7 +12,6 @@ import {
     ConvertArrayOfNodesToMap,
     FlattenFileNodes,
     GetFileMapOfNodes,
-    GetNonDeletedByFilePath,
     UpdateLocalFileMapWithLocalChanges
 } from "./file_node_util";
 import type { Result, StatusResult } from "../lib/result";
@@ -21,12 +20,11 @@ import { FirebaseSyncer } from "./firebase_syncer";
 import type { UserCredential } from "firebase/auth";
 import type { FirebaseApp } from "firebase/app";
 import { GetOrCreateSyncProgressView } from "../progressView";
-import { WriteUidToAllFilesIfNecessary } from "./file_id_util";
 import { LogError } from "../log";
 import { CleanUpLeftOverLocalFiles } from "./syncer_update_util";
 import type { UnsubFunc } from "../watcher";
 import { AddWatchHandler } from "../watcher";
-import type { LocalNode } from "./file_node";
+import type { FilePathType, LocalNode } from "./file_node";
 import type { ConvergenceUpdate, NullUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { uuidv7 } from "../lib/uuid";
@@ -40,9 +38,7 @@ export class FileSyncer {
     /** firebase syncer if one has been created. */
     private _firebaseHistory: Option<FirebaseHistory> = None;
     /** Identified file changes to check for changes. */
-    private _touchedFilepaths = new Set<string>();
-    /** Files that have been changed in some way. */
-    private _touchedFileNodes = new Set<LocalNode>();
+    private _touchedFilepaths = new Set<FilePathType>();
     /** Function to handle unsubing the watch func. */
     private _unsubWatchHandler: Option<UnsubFunc> = None;
     /** timeid to kill the tick function. */
@@ -71,12 +67,13 @@ export class FileSyncer {
             });
         });
 
-        view.setSyncerStatus(config.syncerId, "Writing file uids...");
-        // First I'm gonna make sure all markdown files have a fileId
-        const fileUidWrite = await WriteUidToAllFilesIfNecessary(plugin.app, config);
-        if (fileUidWrite.err) {
-            return fileUidWrite;
-        }
+        // TODO: revisit file id writing.
+        // view.setSyncerStatus(config.syncerId, "Writing file uids...");
+        // // First I'm gonna make sure all markdown files have a fileId
+        // const fileUidWrite = await WriteUidToAllFilesIfNecessary(plugin.app, config);
+        // if (fileUidWrite.err) {
+        //     return fileUidWrite;
+        // }
 
         view.setSyncerStatus(config.syncerId, "Getting file nodes");
         // Get the file map of the filesystem.
@@ -184,111 +181,46 @@ export class FileSyncer {
 
     private listenForFileChanges() {
         this._unsubWatchHandler = Some(
-            AddWatchHandler(this._plugin.app, (type, path, oldPath, _info) => {
-                // Skip file paths outside nested root path.
-                if (
-                    this._config.type === RootSyncType.FOLDER_TO_ROOT &&
-                    !path.startsWith(this._config.nestedRootPath)
-                ) {
+            AddWatchHandler(
+                this._plugin.app,
+                (type, path: FilePathType, oldPath: FilePathType | undefined, _info) => {
+                    // Skip file paths outside nested root path.
+                    if (
+                        this._config.type === RootSyncType.FOLDER_TO_ROOT &&
+                        !path.startsWith(this._config.nestedRootPath)
+                    ) {
+                        return;
+                    }
+
+                    switch (type) {
+                        case "folder-created":
+                            break;
+                        case "file-created":
+                            this._touchedFilepaths.add(path);
+                            break;
+                        case "modified":
+                            this._touchedFilepaths.add(path);
+                            break;
+                        case "file-removed":
+                            this._touchedFilepaths.add(path);
+                            break;
+                        case "renamed":
+                            this._touchedFilepaths.add(path);
+                            if (oldPath !== undefined) {
+                                this._touchedFilepaths.add(oldPath);
+                            }
+                            break;
+                        case "closed":
+                            this._touchedFilepaths.add(path);
+                            break;
+                        case "raw":
+                            this._touchedFilepaths.add(path);
+                            break;
+                    }
                     return;
                 }
-
-                switch (type) {
-                    case "folder-created":
-                        break;
-                    case "file-created":
-                        this._touchedFilepaths.add(path);
-                        break;
-                    case "modified":
-                        this.handleModification(path);
-                        break;
-                    case "file-removed":
-                        this.handleRemoval(path);
-                        break;
-                    case "renamed":
-                        this.handleRename(path, oldPath);
-                        break;
-                    case "closed":
-                        this.handleModification(path, /*isRaw=*/ true);
-                        break;
-                    case "raw":
-                        this.handleModification(path, /*isRaw=*/ true);
-                        break;
-                }
-                return;
-            })
+            )
         );
-    }
-
-    /** Handle the modification of a file. */
-    private handleModification(path: string, isRaw = false) {
-        const nonDeleteNode = GetNonDeletedByFilePath(this._mapOfFileNodes, path);
-        if (nonDeleteNode.err && !isRaw) {
-            LogError(nonDeleteNode.val);
-            this._touchedFilepaths.add(path);
-            return;
-        } else if (nonDeleteNode.err) {
-            this._touchedFilepaths.add(path);
-            return;
-        }
-        const optNode = nonDeleteNode.safeUnwrap();
-        if (optNode.none) {
-            this._touchedFilepaths.add(path);
-            return;
-        }
-        optNode.safeValue().metadata.firestoreTime = Some(Date.now());
-        this._touchedFileNodes.add(optNode.safeValue());
-    }
-
-    /** Handle the removal of a file. */
-    private handleRemoval(path: string) {
-        const nonDeleteNode = GetNonDeletedByFilePath(this._mapOfFileNodes, path);
-        if (nonDeleteNode.err) {
-            LogError(nonDeleteNode.val);
-            this._touchedFilepaths.add(path);
-            return;
-        }
-        const optNode = nonDeleteNode.safeUnwrap();
-        if (optNode.none) {
-            this._touchedFilepaths.add(path);
-            return;
-        }
-        optNode.safeValue().metadata.firestoreTime = Some(Date.now());
-        optNode.safeValue().data.deleted = true;
-    }
-
-    /** Handle the renaming of files. */
-    private handleRename(path: string, oldPath?: string) {
-        if (path === "") {
-            return;
-        }
-        if (oldPath === undefined) {
-            this._touchedFilepaths.add(path);
-            return;
-        }
-        const nonDeleteNode = GetNonDeletedByFilePath(this._mapOfFileNodes, oldPath);
-        if (nonDeleteNode.err) {
-            LogError(nonDeleteNode.val);
-            this._touchedFilepaths.add(oldPath);
-            this._touchedFilepaths.add(path);
-            return;
-        }
-        const optNode = nonDeleteNode.safeUnwrap();
-        if (optNode.none) {
-            this._touchedFilepaths.add(oldPath);
-            this._touchedFilepaths.add(path);
-            return;
-        }
-        const node = optNode.safeValue();
-        node.metadata.firestoreTime = Some(Date.now());
-        this._touchedFileNodes.add(optNode.safeValue());
-
-        const pathSplit = path.split("/");
-        const fileName = pathSplit.pop()!;
-        const [baseName, extension] = fileName.split(".") as [string, string | undefined];
-        node.data.baseName = baseName;
-        node.data.extension = extension ?? "";
-        node.data.fullPath = path;
     }
 
     /** Execute a filesyncer tick. */
@@ -347,13 +279,10 @@ export class FileSyncer {
         // First converge the file updates.
         const touchedFilePaths = this._touchedFilepaths;
         this._touchedFilepaths = new Set();
-        const touchedFileNode = this._touchedFileNodes;
-        this._touchedFileNodes = new Set();
         const mergeResult = await UpdateLocalFileMapWithLocalChanges(
             this._plugin.app,
             this._config,
             this._mapOfFileNodes,
-            touchedFileNode,
             touchedFilePaths
         );
         if (mergeResult.err) {
@@ -449,7 +378,6 @@ export class FileSyncer {
                 finalFiles.push(file);
             }
         }
-        console.log("finalFiles", finalFiles, "filteredLocalFiles", filteredLocalFiles);
         // ALso clean up local files.
 
         const resultOfMap = ConvertArrayOfNodesToMap(finalFiles);

@@ -2,6 +2,7 @@ import { Bytes } from "firebase/firestore";
 import { Ok, type Result } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
+import type { FilePathType } from "./file_node";
 import { CloudNodeFileRef, CloudNodeRaw, type CloudNode } from "./file_node";
 import type { FileMapOfNodes } from "./file_node_util";
 import { FlattenFileNodes } from "./file_node_util";
@@ -182,7 +183,7 @@ export async function GetCloudNodesFromCache(
         if (data.fileStorageRef !== null) {
             return new CloudNodeFileRef(
                 {
-                    fullPath: data.path,
+                    fullPath: data.path as FilePathType,
                     cTime: data.cTime,
                     mTime: data.mTime,
                     size: data.size,
@@ -208,7 +209,7 @@ export async function GetCloudNodesFromCache(
         }
         return new CloudNodeRaw(
             {
-                fullPath: data.path,
+                fullPath: data.path as FilePathType,
                 cTime: data.cTime,
                 mTime: data.mTime,
                 size: data.size,

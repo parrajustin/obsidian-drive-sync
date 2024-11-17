@@ -49,7 +49,7 @@ export class HistoryEntry extends LitElement {
     // Render the UI as a function of component state
     public override render() {
         if (this.historyEntry.historyNodes.length === 0) {
-            return html`<span>No historic nodes... "${this.historyEntry.fileId}"</span>`;
+            return html`<span>No historic nodes... "${this.historyEntry.filePath}"</span>`;
         }
         const icon = this._isOpen
             ? CreateIcon("Close", IconName.CIRCLE_CHEVRON_UP)
@@ -58,7 +58,7 @@ export class HistoryEntry extends LitElement {
             <div class="header-entry-header">
                 <div class="left-history-entry">
                     <span>${this.getLatestPath()}</span>
-                    <span>ID: ${this.historyEntry.fileId}</span>
+                    <span>File Path: ${this.historyEntry.filePath}</span>
                 </div>
                 <div
                     class="right-history-entry"

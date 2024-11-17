@@ -14,6 +14,7 @@ import { WrapPromise } from "../lib/wrap_promise";
 import { uuidv7 } from "../lib/uuid";
 import type { SyncerConfig } from "../settings/syncer_config_data";
 import { ShouldHaveFileId } from "./query_util";
+import type { FilePathType } from "./file_node";
 
 export const FILE_ID_FRONTMATTER_KEY = "File Id";
 
@@ -42,7 +43,7 @@ export async function GetFileUidFromFrontmatter(
     config: SyncerConfig,
     file: TFile
 ): Promise<Result<Option<string>, StatusError>> {
-    if (!ShouldHaveFileId(file.path, config)) {
+    if (!ShouldHaveFileId(file.path as FilePathType, config)) {
         return Ok(None);
     }
     return ReadFileIdWithoutCache(app, file);
@@ -58,7 +59,7 @@ export async function WriteUidToAllFilesIfNecessary(
     }
 
     for (const fileName in app.vault.fileMap) {
-        if (!ShouldHaveFileId(fileName, config)) {
+        if (!ShouldHaveFileId(fileName as FilePathType, config)) {
             continue;
         }
         const entry = app.vault.fileMap[fileName]!;
@@ -93,7 +94,7 @@ export async function WriteUidToFile(
     if (!config.enableFileIdWriting) {
         return Ok();
     }
-    if (!ShouldHaveFileId(file.path, config)) {
+    if (!ShouldHaveFileId(file.path as FilePathType, config)) {
         return Ok();
     }
     const processFrontmatter = await WrapPromise(

@@ -2,9 +2,15 @@ import type { TFile } from "obsidian";
 import type { Some } from "../lib/option";
 import { None, type Option } from "../lib/option";
 
+export interface Tag<T> {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    __special_tag_type: T;
+}
+export type FilePathType = string & Tag<"FilePath">;
+
 export interface FileData {
     // Full filepath.
-    fullPath: string;
+    fullPath: FilePathType;
     // The file creation time.
     cTime: number;
     // The file modification time.
@@ -262,7 +268,7 @@ export class LocalNodeObsidian extends BaseMutableFileNode {
     public static constructFromTFile(
         vaultName: string,
         syncerConfigId: string,
-        fullPath: string,
+        fullPath: FilePathType,
         file: TFile,
         fileId: Option<string>,
         fileHash: string
