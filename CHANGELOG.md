@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.2.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.1.1...v2.2.0) (2024-11-17)
+
+
+### Features
+
+* **file:** Changed files to be file centric instead of file id ([77bb3f9](https://github.com/parrajustin/obsidian-drive-sync/commit/77bb3f9cc3fae8637c8f2d8ab27d80798e7abd6f))
+
+
+### Bug Fixes
+
+* cleanup removal of local cache types ([560b1a8](https://github.com/parrajustin/obsidian-drive-sync/commit/560b1a86c26f23ba9e3ee8c41a8e97c2cd310d24))
+* Fix an issue with deleting cloud using local not marked ([9567273](https://github.com/parrajustin/obsidian-drive-sync/commit/9567273b4278e66d46a05ca298725ea2da7fcdb3))
+* fix file syncing pattern for files ([4daf125](https://github.com/parrajustin/obsidian-drive-sync/commit/4daf12567320be552c5292e83d5e2ff1ab02b038))
+* **history:** Remove entryTime from history queries ([068227b](https://github.com/parrajustin/obsidian-drive-sync/commit/068227b3a4794a3fffbda9080d0bdf033e04f0fa))
+* remove local caches when there is the firestore cache ([8283e68](https://github.com/parrajustin/obsidian-drive-sync/commit/8283e685d85483145d5f8233d5aedecaf8b6be30))
+
 ## [2.1.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.1.0...v2.1.1) (2024-11-12)
 
 
