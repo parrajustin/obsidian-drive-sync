@@ -8,7 +8,6 @@ import { SearchStringFuzzySearch } from "./ui/querySuggest";
 import { GetAllFileNodes } from "./sync/file_node_util";
 import { LogError } from "./log";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare const SYNCBUNDLEVERSION: string;
 
 export interface FolderTemplate {
@@ -18,7 +17,7 @@ export interface FolderTemplate {
 
 function CreateAllFileConfig(): SyncerConfig {
     return {
-        version: "v4",
+        version: "v5",
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
@@ -32,13 +31,14 @@ function CreateAllFileConfig(): SyncerConfig {
         maxUpdatePerSyncer: 50,
         storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
         nestedRootPath: "",
-        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null }
+        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
+        sharedSettings: { pathToFolder: "" }
     };
 }
 
 function CreateDefaultSyncConfig(): SyncerConfig {
     return {
-        version: "v4",
+        version: "v5",
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
@@ -52,14 +52,15 @@ function CreateDefaultSyncConfig(): SyncerConfig {
         maxUpdatePerSyncer: 50,
         storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
         nestedRootPath: "",
-        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null }
+        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
+        sharedSettings: { pathToFolder: "" }
     };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
     clientId: uuidv7(),
     syncers: [],
-    version: "v5"
+    version: "v6"
 };
 
 /** The firebase sync settings. */

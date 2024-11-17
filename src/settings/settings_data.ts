@@ -2,12 +2,14 @@ import type {
     SyncerConfigV1,
     SyncerConfigV2,
     SyncerConfigV3,
-    SyncerConfigV4
+    SyncerConfigV4,
+    SyncerConfigV5
 } from "./syncer_config_data";
 import {
     UpdateSchemaV1ToV2 as UpdateSyncerSchemaV1ToV2,
     UpdateSchemaV2ToV3 as UpdateSyncerSchemaV2ToV3,
-    UpdateSchemaV3ToV4 as UpdateSyncerSchemaV3ToV4
+    UpdateSchemaV3ToV4 as UpdateSyncerSchemaV3ToV4,
+    UpdateSchemaV4ToV5 as UpdateSyncerSchemaV4ToV5
 } from "./syncer_config_data";
 
 export interface SettingSchemaV1 {
@@ -47,12 +49,20 @@ export interface SettingSchemaV5 extends Omit<SettingSchemaV4, "version" | "sync
     syncers: SyncerConfigV4[];
 }
 
+/** Syncer support for shared syncers. */
+export interface SettingSchemaV6 extends Omit<SettingSchemaV4, "version" | "syncers"> {
+    version: "v6";
+    /** Individual syncer configs. */
+    syncers: SyncerConfigV5[];
+}
+
 export type AllSettingSchemas =
     | SettingSchemaV2
     | SettingSchemaV3
     | SettingSchemaV4
-    | SettingSchemaV5;
-export type Settings = SettingSchemaV5;
+    | SettingSchemaV5
+    | SettingSchemaV6;
+export type Settings = SettingSchemaV6;
 
 /** Updates v1 setting schema to v2. */
 export function UpdateSchemaV1ToV2(v1Schema: SettingSchemaV1): SettingSchemaV2 {
@@ -86,6 +96,14 @@ export function UpdateSchemaV4ToV5(prevSchema: SettingSchemaV4): SettingSchemaV5
     };
 }
 
+export function UpdateSchemaV5ToV6(prevSchema: SettingSchemaV5): SettingSchemaV6 {
+    return {
+        ...prevSchema,
+        version: "v6",
+        syncers: prevSchema.syncers.map(UpdateSyncerSchemaV4ToV5)
+    };
+}
+
 /** Updates setting schema getting the most up to date version. */
 export function UpdateSettingsSchema(settings: AllSettingSchemas | SettingSchemaV1): Settings {
     if (!Object.keys(settings).contains("version")) {
@@ -100,6 +118,8 @@ export function UpdateSettingsSchema(settings: AllSettingSchemas | SettingSchema
         case "v4":
             return UpdateSettingsSchema(UpdateSchemaV4ToV5(restOfSchema));
         case "v5":
+            return UpdateSettingsSchema(UpdateSchemaV5ToV6(restOfSchema));
+        case "v6":
     }
     return restOfSchema;
 }
