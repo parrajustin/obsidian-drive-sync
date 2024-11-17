@@ -316,9 +316,7 @@ export class FileSyncer {
 
         // Only do a set number of updates per cycle.
         const limitUpdates = filteredUpdates.slice(0, this._config.maxUpdatePerSyncer);
-        // console.log("allFlatFiles", allFlatFiles);
         console.log("limitUpdates", limitUpdates);
-        // return Err(InternalError("IDK"));
 
         // Build the operations necessary to sync.
         const buildConvergenceOperations = this._firebaseSyncer
