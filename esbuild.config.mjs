@@ -67,7 +67,7 @@ const context = await esbuild
         outdir: "dist",
         metafile: prod,
         define: {
-            SYNCBUNDLEVERSION: `"${version}"`
+            SYNCBUNDLEVERSION: `"${prod ? version: "vDev"}"`
         }
     });
 

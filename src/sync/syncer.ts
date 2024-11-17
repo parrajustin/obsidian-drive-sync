@@ -153,6 +153,9 @@ export class FileSyncer {
                 firebaseSyncer.initailizeRealTimeUpdates();
 
                 view.setSyncerStatus(this._config.syncerId, "running first tick");
+                if (this._config.type !== RootSyncType.ROOT_SYNCER) {
+                    return Err(UnimplementedError(`Type "${this._config.type}" not implemented`));
+                }
                 // Start the file syncer repeating tick.
                 await this.fileSyncerTick();
 

@@ -7,6 +7,7 @@ import { uuidv7 } from "./lib/uuid";
 import { SearchStringFuzzySearch } from "./ui/querySuggest";
 import { GetAllFileNodes } from "./sync/file_node_util";
 import { LogError } from "./log";
+import { FolderFuzzySearch } from "./ui/folderFuzzySearch";
 
 declare const SYNCBUNDLEVERSION: string;
 
@@ -245,19 +246,58 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     .addDropdown((cb) => {
                         cb.addOption(RootSyncType.ROOT_SYNCER, "Root")
                             .addOption(RootSyncType.FOLDER_TO_ROOT, "Nested")
+                            .addOption(RootSyncType.SHARED, "Shared")
                             .setValue(elem.type)
                             .onChange((value: RootSyncType) => {
                                 elem.type = value;
+                                resetList();
                             });
                     });
-                new Setting(liContainer)
-                    .setName("Vault Name")
-                    .setDesc("Syncing remote devices is done through vault name.")
-                    .addText((cb) => {
-                        cb.setValue(elem.vaultName).onChange((val) => {
-                            elem.vaultName = val;
+                if (elem.type === RootSyncType.SHARED) {
+                    if (!elem.vaultName.startsWith("___SHAREDSYNCER___")) {
+                        elem.vaultName = `___SHAREDSYNCER___-${uuidv7()}`;
+                    }
+                    // eslint-disable-next-line @typescript-eslint/no-empty-function
+                    let sharedFolderText: (data: string) => void = () => {};
+                    new Setting(liContainer)
+                        .setName("Shared Folder")
+                        .setDesc("The folder to put the shared files into.")
+                        .addText((cb) => {
+                            cb.disabled = true;
+                            cb.setValue(elem.sharedSettings.pathToFolder);
+                            sharedFolderText = (data: string) => {
+                                cb.setValue(data);
+                                elem.sharedSettings.pathToFolder = data;
+                            };
+                        });
+                    new Setting(liContainer).setName("Select Shared Folder").addButton((cb) => {
+                        cb.setIcon("pencil").onClick(() => {
+                            const searchStringChecker = new FolderFuzzySearch(
+                                this.app,
+                                this.app.vault.getAllFolders(/*includeRoot=*/ true),
+                                (str) => {
+                                    if (str === "/") {
+                                        str = "";
+                                    }
+                                    elem.rawFileSyncQuery = str;
+                                    sharedFolderText(str);
+                                },
+                                elem.sharedSettings.pathToFolder
+                            );
+                            searchStringChecker.open();
                         });
                     });
+                } else {
+                    new Setting(liContainer)
+                        .setName("Vault Name")
+                        .setDesc("Syncing remote devices is done through vault name.")
+                        .addText((cb) => {
+                            cb.setValue(elem.vaultName).onChange((val) => {
+                                elem.vaultName = val;
+                            });
+                        });
+                }
+
                 new Setting(liContainer)
                     .setName("Nested Vault Path")
                     .setDesc("(only valid for nested type) The nested vault's start path.")
