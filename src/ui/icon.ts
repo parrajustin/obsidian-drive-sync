@@ -1,5 +1,6 @@
 export enum IconName {
     FOLDER_SYNC = "folder-sync",
+    FILE_QUESTION = "file-question",
     CLOUD_DOWNLOAD = "cloud-download",
     TRASH_2 = "trash-2",
     HARD_DRIVE_UPLOAD = "hard-drive-upload",
@@ -12,7 +13,7 @@ export enum IconName {
     EYE = "eye"
 }
 
-export function CreateIcon(hoverToolTip: string, iconName: IconName) {
+export function CreateIcon(hoverToolTip: string, iconName: IconName): HTMLSpanElement {
     const iconSpan = createSpan({
         cls: "progress-icons",
         attr: {
@@ -25,6 +26,9 @@ export function CreateIcon(hoverToolTip: string, iconName: IconName) {
         }
     });
     switch (iconName) {
+        case IconName.FILE_QUESTION:
+            iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-question"><path d="M12 17h.01"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3"/></svg>`;
+            break;
         case IconName.FOLDER_SYNC:
             iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder-sync"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v.5"/><path d="M12 10v4h4"/><path d="m12 14 1.535-1.605a5 5 0 0 1 8 1.5"/><path d="M22 22v-4h-4"/><path d="m22 18-1.535 1.605a5 5 0 0 1-8-1.5"/></svg>`;
             break;

@@ -186,8 +186,10 @@ export async function UpdateLocalFileMapWithLocalChanges(
                     } else if (origNode.some && newNode.none) {
                         // Couldn't get new file information, maybe the file is gone? just marked the file node deleted.
                         origNode.safeValue().data.deleted = true;
+                        origNode.safeValue().metadata.firestoreTime = Some(Date.now());
                     } else if (origNode.none && newNode.some) {
                         // Only found the new file.
+                        newNode.safeValue().metadata.firestoreTime = Some(Date.now());
                         filesByFilePath.set(path, newNode.safeValue());
                     } else if (
                         origNode.some &&
@@ -196,6 +198,7 @@ export async function UpdateLocalFileMapWithLocalChanges(
                     ) {
                         // Just update the node's data.
                         origNode.safeValue().data = newNode.safeValue().data;
+                        origNode.safeValue().metadata.firestoreTime = Some(Date.now());
                     }
                     return Ok();
                 }

@@ -29,8 +29,7 @@ import { GetFileSchemaConverter } from "./firestore_schema";
 import type { UserCredential } from "firebase/auth";
 import type { SyncProgressView } from "../progressView";
 import { GetOrCreateSyncProgressView } from "../progressView";
-import type { FileMapOfNodes } from "./file_node_util";
-import { GetLocalFileNode, GetNonDeletedByFilePath } from "./file_node_util";
+import { GetLocalFileNode } from "./file_node_util";
 import { DeleteFile, ReadFile, WriteFile } from "./file_util";
 import type { SyncerConfig } from "../settings/syncer_config_data";
 import type {
@@ -417,8 +416,7 @@ export function CreateOperationsToUpdateLocal(
 export async function CleanUpLeftOverLocalFiles(
     app: App,
     syncConfig: SyncerConfig,
-    updates: ConvergenceUpdate[],
-    localFileNodes: FileMapOfNodes<LocalNode>
+    updates: ConvergenceUpdate[]
 ): Promise<StatusResult<StatusError>> {
     for (const update of updates) {
         if (
@@ -433,41 +431,12 @@ export async function CleanUpLeftOverLocalFiles(
         if (possibleLocalFile.none) {
             continue;
         }
-
-        // Check to make sure nothing else used that local file path.
-        const realLocalFileResult = GetNonDeletedByFilePath(
-            localFileNodes,
-            possibleLocalFile.safeValue()
-        );
-        if (realLocalFileResult.err) {
-            return realLocalFileResult;
-        }
-
-        // check if the option has a value.
-        const fileOption = realLocalFileResult.safeUnwrap();
-        if (fileOption.none) {
-            // Another file is using the directory
-            continue;
-        }
-
-        const getFileResult = await GetLocalFileNode(
-            app,
-            syncConfig,
-            possibleLocalFile.safeValue() as FilePathType
-        );
-        if (getFileResult.err) {
-            return getFileResult;
-        }
-        const getFileOpt = getFileResult.safeUnwrap();
-        if (getFileOpt.none) {
-            // No file found just continue.
-            continue;
-        }
+        console.log("need to clean up", possibleLocalFile);
 
         const deleteFileResult = await DeleteFile(
             app,
-            possibleLocalFile.safeValue() as FilePathType,
-            getFileOpt.safeValue()
+            syncConfig,
+            possibleLocalFile.safeValue() as FilePathType
         );
         if (deleteFileResult.err && deleteFileResult.val.errorCode !== ErrorCode.NOT_FOUND) {
             // We let the not found error move on as if the file is somehow missing we don't care.

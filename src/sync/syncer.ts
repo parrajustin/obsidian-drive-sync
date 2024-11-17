@@ -390,8 +390,7 @@ export class FileSyncer {
         const cleanUpResult = await CleanUpLeftOverLocalFiles(
             this._plugin.app,
             this._config,
-            limitUpdates,
-            this._mapOfFileNodes
+            limitUpdates
         );
         if (cleanUpResult.err) {
             return cleanUpResult;

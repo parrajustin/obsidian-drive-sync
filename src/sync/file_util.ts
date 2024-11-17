@@ -62,15 +62,19 @@ export async function WriteFile(
 /** Deletes the raw file at `filePath`, works for any file. */
 export async function DeleteFile(
     app: App,
-    filePath: FilePathType,
-    node: LocalNode
+    syncConfig: SyncerConfig,
+    filePath: FilePathType
 ): Promise<StatusResult<StatusError>> {
-    switch (node.type) {
-        case "LOCAL_RAW":
-            return DeleteRawFile(app, filePath);
-        case "LOCAL_OBSIDIAN_FILE":
-            return DeleteObsidianFile(app, filePath);
+    if (!IsAcceptablePath(filePath, syncConfig)) {
+        return Err(InvalidArgumentError(`Path "${filePath}" outside acceptable paths.`));
     }
+    if (IsObsidianFile(filePath, syncConfig)) {
+        return DeleteObsidianFile(app, filePath);
+    }
+    if (IsLocalFileRaw(filePath, syncConfig)) {
+        return DeleteRawFile(app, filePath);
+    }
+    return Err(InvalidArgumentError(`Path "${filePath}" not raw or obsidian path.`));
 }
 
 /** QUery firestore to get a document. */
