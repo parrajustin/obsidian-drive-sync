@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-firebase-sync",
 	"name": "Firebase Sync",
-	"version": "v2.2.0",
+	"version": "v2.3.1",
 	"description": "Syncing of obsidian files using Firebase",
 	"minAppVersion": "1.5.0",
 	"author": "Justin Parra",
