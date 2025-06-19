@@ -17,6 +17,19 @@ jest.mock(
     },
     { virtual: true }
 );
+jest.mock(
+    "window",
+    () => {
+        return {
+            app: {
+                vault: {
+                    getName: () => "test_name"
+                }
+            }
+        };
+    },
+    { virtual: true }
+);
 
 describe("Firebase Cache", () => {
     test("test cache creation and retrieval", async () => {

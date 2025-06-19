@@ -20,8 +20,13 @@ export type AnyVerionSettingsConfig = Version0SettingsConfig;
 
 export type LatestSettingsConfigVersion = Version0SettingsConfig;
 
-export const SETTINGS_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SettingsConfig], 0>([], {
-    clientId: uuidv7(),
-    syncers: [],
-    version: 0
-});
+export const SETTINGS_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SettingsConfig], 0>(
+    [],
+    () => {
+        return {
+            clientId: uuidv7(),
+            syncers: [],
+            version: 0
+        };
+    }
+);

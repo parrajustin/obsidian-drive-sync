@@ -17,6 +17,19 @@ jest.mock(
     },
     { virtual: true }
 );
+jest.mock(
+    "window",
+    () => {
+        return {
+            app: {
+                vault: {
+                    getName: () => "test_name"
+                }
+            }
+        };
+    },
+    { virtual: true }
+);
 
 describe("ConvergeMapsToUpdateStates", () => {
     test("Returns null updates for same node without id.", () => {

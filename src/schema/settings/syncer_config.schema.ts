@@ -53,21 +53,23 @@ export type AnyVerionSyncConfig = Version0SyncConfig;
 
 export type LatestSyncConfigVersion = Version0SyncConfig;
 
-export const SYNCER_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SyncConfig], 0>([], {
-    type: RootSyncType.ROOT_SYNCER,
-    syncerId: uuidv7(),
-    dataStorageEncrypted: false,
-    syncQuery: "*",
-    rawFileSyncQuery: "f:^.obsidian.*.(json)$ -f:.*obsidian-firebase-sync/data.json",
-    obsidianFileSyncQuery: "-f:^.obsidian",
-    enableFileIdWriting: false,
-    fileIdFileQuery: "-f:template -f:templator",
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    vaultName: ((window as any).app as App).vault.getName(),
-    maxUpdatePerSyncer: 50,
-    storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
-    nestedRootPath: "",
-    storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
-    sharedSettings: { pathToFolder: "" },
-    version: 0
+export const SYNCER_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SyncConfig], 0>([], () => {
+    return {
+        type: RootSyncType.ROOT_SYNCER,
+        syncerId: uuidv7(),
+        dataStorageEncrypted: false,
+        syncQuery: "*",
+        rawFileSyncQuery: "f:^.obsidian.*.(json)$ -f:.*obsidian-firebase-sync/data.json",
+        obsidianFileSyncQuery: "-f:^.obsidian",
+        enableFileIdWriting: false,
+        fileIdFileQuery: "-f:template -f:templator",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+        vaultName: ((window as any).app as App).vault.getName(),
+        maxUpdatePerSyncer: 50,
+        storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
+        nestedRootPath: "",
+        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
+        sharedSettings: { pathToFolder: "" },
+        version: 0
+    };
 });

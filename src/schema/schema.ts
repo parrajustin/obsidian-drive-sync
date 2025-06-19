@@ -56,7 +56,7 @@ type AnyValueInTuple<T extends readonly unknown[]> = T[number];
 export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersion extends number> {
     constructor(
         private _converters: GetConverters<Schemas>,
-        private _default: Schemas[0]
+        private _default: () => Schemas[0]
     ) {}
 
     public loadData<T extends VersionedSchema<unknown, unknown>>(
@@ -81,7 +81,7 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
      * @returns latest schema version
      */
     public getDefault(): Schemas[MaxVersion] {
-        return this.loadDataInternal(this._default, 0);
+        return this.loadDataInternal(this._default(), 0);
     }
 
     private loadDataInternal(

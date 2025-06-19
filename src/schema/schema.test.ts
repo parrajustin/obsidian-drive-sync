@@ -26,7 +26,9 @@ const MANAGER = new SchemaManager<[Version0, Version1, Version2], 2>(
             };
         }
     ],
-    { name: "default", otherData: "lol", temp: 0 }
+    () => {
+        return { name: "default", otherData: "lol", temp: 0, version: 0 };
+    }
 );
 
 describe("SchemaManager", () => {
