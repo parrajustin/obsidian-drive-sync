@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.3.1...v2.4.0) (2025-06-19)
+
+
+### Features
+
+* Add more identifiers to the build ([e862202](https://github.com/parrajustin/obsidian-drive-sync/commit/e862202ef3d39cee92a74f1f65d5bf12d4041435))
+
 ## [2.3.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.3.0...v2.3.1) (2025-06-19)
 
 
