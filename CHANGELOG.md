@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.3.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.2.0...v2.3.0) (2025-06-19)
+
+
+### Features
+
+* Add inital schema update util ([db1ff6a](https://github.com/parrajustin/obsidian-drive-sync/commit/db1ff6afca7c542e2fa435abbc776695d31f8a39))
+* **shared_syncer:** adding ability to select a folder from settings ([4052587](https://github.com/parrajustin/obsidian-drive-sync/commit/4052587f96d8c727f4b716e8fba07fd1705cbe10))
+
+
+### Bug Fixes
+
+* **shared_syncer:** Added the shared syncer type config ([dcab164](https://github.com/parrajustin/obsidian-drive-sync/commit/dcab1643dd9d6f2fcb5b3e94e8dba3ebf9b59941))
+* small code cleanup ([38f8491](https://github.com/parrajustin/obsidian-drive-sync/commit/38f84912c6fc94add85bc5457f2fae61750bb87c))
+
 ## [2.2.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.1.1...v2.2.0) (2024-11-17)
 
 
