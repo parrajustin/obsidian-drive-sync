@@ -1,6 +1,6 @@
 {
     "name": "obsidian-drive-sync",
-    "version": "2.3.0",
+    "version": "2.3.1",
     "description": "Syncing of obsidian files using Google drive",
     "main": "main.js",
     "type": "module",
