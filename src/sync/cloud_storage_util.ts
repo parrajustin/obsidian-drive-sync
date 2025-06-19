@@ -10,13 +10,13 @@ import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import { ReadFile } from "./file_util";
-import type { SyncerConfig } from "../settings/syncer_config_data";
 import type { FilePathType, LocalNode } from "./file_node";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 
 /** uploads a file to storage using a resumable upload task. Returns storage ref path. */
 export async function UploadFileToStorage(
     app: App,
-    syncConfig: SyncerConfig,
+    syncConfig: LatestSyncConfigVersion,
     filePath: FilePathType,
     userCreds: UserCredential,
     fileId: string,

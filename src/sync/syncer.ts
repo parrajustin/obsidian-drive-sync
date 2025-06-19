@@ -19,7 +19,7 @@ import { Err, Ok } from "../lib/result";
 import { FirebaseSyncer } from "./firebase_syncer";
 import type { UserCredential } from "firebase/auth";
 import type { FirebaseApp } from "firebase/app";
-import { GetOrCreateSyncProgressView } from "../progressView";
+import { GetOrCreateSyncProgressView } from "../sidepanel/progressView";
 import { LogError } from "../log";
 import { CleanUpLeftOverLocalFiles } from "./syncer_update_util";
 import type { UnsubFunc } from "../watcher";
@@ -28,8 +28,9 @@ import type { FilePathType, LocalNode } from "./file_node";
 import type { ConvergenceUpdate, NullUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { uuidv7 } from "../lib/uuid";
-import { RootSyncType, type SyncerConfig } from "../settings/syncer_config_data";
 import { FirebaseHistory } from "../history/firebase_hist";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
+import { RootSyncType } from "../schema/settings/syncer_config.schema";
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
 export class FileSyncer {
@@ -49,14 +50,14 @@ export class FileSyncer {
     private constructor(
         private _plugin: FirestoreSyncPlugin,
         private _firebaseApp: FirebaseApp,
-        private _config: SyncerConfig,
+        private _config: LatestSyncConfigVersion,
         private _mapOfFileNodes: FileMapOfNodes<LocalNode>
     ) {}
 
     /** Constructs the file syncer. */
     public static async constructFileSyncer(
         plugin: FirestoreSyncPlugin,
-        config: SyncerConfig
+        config: LatestSyncConfigVersion
     ): Promise<Result<FileSyncer, StatusError>> {
         const view = await GetOrCreateSyncProgressView(plugin.app, /*reveal=*/ false);
         view.setSyncerStatus(config.syncerId, "Waiting for layout...");

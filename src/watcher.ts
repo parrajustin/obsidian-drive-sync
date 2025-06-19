@@ -1,3 +1,5 @@
+// A util to add file event watchers to the obisidan underlying code.
+
 import type { App } from "obsidian";
 import type { HandlerFunc } from "./types";
 

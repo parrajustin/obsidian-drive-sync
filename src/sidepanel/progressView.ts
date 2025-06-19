@@ -1,13 +1,13 @@
 import type { App, WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
-import { ConvergenceAction } from "./sync/converge_file_models";
-import { None, Some, type Option } from "./lib/option";
-import { ErrorCode, type StatusError } from "./lib/status_error";
-import type { SyncerConfig } from "./settings/syncer_config_data";
-import type { FirebaseHistory } from "./history/firebase_hist";
-import type FirestoreSyncPlugin from "./main";
-import type { FilePathType } from "./sync/file_node";
-import { CreateIcon, IconName } from "./ui/icon";
+import { ConvergenceAction } from "../sync/converge_file_models";
+import { None, Some, type Option } from "../lib/option";
+import { ErrorCode, type StatusError } from "../lib/status_error";
+import type { FirebaseHistory } from "../history/firebase_hist";
+import type FirestoreSyncPlugin from "../main";
+import type { FilePathType } from "../sync/file_node";
+import { CreateIcon, IconName } from "../ui/icon";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
 const MAX_NUMBER_OF_CYCLES = 50;
@@ -65,7 +65,7 @@ export class SyncProgressView extends ItemView {
     /** The header element. */
     private _headerElement: HTMLHeadingElement;
     private _syncerDiv: HTMLDivElement;
-    private _syncerConfigs: SyncerConfig[] = [];
+    private _syncerConfigs: LatestSyncConfigVersion[] = [];
     /** Statuses of individal syncers. */
     private _syncerStatuses = new Map<string, HTMLSpanElement>();
     /** Reference to the firebase history elements. */
@@ -116,14 +116,14 @@ export class SyncProgressView extends ItemView {
     }
 
     /** Set all the syncer configs to setup the view. */
-    public setSyncers(configs: SyncerConfig[]) {
+    public setSyncers(configs: LatestSyncConfigVersion[]) {
         this._syncerConfigs = configs;
         this.updateProgressView();
         this.renderSyncers();
     }
 
     /** Sets the syncer history for a specific id. */
-    public setSyncerHistory(config: SyncerConfig, history: FirebaseHistory) {
+    public setSyncerHistory(config: LatestSyncConfigVersion, history: FirebaseHistory) {
         this._syncerHistory.set(config.syncerId, history);
         const containerEl = this._syncerHistBtn.get(config.syncerId);
         if (containerEl !== undefined) {

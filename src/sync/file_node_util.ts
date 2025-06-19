@@ -9,12 +9,12 @@ import { WrapPromise } from "../lib/wrap_promise";
 import type { LocalNode, AllFileNodeTypes, ImmutableBaseFileNode, FilePathType } from "./file_node";
 import { LocalNodeObsidian, LocalNodeRaw } from "./file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
-import type { SyncerConfig } from "../settings/syncer_config_data";
 import { Bytes } from "firebase/firestore";
 import GetSha256Hash from "../lib/sha";
 import { ReadObsidianFile } from "./file_util_obsidian_api";
 import { ReadRawFile } from "./file_util_raw_api";
 import { AsyncForEach, CombineResults } from "../util";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 
 /** Flat array of all nodes to a single file path. */
 export class FileNodeArray<TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes> {
@@ -29,7 +29,7 @@ export type FileMapOfNodes<TypeOfData extends ImmutableBaseFileNode = AllFileNod
 /** Gets the obsidian file node. */
 export async function GetObsidianNode(
     app: App,
-    config: SyncerConfig,
+    config: LatestSyncConfigVersion,
     fileName: FilePathType
 ): Promise<Result<Option<LocalNodeObsidian>, StatusError>> {
     const file = app.vault.fileMap[fileName]!;
@@ -63,7 +63,7 @@ export async function GetObsidianNode(
 /** Gets the raw file ndoe. */
 export async function GetRawNode(
     app: App,
-    config: SyncerConfig,
+    config: LatestSyncConfigVersion,
     fileName: FilePathType
 ): Promise<Result<Option<LocalNodeRaw>, StatusError>> {
     const fileStat = await WrapPromise(
@@ -116,7 +116,7 @@ export async function GetRawNode(
     return Ok(Some(node));
 }
 
-export function IsFilePathValid(config: SyncerConfig, fullPath: FilePathType) {
+export function IsFilePathValid(config: LatestSyncConfigVersion, fullPath: FilePathType) {
     return (
         IsAcceptablePath(fullPath, config) &&
         (IsLocalFileRaw(fullPath, config) || IsObsidianFile(fullPath, config))
@@ -126,7 +126,7 @@ export function IsFilePathValid(config: SyncerConfig, fullPath: FilePathType) {
 /** Get the local file node if any. */
 export async function GetLocalFileNode(
     app: App,
-    config: SyncerConfig,
+    config: LatestSyncConfigVersion,
     fullPath: FilePathType
 ): Promise<Result<Option<LocalNode>, StatusError>> {
     if (IsAcceptablePath(fullPath, config) && IsLocalFileRaw(fullPath, config)) {
@@ -149,7 +149,7 @@ export async function GetLocalFileNode(
  */
 export async function UpdateLocalFileMapWithLocalChanges(
     app: App,
-    config: SyncerConfig,
+    config: LatestSyncConfigVersion,
     fileMap: FileMapOfNodes<LocalNode>,
     changedPath: Set<FilePathType>
 ): Promise<Result<FileMapOfNodes<LocalNode>, StatusError>> {
@@ -216,7 +216,7 @@ export async function UpdateLocalFileMapWithLocalChanges(
 
 /** Filters file nodes to make sure they should be kept. */
 export function FilterFileNodes<TypeOfData extends ImmutableBaseFileNode = AllFileNodeTypes>(
-    config: SyncerConfig,
+    config: LatestSyncConfigVersion,
     nodes: TypeOfData[]
 ): TypeOfData[] {
     return nodes.filter(
@@ -229,7 +229,7 @@ export function FilterFileNodes<TypeOfData extends ImmutableBaseFileNode = AllFi
 /** Gets all the file nodes from the filesystem. */
 export async function GetAllFileNodes(
     app: App,
-    config: SyncerConfig
+    config: LatestSyncConfigVersion
 ): Promise<Result<LocalNode[], StatusError>> {
     const files: LocalNode[] = [];
 
@@ -362,7 +362,7 @@ export function ConvertArrayOfNodesToMap<
 /** Get the map of nodes or files. Use to keep track of file changes. */
 export async function GetFileMapOfNodes(
     app: App,
-    config: SyncerConfig
+    config: LatestSyncConfigVersion
 ): Promise<Result<FileMapOfNodes<LocalNode>, StatusError>> {
     const fileNodesResult = await GetAllFileNodes(app, config);
     if (fileNodesResult.err) {

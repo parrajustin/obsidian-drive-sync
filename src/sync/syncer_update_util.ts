@@ -27,11 +27,10 @@ import { ConvergenceAction } from "./converge_file_models";
 import type { FileDbModel } from "./firestore_schema";
 import { GetFileSchemaConverter } from "./firestore_schema";
 import type { UserCredential } from "firebase/auth";
-import type { SyncProgressView } from "../progressView";
-import { GetOrCreateSyncProgressView } from "../progressView";
+import type { SyncProgressView } from "../sidepanel/progressView";
+import { GetOrCreateSyncProgressView } from "../sidepanel/progressView";
 import { GetLocalFileNode } from "./file_node_util";
 import { DeleteFile, ReadFile, WriteFile } from "./file_util";
-import type { SyncerConfig } from "../settings/syncer_config_data";
 import type {
     CloudNode,
     FilePathType,
@@ -43,6 +42,7 @@ import { LocalNodeObsidian, LocalNodeRaw, UploadFileNode } from "./file_node";
 import { CloudNodeFileRef, CloudNodeRaw } from "./file_node";
 import { MarkFirestoreAsDeleted, UploadFileToFirestore } from "./firestore_util";
 import { GetFileCollectionPath } from "../firestore/file_db_util";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
@@ -74,7 +74,7 @@ export function CreateOperationsToUpdateCloud(
     db: Firestore,
     localUpdates: (LocalConvergenceUpdate | LocalDeleteCloudConvergenceUpdate)[],
     app: App,
-    syncConfig: SyncerConfig,
+    syncConfig: LatestSyncConfigVersion,
     creds: UserCredential
 ): Promise<StatusResult<StatusError>>[] {
     const localOperations = AsyncForEach(
@@ -243,7 +243,7 @@ async function DownloadCloudUpdate(
     db: Firestore,
     ids: Identifiers,
     app: App,
-    syncConfig: SyncerConfig,
+    syncConfig: LatestSyncConfigVersion,
     update: CloudConvergenceUpdate,
     view: SyncProgressView,
     filePath: FilePathType,
@@ -359,7 +359,7 @@ export function CreateOperationsToUpdateLocal(
     ids: Identifiers,
     cloudUpdates: (CloudConvergenceUpdate | CloudDeleteLocalConvergenceUpdate)[],
     app: App,
-    syncConfig: SyncerConfig,
+    syncConfig: LatestSyncConfigVersion,
     creds: UserCredential
 ): Promise<StatusResult<StatusError>>[] {
     const ops = AsyncForEach(cloudUpdates, async (update): Promise<StatusResult<StatusError>> => {
@@ -415,7 +415,7 @@ export function CreateOperationsToUpdateLocal(
  */
 export async function CleanUpLeftOverLocalFiles(
     app: App,
-    syncConfig: SyncerConfig,
+    syncConfig: LatestSyncConfigVersion,
     updates: ConvergenceUpdate[]
 ): Promise<StatusResult<StatusError>> {
     for (const update of updates) {

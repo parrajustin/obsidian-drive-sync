@@ -12,9 +12,9 @@ import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import { uuidv7 } from "../lib/uuid";
-import type { SyncerConfig } from "../settings/syncer_config_data";
 import { ShouldHaveFileId } from "./query_util";
 import type { FilePathType } from "./file_node";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 
 export const FILE_ID_FRONTMATTER_KEY = "File Id";
 
@@ -40,7 +40,7 @@ async function ReadFileIdWithoutCache(
 /** Get the file uid from frontmatter. */
 export async function GetFileUidFromFrontmatter(
     app: App,
-    config: SyncerConfig,
+    config: LatestSyncConfigVersion,
     file: TFile
 ): Promise<Result<Option<string>, StatusError>> {
     if (!ShouldHaveFileId(file.path as FilePathType, config)) {
@@ -52,7 +52,7 @@ export async function GetFileUidFromFrontmatter(
 /** Writes the file uid to all files that don't have one. */
 export async function WriteUidToAllFilesIfNecessary(
     app: App,
-    config: SyncerConfig
+    config: LatestSyncConfigVersion
 ): Promise<StatusResult<StatusError>> {
     if (!config.enableFileIdWriting) {
         return Ok();
@@ -86,7 +86,7 @@ export async function WriteUidToAllFilesIfNecessary(
 /** Write the uid to the file. If no supported frontmatter returns Ok(). */
 export async function WriteUidToFile(
     app: App,
-    config: SyncerConfig,
+    config: LatestSyncConfigVersion,
     file: TFile,
     uid: string,
     dataWriteOptions?: DataWriteOptions

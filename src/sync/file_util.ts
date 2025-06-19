@@ -26,7 +26,7 @@ import { GetFileCollectionPath } from "../firestore/file_db_util";
 import { GetFileSchemaConverter } from "./firestore_schema";
 import { HistoricFileNode } from "../history/history_file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
-import type { SyncerConfig } from "../settings/syncer_config_data";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 
 /** Reads a file through the raw apis. */
 export async function ReadFile(
@@ -47,7 +47,7 @@ export async function WriteFile(
     app: App,
     filePath: FilePathType,
     data: Uint8Array,
-    syncConfig: SyncerConfig,
+    syncConfig: LatestSyncConfigVersion,
     opts?: DataWriteOptions
 ): Promise<StatusResult<StatusError>> {
     if (IsAcceptablePath(filePath, syncConfig) && IsObsidianFile(filePath, syncConfig)) {
@@ -62,7 +62,7 @@ export async function WriteFile(
 /** Deletes the raw file at `filePath`, works for any file. */
 export async function DeleteFile(
     app: App,
-    syncConfig: SyncerConfig,
+    syncConfig: LatestSyncConfigVersion,
     filePath: FilePathType
 ): Promise<StatusResult<StatusError>> {
     if (!IsAcceptablePath(filePath, syncConfig)) {

@@ -4,8 +4,7 @@ import type { FirebaseApp } from "firebase/app";
 import { initializeApp } from "firebase/app";
 import type { Option } from "./lib/option";
 import { None, Some } from "./lib/option";
-import { UpdateSettingsSchema, type Settings } from "./settings/settings_data";
-import { DEFAULT_SETTINGS, FirebaseSyncSettingTab } from "./settings";
+import { FirebaseSyncSettingTab } from "./settings/settings";
 import type { UserCredential, Auth } from "firebase/auth";
 import {
     signInWithEmailAndPassword,
@@ -22,17 +21,23 @@ import { WrapPromise } from "./lib/wrap_promise";
 import { LogError } from "./log";
 import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
-import { GetOrCreateSyncProgressView, PROGRESS_VIEW_TYPE, SyncProgressView } from "./progressView";
+import {
+    GetOrCreateSyncProgressView,
+    PROGRESS_VIEW_TYPE,
+    SyncProgressView
+} from "./sidepanel/progressView";
 import { SetFileSchemaConverter } from "./sync/firestore_schema";
 import { SetHistorySchemaConverter } from "./history/history_schema";
 import { HISTORY_VIEW_TYPE, HistoryProgressView } from "./history/history_view";
+import type { LatestSettingsConfigVersion } from "./schema/settings/settings_config.schema";
+import { SETTINGS_CONFIG_SCHEMA_MANAGER } from "./schema/settings/settings_config.schema";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
     public firebaseApp: Option<FirebaseApp> = None;
     public userCreds: Option<UserCredential> = None;
     public auth: Option<Auth> = None;
-    public settings: Settings;
+    public settings: LatestSettingsConfigVersion;
     public loggedIn: Promise<UserCredential>;
     public loggedInResolve: (user: UserCredential) => void;
     /** Root file syncers. */
@@ -42,7 +47,7 @@ export default class FirestoreSyncPlugin extends Plugin {
 
     constructor(app: App, manifest: PluginManifest) {
         super(app, manifest);
-        this.settings = DEFAULT_SETTINGS;
+        this.settings = SETTINGS_CONFIG_SCHEMA_MANAGER.getDefault();
         const { promise, resolve } = CreateExternallyResolvablePromise<UserCredential>();
         this.loggedIn = promise;
         this.loggedInResolve = resolve;
@@ -99,9 +104,8 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     public async loadSettings(): Promise<void> {
-        this.settings = UpdateSettingsSchema(
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-            Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
+        this.settings = SETTINGS_CONFIG_SCHEMA_MANAGER.loadData(
+            Object.assign({}, SETTINGS_CONFIG_SCHEMA_MANAGER.getDefault(), await this.loadData())
         );
         this.startupSyncers();
     }

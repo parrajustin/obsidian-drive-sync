@@ -35,10 +35,10 @@ import type { App } from "obsidian";
 import type { Identifiers } from "./syncer_update_util";
 import { CreateOperationsToUpdateCloud, CreateOperationsToUpdateLocal } from "./syncer_update_util";
 import { LogError } from "../log";
-import type { SyncerConfig } from "../settings/syncer_config_data";
 import { GetFileCollectionPath } from "../firestore/file_db_util";
 import { GetFirestore } from "../firestore/get_firestore";
 import type { FileSyncer } from "./syncer";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 
 function ForEachSnapshot(
     snapshot: QuerySnapshot<FirestoreNodes, FileDataDbModelV1>,
@@ -71,7 +71,7 @@ export class FirebaseSyncer {
 
     private constructor(
         private _syncer: FileSyncer,
-        private _config: SyncerConfig,
+        private _config: LatestSyncConfigVersion,
         private _creds: UserCredential,
         private _db: Firestore,
         private _cloudNodes: FileMapOfNodes<CloudNode>
@@ -81,7 +81,7 @@ export class FirebaseSyncer {
     public static async buildFirebaseSyncer(
         syncer: FileSyncer,
         firebaseApp: FirebaseApp,
-        config: SyncerConfig,
+        config: LatestSyncConfigVersion,
         creds: UserCredential
     ): Promise<Result<FirebaseSyncer, StatusError>> {
         const db = GetFirestore(firebaseApp);
@@ -249,7 +249,7 @@ export class FirebaseSyncer {
     public resolveConvergenceUpdates(
         ids: Identifiers,
         app: App,
-        syncConfig: SyncerConfig,
+        syncConfig: LatestSyncConfigVersion,
         updates: Exclude<ConvergenceUpdate, NullUpdate>[]
     ): Result<Promise<StatusResult<StatusError>>[], StatusError> {
         if (!this._isValid) {

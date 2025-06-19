@@ -1,13 +1,21 @@
 import type { App } from "obsidian";
 import { PluginSettingTab, Setting } from "obsidian";
 import type TemplaterPlugin from "main";
-import { RootSyncType, type SyncerConfig } from "settings/syncer_config_data";
-import type { Settings } from "settings/settings_data";
-import { uuidv7 } from "./lib/uuid";
-import { SearchStringFuzzySearch } from "./ui/querySuggest";
-import { GetAllFileNodes } from "./sync/file_node_util";
-import { LogError } from "./log";
-import { FolderFuzzySearch } from "./ui/folderFuzzySearch";
+import { uuidv7 } from "../lib/uuid";
+import { SearchStringFuzzySearch } from "../ui/querySuggest";
+import { GetAllFileNodes } from "../sync/file_node_util";
+import { LogError } from "../log";
+import { FolderFuzzySearch } from "../ui/folderFuzzySearch";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
+import {
+    RootSyncType,
+    SYNCER_CONFIG_SCHEMA_MANAGER
+} from "../schema/settings/syncer_config.schema";
+import {
+    SETTINGS_CONFIG_SCHEMA_MANAGER,
+    type LatestSettingsConfigVersion
+} from "../schema/settings/settings_config.schema";
+import { SHARED_ENTRIES_FIREBASE_DB_NAME } from "../constants";
 
 declare const SYNCBUNDLEVERSION: string;
 
@@ -16,9 +24,9 @@ export interface FolderTemplate {
     template: string;
 }
 
-function CreateAllFileConfig(): SyncerConfig {
+function CreateAllFileConfig(): LatestSyncConfigVersion {
     return {
-        version: "v5",
+        version: 0,
         type: RootSyncType.ROOT_SYNCER,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
@@ -37,36 +45,13 @@ function CreateAllFileConfig(): SyncerConfig {
     };
 }
 
-function CreateDefaultSyncConfig(): SyncerConfig {
-    return {
-        version: "v5",
-        type: RootSyncType.ROOT_SYNCER,
-        syncerId: uuidv7(),
-        dataStorageEncrypted: false,
-        syncQuery: "*",
-        rawFileSyncQuery: "f:^.obsidian.*.(json)$ -f:.*obsidian-firebase-sync/data.json",
-        obsidianFileSyncQuery: "-f:^.obsidian",
-        enableFileIdWriting: false,
-        fileIdFileQuery: "-f:template -f:templator",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-        vaultName: ((window as any).app as App).vault.getName(),
-        maxUpdatePerSyncer: 50,
-        storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
-        nestedRootPath: "",
-        storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
-        sharedSettings: { pathToFolder: "" }
-    };
+function CreateDefaultSyncConfig(): LatestSyncConfigVersion {
+    return SYNCER_CONFIG_SCHEMA_MANAGER.getDefault();
 }
-
-export const DEFAULT_SETTINGS: Settings = {
-    clientId: uuidv7(),
-    syncers: [],
-    version: "v6"
-};
 
 /** The firebase sync settings. */
 export class FirebaseSyncSettingTab extends PluginSettingTab {
-    private _settings: Settings;
+    private _settings: LatestSettingsConfigVersion;
 
     constructor(
         app: App,
@@ -101,7 +86,9 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
         heading.innerText = "Reset Settings";
         new Setting(this.containerEl).setName("click to reset settings").addButton((cb) => {
             cb.setIcon("list-restart").onClick(() => {
-                this._plugin.settings = structuredClone(DEFAULT_SETTINGS);
+                this._plugin.settings = structuredClone(
+                    SETTINGS_CONFIG_SCHEMA_MANAGER.getDefault()
+                );
                 this.display();
             });
         });
@@ -221,7 +208,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
             syncerSettingsList.innerHTML = "";
 
             const ulContainer = syncerSettingsList.createEl("ul");
-            const createElement = (elem: SyncerConfig) => {
+            const createElement = (elem: LatestSyncConfigVersion) => {
                 const liContainer = ulContainer.createEl("li");
 
                 new Setting(liContainer).setName("Remove Syncer").addButton((cb) => {
@@ -246,7 +233,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     .addDropdown((cb) => {
                         cb.addOption(RootSyncType.ROOT_SYNCER, "Root")
                             .addOption(RootSyncType.FOLDER_TO_ROOT, "Nested")
-                            .addOption(RootSyncType.SHARED, "Shared")
+                            .addOption(RootSyncType.SHARED, SHARED_ENTRIES_FIREBASE_DB_NAME)
                             .setValue(elem.type)
                             .onChange((value: RootSyncType) => {
                                 elem.type = value;

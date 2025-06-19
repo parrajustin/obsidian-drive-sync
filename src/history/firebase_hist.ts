@@ -10,7 +10,6 @@ import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import type FirestoreSyncPlugin from "../main";
-import type { SyncerConfig } from "../settings/syncer_config_data";
 import type { FilePathType, LocalNode } from "../sync/file_node";
 import { LogError } from "../log";
 import { ConvertToUnknownError } from "../util";
@@ -22,6 +21,8 @@ import { debounce } from "remeda";
 import type { HistoricFileNode } from "./history_file_node";
 import { ConvertHistoricNodesToCache } from "./history_cache";
 import { GetFirestore } from "../firestore/get_firestore";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
+import { HISTORY_CHANGES_FIREBASE_DB_NAME } from "../constants";
 
 const MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT = 20;
 
@@ -29,11 +30,11 @@ const MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT = 20;
 async function GetHistoryData(
     db: Firestore,
     creds: UserCredential,
-    config: SyncerConfig
+    config: LatestSyncConfigVersion
 ): Promise<Result<Map<string, HistoricFileNode>, StatusError>> {
     // Get the file metadata from firestore.
     const queryOfFiles = query(
-        collection(db, "hist"),
+        collection(db, HISTORY_CHANGES_FIREBASE_DB_NAME),
         where("file.userId", "==", creds.user.uid),
         where("file.vaultName", "==", config.vaultName)
     ).withConverter(GetHistorySchemaConverter());
@@ -73,7 +74,7 @@ export class FirebaseHistory {
 
     private constructor(
         private _plugin: FirestoreSyncPlugin,
-        private _config: SyncerConfig,
+        private _config: LatestSyncConfigVersion,
         public creds: UserCredential,
         public db: Firestore,
         private _historicChanges: Map<string, HistoricFileNode>,
@@ -86,7 +87,7 @@ export class FirebaseHistory {
     public static async buildFirebaseHistory(
         plugin: FirestoreSyncPlugin,
         firebaseApp: FirebaseApp,
-        config: SyncerConfig,
+        config: LatestSyncConfigVersion,
         creds: UserCredential,
         mapOfNodes: FileMapOfNodes<LocalNode>
     ): Promise<Result<FirebaseHistory, StatusError>> {
@@ -131,7 +132,7 @@ export class FirebaseHistory {
     /** Initializes the real time subscription on firestore data. */
     public initailizeRealTimeUpdates() {
         const queryOfFiles = query(
-            collection(this.db, "hist"),
+            collection(this.db, HISTORY_CHANGES_FIREBASE_DB_NAME),
             where("file.userId", "==", this.creds.user.uid),
             where("file.vaultName", "==", this._config.vaultName)
         ).withConverter(GetHistorySchemaConverter());
@@ -271,7 +272,9 @@ export class FirebaseHistory {
             }
             // Delete old changes.
             for (const deleteEntry of changes.slice(MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT)) {
-                batcher.delete(doc(this.db, "hist", deleteEntry.extra.historyDocId));
+                batcher.delete(
+                    doc(this.db, HISTORY_CHANGES_FIREBASE_DB_NAME, deleteEntry.extra.historyDocId)
+                );
             }
         }
         if (hasChange) {

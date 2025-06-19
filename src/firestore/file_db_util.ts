@@ -1,4 +1,5 @@
 import type { UserCredential } from "firebase/auth";
+import { NOTES_MARKDOWN_FIREBASE_DB_NAME } from "../constants";
 
 /** Gets the file collection root path. */
 export function GetFileCollectionPath(_creds: UserCredential): string {
@@ -10,5 +11,5 @@ export function GetFileCollectionPath(_creds: UserCredential): string {
     // if (creds.user.uid === "lgppj2II6sYqwcLxCvjfIJLCS8Q2") {
     //     return "lgppj2II6sYqwcLxCvjfIJLCS8Q2";
     // }
-    return "file";
+    return NOTES_MARKDOWN_FIREBASE_DB_NAME;
 }
