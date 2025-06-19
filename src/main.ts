@@ -31,6 +31,7 @@ import { SetHistorySchemaConverter } from "./history/history_schema";
 import { HISTORY_VIEW_TYPE, HistoryProgressView } from "./history/history_view";
 import type { LatestSettingsConfigVersion } from "./schema/settings/settings_config.schema";
 import { SETTINGS_CONFIG_SCHEMA_MANAGER } from "./schema/settings/settings_config.schema";
+import { InitializeOpenObserve } from "./open_observe/init";
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -156,6 +157,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         this.userCreds = Some(creds);
         SetFileSchemaConverter(this, creds);
         SetHistorySchemaConverter(this, creds);
+        InitializeOpenObserve(creds, this.settings.clientId, this.settings.email!);
         this.loggedInResolve(creds);
         return loginResult;
     }

@@ -15,9 +15,8 @@ import {
     SETTINGS_CONFIG_SCHEMA_MANAGER,
     type LatestSettingsConfigVersion
 } from "../schema/settings/settings_config.schema";
-import { SHARED_ENTRIES_FIREBASE_DB_NAME } from "../constants";
+import { PLUGIN_VERSION, SHARED_ENTRIES_FIREBASE_DB_NAME } from "../constants";
 
-declare const SYNCBUNDLEVERSION: string;
 
 export interface FolderTemplate {
     folder: string;
@@ -99,7 +98,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
         heading.innerText = "Sync Plugin";
         const version = this.containerEl.createSpan();
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        version.innerText = `Version: ${SYNCBUNDLEVERSION ?? "unknown"}`;
+        version.innerText = `Version: ${PLUGIN_VERSION ?? "unknown"}`;
     }
 
     /** Add the device identifier. */
