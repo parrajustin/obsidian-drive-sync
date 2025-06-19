@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.3.0...v2.3.1) (2025-06-19)
+
+
+### Bug Fixes
+
+* Fix broken tests and default schema behavior ([ccb13a5](https://github.com/parrajustin/obsidian-drive-sync/commit/ccb13a502a30ecbfcf7be0704a9ca3c24346db39))
+
 ## [2.3.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.2.0...v2.3.0) (2025-06-19)
 
 
