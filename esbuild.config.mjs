@@ -1,6 +1,8 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { config } from "dotenv";
+config();
 
 import path from "path";
 import {writeFile, readFile} from "fs/promises";
@@ -12,6 +14,8 @@ if you want to view the source, please visit the github repository of this plugi
 `;
 
 const version = process.env.SYNCBUNDLEVERSION ?? "v???";
+const lokiClientId = process.env.LOKIACCESSCLIENTID ?? "";
+const lokiClientSecret = process.env.LOKIACCESSCLIENTSECRET ?? "";
 const prod = process.argv[2] === "production";
 const test_build = process.argv[2] === "test" || process.argv[3] === "test";
 
@@ -33,6 +37,7 @@ const context = await esbuild
         entryPoints: [entry_point],
         bundle: true,
         external: [
+            "snappy",
             "obsidian",
             "electron",
             "@codemirror/autocomplete",
@@ -68,7 +73,9 @@ const context = await esbuild
         metafile: prod,
         define: {
             SYNCBUNDLEVERSION: `"${prod ? version : `${process.env.npm_package_version}-dev`}"`,
-            SYNCBUNDLEENV: `"${prod ? "production" : "development"}"`
+            SYNCBUNDLEENV: `"${prod ? "production" : "development"}"`,
+            LOKIACCESSCLIENTID: `"${lokiClientId}"`,
+            LOKIACCESSCLIENTSECRET: `"${lokiClientSecret}"`
         }
     });
 

@@ -20,7 +20,7 @@ import { FirebaseSyncer } from "./firebase_syncer";
 import type { UserCredential } from "firebase/auth";
 import type { FirebaseApp } from "firebase/app";
 import { GetOrCreateSyncProgressView } from "../sidepanel/progressView";
-import { LogError } from "../log";
+import { LogError } from "../logging/log";
 import { CleanUpLeftOverLocalFiles } from "./syncer_update_util";
 import type { UnsubFunc } from "../watcher";
 import { AddWatchHandler } from "../watcher";

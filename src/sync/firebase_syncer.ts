@@ -34,7 +34,7 @@ import { ConvergeMapsToUpdateStates, ConvergenceAction } from "./converge_file_m
 import type { App } from "obsidian";
 import type { Identifiers } from "./syncer_update_util";
 import { CreateOperationsToUpdateCloud, CreateOperationsToUpdateLocal } from "./syncer_update_util";
-import { LogError } from "../log";
+import { LogError } from "../logging/log";
 import { GetFileCollectionPath } from "../firestore/file_db_util";
 import { GetFirestore } from "../firestore/get_firestore";
 import type { FileSyncer } from "./syncer";

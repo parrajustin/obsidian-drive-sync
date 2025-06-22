@@ -2,7 +2,7 @@ import type { App, FuzzyMatch, TFolder } from "obsidian";
 import { FuzzySuggestModal } from "obsidian";
 import { SearchString } from "../lib/search_string_parser";
 import { GetQueryString } from "../sync/query_util";
-import { LogError } from "../log";
+import { LogError } from "../logging/log";
 import { ConvertToUnknownError } from "../util";
 
 export class FolderFuzzySearch extends FuzzySuggestModal<TFolder> {

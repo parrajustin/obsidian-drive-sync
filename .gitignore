@@ -58,3 +58,6 @@ coverage
 
 # dist fodler
 dist/**/*
+
+# Ignore env file
+.env

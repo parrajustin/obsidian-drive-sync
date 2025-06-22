@@ -70,7 +70,7 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
         if (versionOpt.none) {
             return this.getDefault();
         }
-        if (versionOpt.safeValue() < 0 || versionOpt.safeValue() >= this._converters.length - 1) {
+        if (versionOpt.safeValue() < 0 || versionOpt.safeValue() > this._converters.length) {
             return this.getDefault();
         }
         return this.loadDataInternal(data, versionOpt.safeValue());

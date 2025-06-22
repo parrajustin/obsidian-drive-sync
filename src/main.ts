@@ -18,7 +18,7 @@ import { InternalError, InvalidArgumentError } from "./lib/status_error";
 import type { Result, StatusResult } from "./lib/result";
 import { Err, Ok } from "./lib/result";
 import { WrapPromise } from "./lib/wrap_promise";
-import { LogError } from "./log";
+import { LogError } from "./logging/log";
 import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
 import {
@@ -31,7 +31,9 @@ import { SetHistorySchemaConverter } from "./history/history_schema";
 import { HISTORY_VIEW_TYPE, HistoryProgressView } from "./history/history_view";
 import type { LatestSettingsConfigVersion } from "./schema/settings/settings_config.schema";
 import { SETTINGS_CONFIG_SCHEMA_MANAGER } from "./schema/settings/settings_config.schema";
-import { InitializeOpenObserve } from "./open_observe/init";
+import { CreateLogger } from "./logging/logger";
+
+const LOGGER = CreateLogger("main");
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -98,6 +100,7 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     public async saveSettings(startupSyncer = true): Promise<void> {
+        console.log("saveSettings", this.settings);
         await this.saveData(this.settings);
         if (startupSyncer) {
             this.startupSyncers();
@@ -105,9 +108,15 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     public async loadSettings(): Promise<void> {
-        this.settings = SETTINGS_CONFIG_SCHEMA_MANAGER.loadData(
-            Object.assign({}, SETTINGS_CONFIG_SCHEMA_MANAGER.getDefault(), await this.loadData())
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const dataFromObsidian = Object.assign(
+            {},
+            SETTINGS_CONFIG_SCHEMA_MANAGER.getDefault(),
+            await this.loadData()
         );
+        console.log("dataFromObsidian", dataFromObsidian);
+        this.settings = SETTINGS_CONFIG_SCHEMA_MANAGER.loadData(dataFromObsidian);
+        console.log("this.settings", this.settings);
         this.startupSyncers();
     }
 
@@ -155,9 +164,10 @@ export default class FirestoreSyncPlugin extends Plugin {
 
         const creds = loginResult.safeUnwrap();
         this.userCreds = Some(creds);
+        LOGGER.info(`${email} logged in!`, { uid: creds.user.uid, email });
+
         SetFileSchemaConverter(this, creds);
         SetHistorySchemaConverter(this, creds);
-        InitializeOpenObserve(creds, this.settings.clientId, this.settings.email!);
         this.loggedInResolve(creds);
         return loginResult;
     }
@@ -174,9 +184,8 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     public killSyncer(syncerId: string) {
-        console.log("Killing syncer 2");
+        LOGGER.debug("killing syncer", { syncerId });
         for (const syncer of this._syncers) {
-            console.log("Killing syncer 3", syncer.getId());
             if (syncer.getId() === syncerId) {
                 syncer.teardown();
             }

@@ -1,5 +1,12 @@
 import { Notice } from "obsidian";
-import { StatusError } from "./lib/status_error";
+import { StatusError } from "../lib/status_error";
+// import {
+//     LOKI_ACCESS_CLIENT_ID,
+//     LOKI_ACCESS_CLIENT_SECRET,
+//     LOKI_URL,
+//     PLUGIN_ENVIRONMENT,
+//     PLUGIN_VERSION
+// } from "../constants";
 
 export function LogUpdate(msg: string): void {
     const notice = new Notice(msg, 15000);

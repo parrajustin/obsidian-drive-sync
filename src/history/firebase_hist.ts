@@ -11,7 +11,7 @@ import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import type FirestoreSyncPlugin from "../main";
 import type { FilePathType, LocalNode } from "../sync/file_node";
-import { LogError } from "../log";
+import { LogError } from "../logging/log";
 import { ConvertToUnknownError } from "../util";
 import type { HistoryProgressView } from "./history_view";
 import { GetOrCreateHistoryProgressView } from "./history_view";

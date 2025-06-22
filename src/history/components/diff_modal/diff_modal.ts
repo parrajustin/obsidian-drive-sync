@@ -5,7 +5,7 @@ import { ReadFileNode } from "../../../sync/file_util";
 import type { Firestore } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
 import { DiffMatchPatch } from "../../../lib/diff_merge_patch";
-import { LogError } from "../../../log";
+import { LogError } from "../../../logging/log";
 import { None, Some, type Option } from "../../../lib/option";
 import type { HistoricFileNode } from "../../history_file_node";
 

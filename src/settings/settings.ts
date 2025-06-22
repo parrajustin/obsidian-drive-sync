@@ -4,7 +4,7 @@ import type TemplaterPlugin from "main";
 import { uuidv7 } from "../lib/uuid";
 import { SearchStringFuzzySearch } from "../ui/querySuggest";
 import { GetAllFileNodes } from "../sync/file_node_util";
-import { LogError } from "../log";
+import { LogError } from "../logging/log";
 import { FolderFuzzySearch } from "../ui/folderFuzzySearch";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import {
@@ -16,7 +16,9 @@ import {
     type LatestSettingsConfigVersion
 } from "../schema/settings/settings_config.schema";
 import { PLUGIN_VERSION, SHARED_ENTRIES_FIREBASE_DB_NAME } from "../constants";
+import { CreateLogger } from "../logging/logger";
 
+const LOGGER = CreateLogger("settings");
 
 export interface FolderTemplate {
     folder: string;
@@ -61,6 +63,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
     }
 
     public override display(): void {
+        LOGGER.debug("displaying settings");
         this._settings = structuredClone(this._plugin.settings);
         this.containerEl.empty();
 
@@ -72,6 +75,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
     }
 
     public override hide() {
+        this._logger.debug("hiding settings", { settings: this._settings });
         void (async () => {
             this._plugin.settings = this._settings;
             await this._plugin.saveSettings();

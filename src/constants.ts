@@ -1,3 +1,7 @@
+import { uuidv7 } from "./lib/uuid";
+
+export const SERVICE_NAME = "obsidian-sync";
+
 /**
  * The firebase db name holding the synced content of the markdown files.
  */
@@ -17,3 +21,16 @@ export const PLUGIN_VERSION = SYNCBUNDLEVERSION ?? "unknown";
 declare const SYNCBUNDLEENV: string | undefined;
 // The environment of the plugin, e.g. "production" or "development".
 export const PLUGIN_ENVIRONMENT = SYNCBUNDLEENV ?? "unknown";
+
+// The url of the Loki Instance.
+export const LOKI_URL = "https://loki.parrajustin.com/";
+// export const LOKI_URL = "http://192.168.0.49:9980/";
+declare const LOKIACCESSCLIENTID: string | undefined;
+// The loki service account access id.
+export const LOKI_ACCESS_CLIENT_ID = LOKIACCESSCLIENTID;
+declare const LOKIACCESSCLIENTSECRET: string | undefined;
+// The loki service account access secret.
+export const LOKI_ACCESS_CLIENT_SECRET = LOKIACCESSCLIENTSECRET;
+
+// Unique run id.
+export const RUN_ID = uuidv7();
