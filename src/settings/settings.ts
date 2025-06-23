@@ -17,6 +17,7 @@ import {
 } from "../schema/settings/settings_config.schema";
 import { PLUGIN_VERSION, SHARED_ENTRIES_FIREBASE_DB_NAME } from "../constants";
 import { CreateLogger } from "../logging/logger";
+import { Span } from "../logging/tracing/span.decorator";
 
 const LOGGER = CreateLogger("settings");
 
@@ -62,6 +63,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
         this._settings = structuredClone(this._plugin.settings);
     }
 
+    @Span()
     public override display(): void {
         LOGGER.debug("displaying settings");
         this._settings = structuredClone(this._plugin.settings);
@@ -74,6 +76,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
         this.versionEnd();
     }
 
+    @Span()
     public override hide() {
         LOGGER.debug("hiding settings", { settings: this._settings });
         void (async () => {

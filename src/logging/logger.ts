@@ -9,26 +9,23 @@ import {
     RUN_ID,
     SERVICE_NAME
 } from "../constants";
-import type { TransformableInfo } from "logform";
-import { Format, format } from "logform";
+import { format } from "logform";
 import type { Logger } from "winston";
 import { createLogger, transports } from "winston";
 import { THIS_APP } from "../main";
 
-class UserIdFormat extends Format {
-    public transform = (info: TransformableInfo): TransformableInfo => {
-        if (THIS_APP.none) {
-            return info;
-        }
-        info.uid = THIS_APP.safeValue()
-            .userCreds.map((v) => v.user.uid)
-            .valueOr(undefined);
-        info.email = THIS_APP.safeValue()
-            .userCreds.map((v) => v.user.email)
-            .valueOr(undefined);
+const USER_ID_FORMAT = format((info, _opts) => {
+    if (THIS_APP.none) {
         return info;
-    };
-}
+    }
+    info.uid = THIS_APP.safeValue()
+        .userCreds.map((v) => v.user.uid)
+        .valueOr(undefined);
+    info.email = THIS_APP.safeValue()
+        .userCreds.map((v) => v.user.email)
+        .valueOr(undefined);
+    return info;
+});
 
 export function CreateLogger(label: string): Logger {
     const transportStreams: TransportStream[] = [
@@ -43,7 +40,7 @@ export function CreateLogger(label: string): Logger {
                 scene: label
             },
             format: format.combine(
-                new UserIdFormat(),
+                USER_ID_FORMAT(),
                 format.label({ label }),
                 format.timestamp(),
                 format.json()
@@ -65,7 +62,7 @@ export function CreateLogger(label: string): Logger {
             new transports.Console({
                 level: "debug",
                 format: format.combine(
-                    new UserIdFormat(),
+                    USER_ID_FORMAT(),
                     format.label({ label }),
                     format.timestamp(),
                     format.prettyPrint()
@@ -77,7 +74,7 @@ export function CreateLogger(label: string): Logger {
     return createLogger({
         level: "info",
         format: format.combine(
-            new UserIdFormat(),
+            USER_ID_FORMAT(),
             format.label({ label }),
             format.timestamp(),
             format.prettyPrint()

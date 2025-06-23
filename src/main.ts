@@ -33,6 +33,7 @@ import type { LatestSettingsConfigVersion } from "./schema/settings/settings_con
 import { SETTINGS_CONFIG_SCHEMA_MANAGER } from "./schema/settings/settings_config.schema";
 import { CreateLogger } from "./logging/logger";
 import "disposablestack/auto";
+import { Span } from "./logging/tracing/span.decorator";
 
 const LOGGER = CreateLogger("main");
 
@@ -60,6 +61,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         THIS_APP = Some(this);
     }
 
+    @Span()
     public override async onload(): Promise<void> {
         // Register the sync progress view.
         this.registerView(HISTORY_VIEW_TYPE, (leaf) => new HistoryProgressView(leaf));
@@ -97,12 +99,14 @@ export default class FirestoreSyncPlugin extends Plugin {
         this.addSettingTab(new FirebaseSyncSettingTab(this.app, this));
     }
 
+    @Span()
     public override onunload() {
         void (async () => {
             await this.teardownSyncers();
         })();
     }
 
+    @Span()
     public async saveSettings(startupSyncer = true): Promise<void> {
         LOGGER.debug("saving settings", { settings: this.settings, startupSyncer });
         await this.saveData(this.settings);
@@ -111,6 +115,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         }
     }
 
+    @Span()
     public async loadSettings(): Promise<void> {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const dataFromObsidian = Object.assign(
@@ -125,6 +130,7 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     /** Attempts to login from the settings tab. */
+    @Span()
     public async loginForSettings(): Promise<StatusResult<StatusError>> {
         if (this.userCreds.some) {
             return Ok();
@@ -142,6 +148,7 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     /** Login to firebase. */
+    @Span()
     public async login(
         email?: string,
         password?: string
@@ -177,6 +184,7 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     /** Attempts to login to the firebase infra. */
+    @Span()
     public async tryLogin(): Promise<Result<Option<UserCredential>, StatusError>> {
         if (this.settings.email === undefined || this.settings.password === undefined) {
             return Ok(None);
@@ -187,6 +195,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         );
     }
 
+    @Span()
     public killSyncer(syncerId: string) {
         LOGGER.debug("killing syncer", { syncerId });
         for (const syncer of this._syncers) {
@@ -196,6 +205,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         }
     }
 
+    @Span()
     private async teardownSyncers(): Promise<void> {
         for (const syncer of this._syncers) {
             syncer.teardown();
@@ -208,6 +218,7 @@ export default class FirestoreSyncPlugin extends Plugin {
     /**
      * Sets up all the syncers based on their configs. Will shutdown them all if any have an error.
      */
+    @Span()
     private startupSyncers() {
         if (this._loadingSyncers) {
             return;
