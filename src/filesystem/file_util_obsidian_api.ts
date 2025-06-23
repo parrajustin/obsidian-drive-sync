@@ -9,7 +9,10 @@ import { Err, Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { InternalError, InvalidArgumentError, NotFoundError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
-import { ConvertToUnknownError } from "../util";
+import { CreateLogger } from "../logging/logger";
+import { InjectMeta } from "../lib/inject_status_msg";
+
+const LOGGER = CreateLogger("file_util_obsidian_api");
 
 /** Reads a file through the obsidian apis. Only works for files in a vault. No dot "." folders. */
 export async function ReadObsidianFile(
@@ -20,18 +23,28 @@ export async function ReadObsidianFile(
     const file = app.vault.getAbstractFileByPath(filePath);
     if (file === null) {
         // No file found.
-        return Err(NotFoundError(`Could not find file to read "${filePath}"`));
+        return Err(
+            NotFoundError(`Could not find file to read "${filePath}"`).with(
+                InjectMeta({ filePath })
+            )
+        );
     }
     if (!(file instanceof TFile)) {
-        return Err(InvalidArgumentError(`Path leads to a non file type "${filePath}"`));
+        return Err(
+            InvalidArgumentError(`Path leads to a non file type "${filePath}"`).with(
+                InjectMeta({ filePath })
+            )
+        );
     }
     const readDataResult = await WrapPromise(
         app.vault.readBinary(file),
         /*textForUnknown=*/ `Failed to read binary string`
     );
     if (readDataResult.err) {
-        return readDataResult.mapErr(ConvertToUnknownError(`Failed to read binary string`));
+        readDataResult.val.with(InjectMeta({ filePath }));
+        return readDataResult;
     }
+    LOGGER.debug("Read obsidian file", { filePath });
     return Ok(new Uint8Array(readDataResult.safeUnwrap()));
 }
 
@@ -43,6 +56,11 @@ export async function WriteToObsidianFile(
     opts?: DataWriteOptions
 ): Promise<StatusResult<StatusError>> {
     const file = app.vault.getAbstractFileByPath(filePath);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+    const arryBufferData: ArrayBuffer = data.buffer.slice(
+        data.byteOffset,
+        data.byteLength + data.byteOffset
+    ) as ArrayBuffer;
     if (file === null) {
         // Create folders if we have to.
         const pathSplit = filePath.split("/");
@@ -53,29 +71,37 @@ export async function WriteToObsidianFile(
             /*textForUnknown=*/ `Failed to mkdir "${filePath}"`
         );
         if (mkdirs.err) {
+            mkdirs.val.with(InjectMeta({ filePath }));
             return mkdirs;
         }
         // Route if there is no file pre existing.
         const createResult = await WrapPromise(
-            app.vault.createBinary(filePath, data, opts),
+            app.vault.createBinary(filePath, arryBufferData, opts),
             /*textForUnknown=*/ `Failed to create file for "${filePath}"`
         );
         if (createResult.err) {
+            createResult.val.with(InjectMeta({ filePath }));
             return createResult;
         }
     } else if (file instanceof TFile) {
         // Route if there is an existing file.
         const modifyResult = await WrapPromise(
-            app.vault.modifyBinary(file, data, opts),
+            app.vault.modifyBinary(file, arryBufferData, opts),
             /*textForUnknown=*/ `Failed to modify file for "${filePath}"`
         );
         if (modifyResult.err) {
+            modifyResult.val.with(InjectMeta({ filePath }));
             return modifyResult;
         }
     } else {
         // Route if the path leads to a folder.
-        return Err(InternalError(`File "${filePath}" leads to a folder when file is expected!`));
+        return Err(
+            InternalError(`File "${filePath}" leads to a folder when file is expected!`).with(
+                InjectMeta({ filePath })
+            )
+        );
     }
+    LOGGER.debug("Wrote obsidian file", { filePath });
 
     return Ok();
 }
@@ -89,10 +115,18 @@ export async function DeleteObsidianFile(
     const file = app.vault.getAbstractFileByPath(filePath);
     if (file === null) {
         // No file found.
-        return Err(NotFoundError(`Could not find file to read "${filePath}"`));
+        return Err(
+            NotFoundError(`Could not find file to read "${filePath}"`).with(
+                InjectMeta({ filePath })
+            )
+        );
     }
     if (!(file instanceof TFile)) {
-        return Err(InvalidArgumentError(`Path leads to a non file type "${filePath}"`));
+        return Err(
+            InvalidArgumentError(`Path leads to a non file type "${filePath}"`).with(
+                InjectMeta({ filePath })
+            )
+        );
     }
 
     // Now sent the file to trash.
@@ -101,10 +135,10 @@ export async function DeleteObsidianFile(
         /*textForUnknown=*/ `Failed to send to trash local file ${filePath}`
     );
     if (trashResult.err) {
-        return trashResult.mapErr(
-            ConvertToUnknownError(`Failed to send to trash local file ${filePath}`)
-        );
+        trashResult.val.with(InjectMeta({ filePath }));
+        return trashResult;
     }
+    LOGGER.debug("Removed obsidian file", { filePath });
 
     return Ok();
 }

@@ -11,8 +11,8 @@ import { LocalNodeObsidian, LocalNodeRaw } from "./file_node";
 import { IsAcceptablePath, IsLocalFileRaw, IsObsidianFile } from "./query_util";
 import { Bytes } from "firebase/firestore";
 import GetSha256Hash from "../lib/sha";
-import { ReadObsidianFile } from "./file_util_obsidian_api";
-import { ReadRawFile } from "./file_util_raw_api";
+import { ReadObsidianFile } from "../filesystem/file_util_obsidian_api";
+import { ReadRawFile } from "../filesystem/file_util_raw_api";
 import { AsyncForEach, CombineResults } from "../util";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 

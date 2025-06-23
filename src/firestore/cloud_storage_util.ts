@@ -9,9 +9,13 @@ import type { Result } from "../lib/result";
 import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
-import { ReadFile } from "./file_util";
-import type { FilePathType, LocalNode } from "./file_node";
+import { ReadFile } from "../sync/file_util";
+import type { FilePathType, LocalNode } from "../sync/file_node";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
+import { CreateLogger } from "../logging/logger";
+import { InjectStatusMsg } from "../lib/inject_status_msg";
+
+const LOGGER = CreateLogger("firestore-storage");
 
 /** uploads a file to storage using a resumable upload task. Returns storage ref path. */
 export async function UploadFileToStorage(
@@ -27,6 +31,13 @@ export async function UploadFileToStorage(
     const storageRef = ref(storage, outputPath);
     const readResult = await ReadFile(app, filePath, node);
     if (readResult.err) {
+        readResult.val.with(
+            InjectStatusMsg("Failed to read local file.", {
+                vault: syncConfig.vaultName,
+                syncerId: syncConfig.syncerId,
+                filename: node.data.fullPath
+            })
+        );
         return readResult;
     }
 
@@ -35,8 +46,20 @@ export async function UploadFileToStorage(
         /*textForUnknown=*/ `Failed to upload cloud storage bytes for ${outputPath}`
     );
     if (uploadBytesResult.err) {
+        uploadBytesResult.val.with(
+            InjectStatusMsg("Failed to upload to storage.", {
+                vault: syncConfig.vaultName,
+                syncerId: syncConfig.syncerId,
+                filename: node.data.fullPath
+            })
+        );
         return uploadBytesResult;
     }
+    LOGGER.debug("Uploaded file to storage.", {
+        vault: syncConfig.vaultName,
+        syncerId: syncConfig.syncerId,
+        filename: node.data.fullPath
+    });
 
     return Ok(storageRef.fullPath);
 }
@@ -52,8 +75,16 @@ export async function DownloadFileFromStorage(
         /*textForUnknown=*/ `Failed to download cloud storage bytes for ${fileStorageRef}`
     );
     if (byteDataResult.err) {
+        byteDataResult.val.with(
+            InjectStatusMsg("Failed to upload to storage.", {
+                fileStorageRef
+            })
+        );
         return byteDataResult;
     }
+    LOGGER.debug("Success downloading from stroage.", {
+        fileStorageRef
+    });
 
     return Ok(byteDataResult.safeUnwrap());
 }

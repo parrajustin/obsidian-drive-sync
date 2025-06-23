@@ -15,7 +15,7 @@ import { ErrorCode, InternalError, UnknownError } from "../lib/status_error";
 import { uuidv7 } from "../lib/uuid";
 import { WrapPromise } from "../lib/wrap_promise";
 import { AsyncForEach } from "../util";
-import { DownloadFileFromStorage, UploadFileToStorage } from "./cloud_storage_util";
+import { DownloadFileFromStorage, UploadFileToStorage } from "../firestore/cloud_storage_util";
 import type {
     CloudConvergenceUpdate,
     CloudDeleteLocalConvergenceUpdate,

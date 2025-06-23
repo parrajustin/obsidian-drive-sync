@@ -1,9 +1,9 @@
 import { describe, expect, jest, test } from "@jest/globals";
-import { None, Some } from "../../src/lib/option";
-import { ConvertArrayOfNodesToMap } from "../../src/sync/file_node_util";
-import { ConvergeMapsToUpdateStates } from "../../src/sync/converge_file_models";
-import type { CloudNode, FilePathType, LocalNode } from "../../src/sync/file_node";
-import { CloudNodeRaw, LocalNodeObsidian, LocalNodeRaw } from "../../src/sync/file_node";
+import { None, Some } from "../lib/option";
+import { ConvertArrayOfNodesToMap } from "./file_node_util";
+import { ConvergeMapsToUpdateStates } from "./converge_file_models";
+import type { CloudNode, FilePathType, LocalNode } from "./file_node";
+import { CloudNodeRaw, LocalNodeObsidian, LocalNodeRaw } from "./file_node";
 
 jest.mock(
     "obsidian",
@@ -12,7 +12,9 @@ jest.mock(
             // eslint-disable-next-line @typescript-eslint/naming-convention
             __esModule: true,
             // eslint-disable-next-line @typescript-eslint/naming-convention
-            TFile: {}
+            TFile: {},
+            // eslint-disable-next-line @typescript-eslint/no-extraneous-class, @typescript-eslint/naming-convention, @typescript-eslint/no-shadow
+            FuzzySuggestModal: class test {}
         };
     },
     { virtual: true }
@@ -30,6 +32,20 @@ jest.mock(
     },
     { virtual: true }
 );
+jest.unstable_mockModule("../../src/logging/logger", () => {
+    return {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        CreateLogger: (_label: string) => {
+            return {};
+        }
+    };
+});
+jest.mock("../logging/logger", () => ({
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    CreateLogger: () => {
+        return {};
+    }
+}));
 
 describe("ConvergeMapsToUpdateStates", () => {
     test("Returns null updates for same node without id.", () => {

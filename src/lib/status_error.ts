@@ -64,6 +64,10 @@ export class StatusError {
         return this;
     }
 
+    public getPayload(): Map<string, unknown> {
+        return this._additionalData;
+    }
+
     public toString(): string {
         const data: string[] = [];
         for (const entry of this._additionalData.entries()) {

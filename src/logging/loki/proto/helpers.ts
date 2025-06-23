@@ -1,4 +1,4 @@
-import type { Batches, LogEntry } from "../batcher";
+import type { Batches } from "../batcher";
 
 // export function CreateProtoTimestamps(logEntry: LogEntry) {
 //     if (logEntry.entries.length > 0) {
@@ -15,10 +15,21 @@ import type { Batches, LogEntry } from "../batcher";
 //     return logEntry;
 // }
 export function PrepareJSONBatch(batch: Batches) {
-    const streams = batch.streams.map((logStream) => ({
-        stream: logStream.labels,
-        values: logStream.entries.map((entry) => [JSON.stringify(entry.ts), entry.line])
-    }));
+    const streams = batch.streams.map((logStream) => {
+        return {
+            stream: logStream.labels,
+            values: logStream.entries.map((entry) => {
+                if (
+                    entry.rest !== undefined &&
+                    entry.rest !== null &&
+                    typeof entry.rest === "object"
+                ) {
+                    return [JSON.stringify(entry.ts), entry.line, entry.rest];
+                }
+                return [JSON.stringify(entry.ts), entry.line];
+            })
+        };
+    });
     return { streams };
 }
 

@@ -2,7 +2,6 @@
 // const { logproto } = require('./proto')
 // const protoHelpers = require('./proto/helpers')
 
-import { log } from "console";
 import * as protoHelpers from "./proto/helpers";
 
 import type TransportStream from "winston-transport";
@@ -23,6 +22,7 @@ interface LokiTransportOptions extends TransportStream.TransportStreamOptions {
 
 interface LogEntryValue {
     ts?: number;
+    rest?: unknown;
     line: string;
 }
 
@@ -58,7 +58,6 @@ export class Batcher {
      * @memberof Batcher
      */
     constructor(public options: LokiTransportOptions) {
-        console.log("Batcher construct", options);
         // Construct Grafana Loki push API url
         this.url = `${this.options.host}loki/api/v1/push`;
 
@@ -152,7 +151,8 @@ export class Batcher {
         logEntry.entries = logEntry.entries.map((v) => {
             return {
                 ts: (v.ts ?? 0) * 1000 * 1000,
-                line: v.line
+                line: v.line,
+                rest: v.rest
             };
         });
         // if ((this.options.replaceTimestamp ?? false) || noTimestamp) {
@@ -233,7 +233,6 @@ export class Batcher {
                     // eslint-disable-next-line @typescript-eslint/naming-convention
                     "Content-Length": `${dataBuffer.length}`
                 };
-                console.log("Header", { ...defaultHeaders, ...this.options.headers });
                 fetch(this.url, {
                     body: reqBody,
                     method: "post",

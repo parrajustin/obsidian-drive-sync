@@ -79,7 +79,7 @@ export class LokiTransport extends Transport {
         });
 
         // Deconstruct the log
-        const { label, labels, timestamp, message, ...rest } = info;
+        const { label, labels, timestamp, message, metadataContext, ...rest } = info;
         const level = info[Symbol.for("level")];
 
         // build custom labels if provided
@@ -128,7 +128,8 @@ export class LokiTransport extends Transport {
             entries: [
                 {
                     ts,
-                    line
+                    line,
+                    rest: metadataContext
                 }
             ]
         };

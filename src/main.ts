@@ -32,8 +32,11 @@ import { HISTORY_VIEW_TYPE, HistoryProgressView } from "./history/history_view";
 import type { LatestSettingsConfigVersion } from "./schema/settings/settings_config.schema";
 import { SETTINGS_CONFIG_SCHEMA_MANAGER } from "./schema/settings/settings_config.schema";
 import { CreateLogger } from "./logging/logger";
+import "disposablestack/auto";
 
 const LOGGER = CreateLogger("main");
+
+export let THIS_APP: Option<FirestoreSyncPlugin> = None;
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -54,6 +57,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         const { promise, resolve } = CreateExternallyResolvablePromise<UserCredential>();
         this.loggedIn = promise;
         this.loggedInResolve = resolve;
+        THIS_APP = Some(this);
     }
 
     public override async onload(): Promise<void> {
@@ -100,7 +104,7 @@ export default class FirestoreSyncPlugin extends Plugin {
     }
 
     public async saveSettings(startupSyncer = true): Promise<void> {
-        console.log("saveSettings", this.settings);
+        LOGGER.debug("saving settings", { settings: this.settings, startupSyncer });
         await this.saveData(this.settings);
         if (startupSyncer) {
             this.startupSyncers();
@@ -114,9 +118,9 @@ export default class FirestoreSyncPlugin extends Plugin {
             SETTINGS_CONFIG_SCHEMA_MANAGER.getDefault(),
             await this.loadData()
         );
-        console.log("dataFromObsidian", dataFromObsidian);
         this.settings = SETTINGS_CONFIG_SCHEMA_MANAGER.loadData(dataFromObsidian);
-        console.log("this.settings", this.settings);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        LOGGER.debug("loaded settings", { dataFromObsidian, parsedSettings: this.settings });
         this.startupSyncers();
     }
 

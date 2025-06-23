@@ -72,10 +72,10 @@ const context = await esbuild
         outdir: "dist",
         metafile: prod,
         define: {
-            SYNCBUNDLEVERSION: `"${prod ? version : `${process.env.npm_package_version}-dev`}"`,
-            SYNCBUNDLEENV: `"${prod ? "production" : "development"}"`,
-            LOKIACCESSCLIENTID: `"${lokiClientId}"`,
-            LOKIACCESSCLIENTSECRET: `"${lokiClientSecret}"`
+            "globalThis.SYNCBUNDLEVERSION": `"${prod ? version : `${process.env.npm_package_version}-dev`}"`,
+            "globalThis.SYNCBUNDLEENV": `"${prod ? "production" : "development"}"`,
+            "globalThis.LOKIACCESSCLIENTID": `"${lokiClientId}"`,
+            "globalThis.LOKIACCESSCLIENTSECRET": `"${lokiClientSecret}"`
         }
     });
 

@@ -14,9 +14,9 @@ import {
     DeleteObsidianFile,
     ReadObsidianFile,
     WriteToObsidianFile
-} from "./file_util_obsidian_api";
-import { DeleteRawFile, ReadRawFile, WriteToRawFile } from "./file_util_raw_api";
-import { DownloadFileFromStorage } from "./cloud_storage_util";
+} from "../filesystem/file_util_obsidian_api";
+import { DeleteRawFile, ReadRawFile, WriteToRawFile } from "../filesystem/file_util_raw_api";
+import { DownloadFileFromStorage } from "../firestore/cloud_storage_util";
 import type { DocumentData, Firestore, FirestoreDataConverter } from "firebase/firestore";
 import { doc, getDoc } from "firebase/firestore";
 import { WrapPromise } from "../lib/wrap_promise";

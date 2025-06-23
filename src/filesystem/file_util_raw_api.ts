@@ -7,6 +7,10 @@ import type { Result, StatusResult } from "../lib/result";
 import { Ok } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
+import { InjectMeta } from "../lib/inject_status_msg";
+import { CreateLogger } from "../logging/logger";
+
+const LOGGER = CreateLogger("file_util_raw_api");
 
 /** Reads a file through the raw apis. */
 export async function ReadRawFile(
@@ -18,8 +22,10 @@ export async function ReadRawFile(
         /*textForUnknown=*/ `Failed to fs read from "${filePath}"`
     );
     if (readDataResult.err) {
+        readDataResult.val.with(InjectMeta({ filePath }));
         return readDataResult;
     }
+    LOGGER.debug("Read raw file", { filePath });
     return Ok(new Uint8Array(readDataResult.safeUnwrap()));
 }
 
@@ -30,6 +36,11 @@ export async function WriteToRawFile(
     data: Uint8Array,
     opts?: DataWriteOptions
 ): Promise<StatusResult<StatusError>> {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+    const arryBufferData: ArrayBuffer = data.buffer.slice(
+        data.byteOffset,
+        data.byteLength + data.byteOffset
+    ) as ArrayBuffer;
     const pathSplit = filePath.split("/");
     // Remove the final filename.
     pathSplit.pop();
@@ -38,16 +49,19 @@ export async function WriteToRawFile(
         /*textForUnknown=*/ `Failed to mkdir "${filePath}"`
     );
     if (mkdirs.err) {
+        mkdirs.val.with(InjectMeta({ filePath }));
         return mkdirs;
     }
 
     const writeResult = await WrapPromise(
-        app.vault.adapter.writeBinary(normalizePath(filePath), data, opts),
+        app.vault.adapter.writeBinary(normalizePath(filePath), arryBufferData, opts),
         /*textForUnknown=*/ `Failed to write fs file "${filePath}"`
     );
     if (writeResult.err) {
+        writeResult.val.with(InjectMeta({ filePath }));
         return writeResult;
     }
+    LOGGER.debug("Wrote obsidian file", { filePath });
     return Ok();
 }
 
@@ -61,6 +75,7 @@ export async function DeleteRawFile(
         /*textForUnknown=*/ `Failed to trash system "${filePath}"`
     );
     if (trashSystemResult.err) {
+        trashSystemResult.val.with(InjectMeta({ filePath }));
         return trashSystemResult;
     }
     if (trashSystemResult.safeUnwrap()) {
@@ -71,7 +86,9 @@ export async function DeleteRawFile(
         /*textForUnknown=*/ `Failed to trash local "${filePath}"`
     );
     if (trashLocalResult.err) {
+        trashLocalResult.val.with(InjectMeta({ filePath }));
         return trashLocalResult;
     }
+    LOGGER.debug("Removed obsidian file", { filePath });
     return Ok();
 }

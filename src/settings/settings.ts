@@ -75,7 +75,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
     }
 
     public override hide() {
-        this._logger.debug("hiding settings", { settings: this._settings });
+        LOGGER.debug("hiding settings", { settings: this._settings });
         void (async () => {
             this._plugin.settings = this._settings;
             await this._plugin.saveSettings();

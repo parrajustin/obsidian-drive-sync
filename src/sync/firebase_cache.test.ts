@@ -1,9 +1,9 @@
 import { describe, expect, jest, test } from "@jest/globals";
-import { None, Some } from "../../src/lib/option";
-import { ConvertArrayOfNodesToMap } from "../../src/sync/file_node_util";
-import type { CloudNode, FilePathType } from "../../src/sync/file_node";
-import { CloudNodeFileRef, CloudNodeRaw } from "../../src/sync/file_node";
-import { ConvertCloudNodesToCache, GetCloudNodesFromCache } from "../../src/sync/firebase_cache";
+import { None, Some } from "../lib/option";
+import { ConvertArrayOfNodesToMap } from "./file_node_util";
+import type { CloudNode, FilePathType } from "./file_node";
+import { CloudNodeFileRef, CloudNodeRaw } from "./file_node";
+import { ConvertCloudNodesToCache, GetCloudNodesFromCache } from "./firebase_cache";
 
 jest.mock(
     "obsidian",
@@ -12,7 +12,9 @@ jest.mock(
             // eslint-disable-next-line @typescript-eslint/naming-convention
             __esModule: true,
             // eslint-disable-next-line @typescript-eslint/naming-convention
-            TFile: {}
+            TFile: {},
+            // eslint-disable-next-line @typescript-eslint/no-extraneous-class, @typescript-eslint/naming-convention, @typescript-eslint/no-shadow
+            FuzzySuggestModal: class test {}
         };
     },
     { virtual: true }
@@ -30,6 +32,19 @@ jest.mock(
     },
     { virtual: true }
 );
+jest.mock(
+    "SYNCBUNDLEVERSION",
+    () => {
+        return "mock-version";
+    },
+    { virtual: true }
+);
+jest.mock("../logging/logger", () => ({
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    CreateLogger: () => {
+        return {};
+    }
+}));
 
 describe("Firebase Cache", () => {
     test("test cache creation and retrieval", async () => {
