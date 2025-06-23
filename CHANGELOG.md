@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.4.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.3.1...v2.4.0) (2025-06-23)
+
+
+### Features
+
+* add access information to  the build step ([1c93774](https://github.com/parrajustin/obsidian-drive-sync/commit/1c937746909d0b4160b2cabb8f2074e4509d2aeb))
+* Add grafana loki logging ([e0c8af9](https://github.com/parrajustin/obsidian-drive-sync/commit/e0c8af9618e5b9362408810f6d72401221896f40))
+* add inital tracing ([579ecd7](https://github.com/parrajustin/obsidian-drive-sync/commit/579ecd7b63ecd1d1788effae23b5a707464d8ddb))
+* Add more identifiers to the build ([e862202](https://github.com/parrajustin/obsidian-drive-sync/commit/e862202ef3d39cee92a74f1f65d5bf12d4041435))
+* Add more inital logging ([a8497c8](https://github.com/parrajustin/obsidian-drive-sync/commit/a8497c81862658fa175fd1718878bd771dd151e1))
+
 ## [2.3.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.3.0...v2.3.1) (2025-06-19)
 
 
