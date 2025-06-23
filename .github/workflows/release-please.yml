@@ -12,6 +12,7 @@ name: release-please
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    environment: runner
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -53,6 +54,8 @@ jobs:
         run: npm run build
         env:
           SYNCBUNDLEVERSION: ${{ steps.release.outputs.tag_name }}
+          LOKIACCESSCLIENTID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          LOKIACCESSCLIENTSECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
 
       - name: Update versions
         run: npm run version
