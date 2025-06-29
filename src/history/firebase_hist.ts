@@ -23,6 +23,7 @@ import { ConvertHistoricNodesToCache } from "./history_cache";
 import { GetFirestore } from "../firestore/get_firestore";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { HISTORY_CHANGES_FIREBASE_DB_NAME } from "../constants";
+import { InjectStatusMsg } from "../lib/inject_status_msg";
 
 const MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT = 20;
 
@@ -95,6 +96,9 @@ export class FirebaseHistory {
 
         const fetchedHistory = await GetHistoryData(db, creds, config);
         if (fetchedHistory.err) {
+            fetchedHistory.val.with(
+                InjectStatusMsg(`Failed to get history data to build firebase history class.`)
+            );
             return fetchedHistory;
         }
 

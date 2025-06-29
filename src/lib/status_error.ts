@@ -68,12 +68,12 @@ export class StatusError {
         return this._additionalData;
     }
 
-    public toString(): string {
+    public toString(printStack = true): string {
         const data: string[] = [];
         for (const entry of this._additionalData.entries()) {
             data.push(`${entry[0]}: ${entry[1]}`);
         }
-        return `[${new Date().toISOString()}] ${ErrorCode[this.errorCode]}: ${this.message} at stack:\n${this._stack}${data.length > 0 ? `\n\n[Additional Data:]\n ${data.join("\n")}` : ""}`;
+        return `[${new Date().toISOString()}] ${ErrorCode[this.errorCode]}: ${this.message} ${printStack ? `at stack:\n${this._stack}` : ``}${data.length > 0 ? `\n\n[Additional Data:]\n ${data.join("\n")}` : ""}`;
     }
 
     public with(func: (error: StatusError) => void): this {

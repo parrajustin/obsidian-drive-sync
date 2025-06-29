@@ -31,8 +31,11 @@ export const PLUGIN_VERSION: string = globalThis.SYNCBUNDLEVERSION ?? "unknown";
 export const PLUGIN_ENVIRONMENT: string = globalThis.SYNCBUNDLEENV ?? "unknown";
 
 // The url of the Loki Instance.
-export const LOKI_URL: string = "https://loki.parrajustin.com/";
-// export const LOKI_URL = "http://192.168.0.49:9980/";
+export const LOKI_URL: string = "https://nginx.parrajustin.com/loki/";
+// export const LOKI_URL = "http://192.168.0.49:9980/loki/";
+export const GRAFANA_TEMPO_URL: string = "https://nginx.parrajustin.com/otlp/v1/traces";
+// export const GRAFANA_TEMPO_URL: string = "http://192.168.0.49:9980/otlp/v1/traces";
+export const ZEIPKIN_URL: string = "http://192.168.0.49:9980/zipkin/api/v2/spans";
 // The loki service account access id.
 export const LOKI_ACCESS_CLIENT_ID: string = globalThis.LOKIACCESSCLIENTID ?? "unknown";
 // The loki service account access secret.
@@ -40,3 +43,11 @@ export const LOKI_ACCESS_CLIENT_SECRET: string = globalThis.LOKIACCESSCLIENTSECR
 
 // Unique run id.
 export const RUN_ID = uuidv7();
+
+// The trace span id to contain the syncer id.
+export const SYNCER_ID_SPAN_ATTR = "syncer.id";
+// The trace span id of the current active cycle for this syncer.
+export const SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR = "syncer.cycle.id";
+
+// Logging attribute name for the full syncer config.
+export const LOGGING_SYNCER_CONFIG_ATTR = "syncer.config";
