@@ -162,6 +162,7 @@ export function Some<T>(val: T): SomeImpl<T> {
 export type Some<T> = SomeImpl<T>;
 
 export type Option<T> = Some<T> | None;
+export type Optional<T> = Some<T> | None;
 
 export function IsOption<T = unknown>(value: unknown): value is Option<T> {
     return value instanceof SomeImpl || value === None;
