@@ -26,9 +26,17 @@ export interface FileData {
     fileHash: string;
 }
 
-export class FileNode {
+export class LocalFileNode {
+    public type = "LOCAL";
     constructor(
         public filedata: FileData,
         public firebaseData: Optional<LatestNotesSchema>
     ) {}
 }
+
+export class DeletedNode {
+    public type = "REMOTE";
+    constructor(public firebaseData: LatestNotesSchema) {}
+}
+
+export type FileNode = DeletedNode | LocalFileNode;
