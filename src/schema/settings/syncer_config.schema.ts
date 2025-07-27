@@ -36,14 +36,10 @@ export interface SyncerConfigV1 {
     obsidianFileSyncQuery: string;
     /** Query where not to write file ids. */
     fileIdFileQuery: string;
-    /** Firebase cached data. */
-    storedFirebaseCache: FirebaseStoredData;
     /** Enables the file id writing. */
     enableFileIdWriting: boolean;
     /** 'nested' syncer type root path for the nested vault. */
     nestedRootPath: string;
-    /** Firebase history cached data. */
-    storedFirebaseHistory: FirebaseStoredData;
     sharedSettings: SharedSyncerSettings;
 }
 

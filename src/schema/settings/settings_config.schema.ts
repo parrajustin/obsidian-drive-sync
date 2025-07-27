@@ -12,6 +12,8 @@ export interface SettingConfigV1 {
     password?: string;
     /** Individual syncer configs. */
     syncers: AnyVerionSyncConfig[];
+    /** The firebase cloud data cache path */
+    firebaseCachePath: string;
 }
 
 export type Version0SettingsConfig = VersionedSchema<SettingConfigV1, 0>;
@@ -27,7 +29,8 @@ export const SETTINGS_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0Setting
         return {
             clientId: uuidv7(),
             syncers: [],
-            version: 0
+            version: 0,
+            firebaseCachePath: ".obsidian-drive-sync-firebase-cache.json.gz"
         };
     }
 );
