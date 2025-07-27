@@ -21,6 +21,7 @@ export type AnyVerionSettingsConfig = Version0SettingsConfig;
 export type LatestSettingsConfigVersion = Version0SettingsConfig;
 
 export const SETTINGS_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SettingsConfig], 0>(
+    "Settings",
     [],
     () => {
         return {

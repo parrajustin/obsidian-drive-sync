@@ -33,7 +33,7 @@ const MANAGER = new SchemaManager<[Version0, Version1, Version2], 2>(
 
 describe("SchemaManager", () => {
     test("null", () => {
-        const finalData = MANAGER.loadData(null);
+        const finalData = MANAGER.LoadData(null);
         expect(finalData).toEqual({
             klep: false,
             otherData: "lol",
@@ -41,7 +41,7 @@ describe("SchemaManager", () => {
         });
     });
     test("undefined", () => {
-        const finalData = MANAGER.loadData(undefined);
+        const finalData = MANAGER.LoadData(undefined);
         expect(finalData).toEqual({
             klep: false,
             otherData: "lol",
@@ -55,7 +55,7 @@ describe("SchemaManager", () => {
             temp: 43,
             version: 0
         };
-        const finalData = MANAGER.loadData(n);
+        const finalData = MANAGER.LoadData(n);
         expect(finalData).toEqual({
             klep: true,
             otherData: "lol",

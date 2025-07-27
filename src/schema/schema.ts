@@ -1,8 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-empty-object-type */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { WrapOptional } from "../lib/option";
+import * as result from "../lib/result";
+import { NotFoundError, StatusError } from "../lib/status_error";
+import { setAttributeOnActiveSpan } from "../logging/tracing/set-attributes-on-active-span";
+import { Span } from "../logging/tracing/span.decorator";
 
 export type VersionedSchema<UnderlyingSchema, Version> = UnderlyingSchema extends {
     version: number;
@@ -55,44 +58,57 @@ type AnyValueInTuple<T extends readonly unknown[]> = T[number];
 
 export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersion extends number> {
     constructor(
+        private _name: string,
         private _converters: GetConverters<Schemas>,
-        private _default: () => Schemas[0]
+        private _default?: () => Schemas[0]
     ) {}
 
-    public loadData<T extends VersionedSchema<unknown, unknown>>(
+    @Span()
+    public LoadData<T extends VersionedSchema<unknown, unknown>>(
         data: T | null | undefined
-    ): Schemas[MaxVersion] {
+    ): result.Result<Schemas[MaxVersion], StatusError> {
         const dataOpt = WrapOptional<VersionedSchema<unknown, unknown>>(data);
         if (dataOpt.none) {
-            return this.getDefault();
+            return this.GetDefault();
         }
         const versionOpt = WrapOptional<number>(dataOpt.safeValue().version as number);
         if (versionOpt.none) {
-            return this.getDefault();
+            return this.GetDefault();
         }
         if (versionOpt.safeValue() < 0 || versionOpt.safeValue() > this._converters.length) {
-            return this.getDefault();
+            return this.GetDefault();
         }
-        return this.loadDataInternal(data, versionOpt.safeValue());
+        return this.LoadDataInternal(data, versionOpt.safeValue());
     }
 
     /**
      * Gets the default configuration of the schema.
      * @returns latest schema version
      */
-    public getDefault(): Schemas[MaxVersion] {
-        return this.loadDataInternal(this._default(), 0);
+    @Span()
+    public GetDefault(): result.Result<Schemas[MaxVersion], StatusError> {
+        const defaultFunc = WrapOptional(this._default);
+        if (defaultFunc.none) {
+            return result.Err(NotFoundError(`No default schema found for ${this._name}.`));
+        }
+        return this.LoadDataInternal(defaultFunc.safeValue()(), 0);
     }
 
-    private loadDataInternal(
+    @Span()
+    private LoadDataInternal(
         data: AnyValueInTuple<Schemas>,
         version: number
     ): AnyValueInTuple<Schemas> {
+        setAttributeOnActiveSpan(`version`, version);
         if (version >= this._converters.length) {
             return data;
         }
         const converter = this._converters[version] as unknown as ConverterFunc<any, any>;
         const newData = converter(data) as AnyValueInTuple<Schemas>;
-        return this.loadDataInternal(newData, version + 1);
+        return this.LoadDataInternal(newData, version + 1);
+    }
+
+    public GetLatestVersion(): number {
+        return this._converters.length + 1;
     }
 }
