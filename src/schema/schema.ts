@@ -63,22 +63,27 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
         private _default?: () => Schemas[0]
     ) {}
 
+    /**
+     * Updates the schema of the input data to the lastest version.
+     * @param data the schema to validate and update
+     * @returns the latest schema version data
+     */
     @Span()
-    public LoadData<T extends VersionedSchema<unknown, unknown>>(
+    public updateSchema<T extends VersionedSchema<unknown, unknown>>(
         data: T | null | undefined
     ): result.Result<Schemas[MaxVersion], StatusError> {
         const dataOpt = WrapOptional<VersionedSchema<unknown, unknown>>(data);
         if (dataOpt.none) {
-            return this.GetDefault();
+            return this.getDefault();
         }
         const versionOpt = WrapOptional<number>(dataOpt.safeValue().version as number);
         if (versionOpt.none) {
-            return this.GetDefault();
+            return this.getDefault();
         }
         if (versionOpt.safeValue() < 0 || versionOpt.safeValue() > this._converters.length) {
-            return this.GetDefault();
+            return this.getDefault();
         }
-        return this.LoadDataInternal(data, versionOpt.safeValue());
+        return this.loadDataInternal(data, versionOpt.safeValue());
     }
 
     /**
@@ -86,16 +91,16 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
      * @returns latest schema version
      */
     @Span()
-    public GetDefault(): result.Result<Schemas[MaxVersion], StatusError> {
+    public getDefault(): result.Result<Schemas[MaxVersion], StatusError> {
         const defaultFunc = WrapOptional(this._default);
         if (defaultFunc.none) {
             return result.Err(NotFoundError(`No default schema found for ${this._name}.`));
         }
-        return this.LoadDataInternal(defaultFunc.safeValue()(), 0);
+        return this.loadDataInternal(defaultFunc.safeValue()(), 0);
     }
 
     @Span()
-    private LoadDataInternal(
+    private loadDataInternal(
         data: AnyValueInTuple<Schemas>,
         version: number
     ): AnyValueInTuple<Schemas> {
@@ -105,10 +110,10 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
         }
         const converter = this._converters[version] as unknown as ConverterFunc<any, any>;
         const newData = converter(data) as AnyValueInTuple<Schemas>;
-        return this.LoadDataInternal(newData, version + 1);
+        return this.loadDataInternal(newData, version + 1);
     }
 
-    public GetLatestVersion(): number {
+    public getLatestVersion(): number {
         return this._converters.length + 1;
     }
 }

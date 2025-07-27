@@ -2,7 +2,6 @@ import type { App } from "obsidian";
 import { uuidv7 } from "../../lib/uuid";
 import type { VersionedSchema } from "../schema";
 import { SchemaManager } from "../schema";
-import type { FirebaseStoredData } from "../../sync/firebase_cache";
 
 export enum RootSyncType {
     ROOT_SYNCER = "root",
@@ -41,6 +40,8 @@ export interface SyncerConfigV1 {
     /** 'nested' syncer type root path for the nested vault. */
     nestedRootPath: string;
     sharedSettings: SharedSyncerSettings;
+    /** The firebase cloud data cache path */
+    firebaseCachePath: string;
 }
 
 export type Version0SyncConfig = VersionedSchema<SyncerConfigV1, 0>;
@@ -69,6 +70,7 @@ export const SYNCER_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SyncConfi
             nestedRootPath: "",
             storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
             sharedSettings: { pathToFolder: "" },
+            firebaseCachePath: ".obsidian-drive-sync-firebase-cache.json.gz",
             version: 0
         };
     }
