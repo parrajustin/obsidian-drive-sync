@@ -11,7 +11,7 @@ import {
 } from "../constants";
 import { format } from "logform";
 import type { Logger } from "winston";
-import { createLogger, transports } from "winston";
+import winston, { createLogger, transports } from "winston";
 import { THIS_APP } from "../main";
 
 const USER_ID_FORMAT = format((info, _opts) => {
@@ -30,7 +30,7 @@ const USER_ID_FORMAT = format((info, _opts) => {
 export function CreateLogger(label: string): Logger {
     const transportStreams: TransportStream[] = [
         new LokiTransport({
-            level: "debug",
+            level: "error",
             host: LOKI_URL,
             labels: {
                 env: PLUGIN_ENVIRONMENT,
@@ -72,7 +72,7 @@ export function CreateLogger(label: string): Logger {
     }
 
     return createLogger({
-        level: "info",
+        levels: winston.config.syslog.levels,
         format: format.combine(
             USER_ID_FORMAT(),
             format.label({ label }),
