@@ -1,0 +1,198 @@
+import { App, TFile } from "obsidian";
+import { Result, StatusResult, Ok, Err } from "../lib/result";
+import { InvalidArgumentError, NotFoundError, StatusError } from "../lib/status_error";
+import { WrapPromise } from "../lib/wrap_promise";
+import { PromiseResultSpanError } from "../logging/tracing/result_span.decorator";
+import { Span } from "../logging/tracing/span.decorator";
+import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
+import { IsAcceptablePath, IsObsidianFile, IsLocalFileRaw } from "../sync/query_util";
+import { AsyncForEach, CombineResults } from "../util";
+import { Bytes } from "firebase/firestore";
+import { None, Optional, Some } from "../lib/option";
+import GetSha256Hash from "../lib/sha";
+import { FileUtilObsidian } from "./file_util_obsidian_api";
+import { FileUtilRaw } from "./file_util_raw_api";
+import { FileNode } from "./file_node";
+import type { FilePathType } from "./file_node";
+
+export class FileAccess {
+    /** Gets the obsidian file node. */
+    @Span()
+    @PromiseResultSpanError
+    public static async getObsidianNode(
+        app: App,
+        fileName: FilePathType
+    ): Promise<Result<Optional<FileNode>, StatusError>> {
+        const file = app.vault.fileMap[fileName]!;
+        if (!(file instanceof TFile)) {
+            return Ok(None);
+        }
+        // TODO: look into using file id again.
+        // const fileIdResult = await GetFileUidFromFrontmatter(app, config, file);
+        // if (fileIdResult.err) {
+        //     return fileIdResult;
+        // }
+
+        const fileContents = await FileUtilObsidian.readObsidianFile(app, fileName);
+        const fileHash = fileContents.map((f) =>
+            Bytes.fromUint8Array(GetSha256Hash(new Uint8Array(f))).toBase64()
+        );
+        if (fileHash.err) {
+            return fileHash;
+        }
+        const node = new FileNode(
+            {
+                fullPath: fileName,
+                cTime: file.stat.ctime,
+                mTime: file.stat.mtime,
+                size: file.stat.size,
+                baseName: file.basename,
+                extension: file.extension,
+                deleted: false,
+                fileHash: fileHash.safeUnwrap()
+            },
+            None
+        );
+        return Ok(Some(node));
+    }
+
+    /** Gets the raw file ndoe. */
+    @Span()
+    @PromiseResultSpanError
+    public static async getRawNode(
+        app: App,
+        fileName: FilePathType
+    ): Promise<Result<Optional<FileNode>, StatusError>> {
+        const fileStat = await WrapPromise(
+            app.vault.adapter.stat(fileName),
+            /*textForUnknown=*/ `Failed to stat ${fileName}`
+        );
+        if (fileStat.err) {
+            return fileStat;
+        }
+        const stat = fileStat.safeUnwrap();
+        if (stat === null) {
+            return Ok(None);
+        }
+        if (stat.type === "folder") {
+            return Ok(None);
+        }
+
+        const path = fileName.split("/");
+        const file = path.pop()!;
+        const [baseName, extension] = file.split(".") as [string, string | undefined];
+
+        const fileContents = await FileUtilRaw.readRawFile(app, fileName);
+        const fileHash = fileContents.map((f) =>
+            Bytes.fromUint8Array(GetSha256Hash(new Uint8Array(f))).toBase64()
+        );
+        if (fileHash.err) {
+            return fileHash;
+        }
+        const node = new FileNode(
+            {
+                fullPath: fileName,
+                cTime: stat.ctime,
+                mTime: stat.mtime,
+                size: stat.size,
+                baseName: baseName,
+                extension: extension ?? "",
+                deleted: false,
+                fileHash: fileHash.safeUnwrap()
+            },
+            None
+        );
+        return Ok(Some(node));
+    }
+
+    /**
+     * Gets the file node, if file is not acceptable or neither local/obsidian will return error.
+     * @param fullpath the full path to the file to get
+     * @param config syncer config for the fetching
+     * @returns FileNode if found.
+     */
+    @Span()
+    @PromiseResultSpanError
+    public static async getFileNode(
+        app: App,
+        fullpath: FilePathType,
+        config: LatestSyncConfigVersion
+    ): Promise<Result<FileNode, StatusError>> {
+        if (!IsAcceptablePath(fullpath, config)) {
+            return Err(NotFoundError(`File node path: "${fullpath}" not found.`));
+        }
+        if (IsObsidianFile(fullpath, config)) {
+            const fileResult = await this.getObsidianNode(app, fullpath);
+            if (fileResult.err) {
+                return fileResult;
+            }
+            const optFile = fileResult.safeUnwrap();
+            if (optFile.some) {
+                return Ok(optFile.safeValue());
+            }
+        }
+        if (IsLocalFileRaw(fullpath, config)) {
+            const fileResult = await this.getRawNode(app, fullpath);
+            if (fileResult.err) {
+                return fileResult;
+            }
+            const optFile = fileResult.safeUnwrap();
+            if (optFile.some) {
+                return Ok(optFile.safeValue());
+            }
+        }
+        return Err(
+            InvalidArgumentError(
+                `File node path: "${fullpath}" is acceptable but isn't obisdian or local files.`
+            )
+        );
+    }
+
+    /** Gets all the file nodes from the filesystem. */
+    @Span()
+    @PromiseResultSpanError
+    public static async getAllFileNodes(
+        app: App,
+        config: LatestSyncConfigVersion
+    ): Promise<Result<FileNode[], StatusError>> {
+        const files: FileNode[] = [];
+
+        const iterateFiles = async (path: string): Promise<StatusResult<StatusError>> => {
+            const fileNamesResult = await WrapPromise(
+                app.vault.adapter.list(path),
+                /*textForUnknown=*/ `Failed to list(${path})`
+            );
+            if (fileNamesResult.err) {
+                return fileNamesResult;
+            }
+
+            const fileResult = AsyncForEach<FilePathType, StatusResult<StatusError>>(
+                fileNamesResult.safeUnwrap().files as FilePathType[],
+                async (fullpath: FilePathType): Promise<StatusResult<StatusError>> => {
+                    if (!IsAcceptablePath(fullpath, config)) {
+                        return Ok();
+                    }
+                    const fileNode = await this.getFileNode(app, fullpath, config);
+                    if (fileNode.ok) {
+                        files.push(fileNode.safeUnwrap());
+                    }
+                    return fileNode;
+                }
+            );
+
+            const folderResult = AsyncForEach<string, StatusResult<StatusError>>(
+                fileNamesResult.safeUnwrap().folders,
+                async (folder: string) => iterateFiles(folder)
+            );
+
+            const combinePromises = await Promise.all([...fileResult, ...folderResult]);
+            return CombineResults(combinePromises);
+        };
+        const iterateResult = await iterateFiles("");
+        if (iterateResult.err) {
+            return iterateResult;
+        }
+
+        return Ok(files);
+    }
+}
