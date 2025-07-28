@@ -38,3 +38,6 @@ declare module "obsidian" {
         fileMap: Record<string, TAbstractFile>;
     }
 }
+
+// Number of milliseconds from unix epoch.
+export type MsFromEpoch = number;
