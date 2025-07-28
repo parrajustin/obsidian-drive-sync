@@ -23,6 +23,16 @@ import type { FilePathType } from "./file_node";
 import { MapOfFileNodes } from "./file_map_util";
 import { MsFromEpoch } from "../types";
 
+/**
+ * Defines the concrete node type based on the generic boolean flags.
+ * - If CanHaveMissing is true, includes MissingNode.
+ * - If CanHaveInvalid is true, includes IgnoredNode.
+ */
+type GetNodeTypes<CanHaveMissing extends boolean, CanHaveInvalid extends boolean> =
+    | LocalFileNode
+    | (CanHaveMissing extends true ? MissingFileNode : never)
+    | (CanHaveInvalid extends true ? InvalidFileNode : never);
+
 export class FileAccess {
     /** Gets the obsidian file node. */
     @Span()
@@ -30,7 +40,7 @@ export class FileAccess {
     public static async getObsidianNode(
         app: App,
         fileName: FilePathType
-    ): Promise<Result<Optional<LocalFileNodeTypes>, StatusError>> {
+    ): Promise<Result<Optional<LocalFileNode>, StatusError>> {
         const file = app.vault.fileMap[fileName]!;
         if (!(file instanceof TFile)) {
             return Ok(None);
@@ -72,7 +82,7 @@ export class FileAccess {
     public static async getRawNode(
         app: App,
         fileName: FilePathType
-    ): Promise<Result<Optional<LocalFileNodeTypes>, StatusError>> {
+    ): Promise<Result<Optional<LocalFileNode>, StatusError>> {
         const fileStat = await WrapPromise(
             app.vault.adapter.stat(fileName),
             /*textForUnknown=*/ `Failed to stat ${fileName}`
@@ -127,20 +137,23 @@ export class FileAccess {
      */
     @Span()
     @PromiseResultSpanError
-    public static async getFileNode(
+    public static async getFileNode<
+        CanHaveMissing extends boolean = false,
+        CanHaveInvalid extends boolean = false
+    >(
         app: App,
         fullPath: FilePathType,
         config: LatestSyncConfigVersion,
-        ignoreMissingFile = false,
-        ignoreInvalidPath = false
-    ): Promise<Result<LocalFileNodeTypes, StatusError>> {
+        ignoreMissingFile: CanHaveMissing = false as CanHaveMissing,
+        ignoreInvalidPath: CanHaveInvalid = false as CanHaveInvalid
+    ): Promise<Result<GetNodeTypes<CanHaveMissing, CanHaveInvalid>, StatusError>> {
         if (!IsAcceptablePath(fullPath, config)) {
             if (ignoreInvalidPath) {
                 const invalid: InvalidFileNode = {
                     type: FileNodeType.INVALID,
                     fileData: { fullPath }
                 };
-                return Ok(invalid);
+                return Ok(invalid as GetNodeTypes<CanHaveMissing, CanHaveInvalid>);
             }
             return Err(NotFoundError(`File node path: "${fullPath}" not found.`));
         }
@@ -159,7 +172,7 @@ export class FileAccess {
                     localTime: Date.now(),
                     fileData: { fullPath }
                 };
-                return Ok(missing);
+                return Ok(missing as GetNodeTypes<CanHaveMissing, CanHaveInvalid>);
             }
         }
         if (IsLocalFileRaw(fullPath, config)) {
@@ -177,7 +190,7 @@ export class FileAccess {
                     localTime: Date.now(),
                     fileData: { fullPath }
                 };
-                return Ok(missing);
+                return Ok(missing as GetNodeTypes<CanHaveMissing, CanHaveInvalid>);
             }
         }
         if (ignoreInvalidPath) {
@@ -185,7 +198,7 @@ export class FileAccess {
                 type: FileNodeType.INVALID,
                 fileData: { fullPath }
             };
-            return Ok(invalid);
+            return Ok(invalid as GetNodeTypes<CanHaveMissing, CanHaveInvalid>);
         }
         return Err(
             InvalidArgumentError(
@@ -256,8 +269,8 @@ export class FileAccess {
     public static async getAllFileNodes(
         app: App,
         config: LatestSyncConfigVersion
-    ): Promise<Result<LocalFileNodeTypes[], StatusError>> {
-        const files: LocalFileNodeTypes[] = [];
+    ): Promise<Result<LocalFileNode[], StatusError>> {
+        const files: LocalFileNode[] = [];
 
         const iterateFiles = async (path: string): Promise<StatusResult<StatusError>> => {
             const fileNamesResult = await WrapPromise(
