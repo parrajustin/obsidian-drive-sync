@@ -1,4 +1,4 @@
-import { App, TFile } from "obsidian";
+import { App, normalizePath, TFile } from "obsidian";
 import { Result, StatusResult, Ok, Err } from "../lib/result";
 import { InvalidArgumentError, NotFoundError, StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
@@ -8,12 +8,19 @@ import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.s
 import { IsAcceptablePath, IsObsidianFile, IsLocalFileRaw } from "../sync/query_util";
 import { AsyncForEach, CombineResults } from "../util";
 import { Bytes } from "firebase/firestore";
-import { None, Optional, Some } from "../lib/option";
+import { None, Optional, Some, WrapOptional } from "../lib/option";
 import GetSha256Hash from "../lib/sha";
 import { FileUtilObsidian } from "./file_util_obsidian_api";
 import { FileUtilRaw } from "./file_util_raw_api";
-import { FileNode } from "./file_node";
+import {
+    FileNode,
+    FileNodeType,
+    InvalidFileNode,
+    LocalFileNode,
+    MissingFileNode
+} from "./file_node";
 import type { FilePathType } from "./file_node";
+import { MapOfFileNodes } from "./file_map_util";
 
 export class FileAccess {
     /** Gets the obsidian file node. */
@@ -40,8 +47,9 @@ export class FileAccess {
         if (fileHash.err) {
             return fileHash;
         }
-        const node = new FileNode(
-            {
+        const node: LocalFileNode = {
+            type: FileNodeType.LOCAL_FILE,
+            fileData: {
                 fullPath: fileName,
                 cTime: file.stat.ctime,
                 mTime: file.stat.mtime,
@@ -51,8 +59,8 @@ export class FileAccess {
                 deleted: false,
                 fileHash: fileHash.safeUnwrap()
             },
-            None
-        );
+            firebaseData: None
+        };
         return Ok(Some(node));
     }
 
@@ -89,8 +97,9 @@ export class FileAccess {
         if (fileHash.err) {
             return fileHash;
         }
-        const node = new FileNode(
-            {
+        const node: LocalFileNode = {
+            type: FileNodeType.LOCAL_FILE,
+            fileData: {
                 fullPath: fileName,
                 cTime: stat.ctime,
                 mTime: stat.mtime,
@@ -100,29 +109,40 @@ export class FileAccess {
                 deleted: false,
                 fileHash: fileHash.safeUnwrap()
             },
-            None
-        );
+            firebaseData: None
+        };
         return Ok(Some(node));
     }
 
     /**
      * Gets the file node, if file is not acceptable or neither local/obsidian will return error.
-     * @param fullpath the full path to the file to get
+     * @param fullPath the full path to the file to get
      * @param config syncer config for the fetching
+     * @param ignoreMissingFile if true, missing files will not fail.
+     * @param ignoreInvalidPath if true won't return error just invalid path file.
      * @returns FileNode if found.
      */
     @Span()
     @PromiseResultSpanError
     public static async getFileNode(
         app: App,
-        fullpath: FilePathType,
-        config: LatestSyncConfigVersion
+        fullPath: FilePathType,
+        config: LatestSyncConfigVersion,
+        ignoreMissingFile = false,
+        ignoreInvalidPath = false
     ): Promise<Result<FileNode, StatusError>> {
-        if (!IsAcceptablePath(fullpath, config)) {
-            return Err(NotFoundError(`File node path: "${fullpath}" not found.`));
+        if (!IsAcceptablePath(fullPath, config)) {
+            if (ignoreInvalidPath) {
+                const invalid: InvalidFileNode = {
+                    type: FileNodeType.INVALID,
+                    fileData: { fullPath }
+                };
+                return Ok(invalid);
+            }
+            return Err(NotFoundError(`File node path: "${fullPath}" not found.`));
         }
-        if (IsObsidianFile(fullpath, config)) {
-            const fileResult = await this.getObsidianNode(app, fullpath);
+        if (IsObsidianFile(fullPath, config)) {
+            const fileResult = await this.getObsidianNode(app, fullPath);
             if (fileResult.err) {
                 return fileResult;
             }
@@ -130,9 +150,16 @@ export class FileAccess {
             if (optFile.some) {
                 return Ok(optFile.safeValue());
             }
+            if (ignoreMissingFile) {
+                const missing: MissingFileNode = {
+                    type: FileNodeType.LOCAL_MISSING,
+                    fileData: { fullPath }
+                };
+                return Ok(missing);
+            }
         }
-        if (IsLocalFileRaw(fullpath, config)) {
-            const fileResult = await this.getRawNode(app, fullpath);
+        if (IsLocalFileRaw(fullPath, config)) {
+            const fileResult = await this.getRawNode(app, fullPath);
             if (fileResult.err) {
                 return fileResult;
             }
@@ -140,12 +167,77 @@ export class FileAccess {
             if (optFile.some) {
                 return Ok(optFile.safeValue());
             }
+            if (ignoreMissingFile) {
+                const missing: MissingFileNode = {
+                    type: FileNodeType.LOCAL_MISSING,
+                    fileData: { fullPath }
+                };
+                return Ok(missing);
+            }
+        }
+        if (ignoreInvalidPath) {
+            const invalid: InvalidFileNode = {
+                type: FileNodeType.INVALID,
+                fileData: { fullPath }
+            };
+            return Ok(invalid);
         }
         return Err(
             InvalidArgumentError(
-                `File node path: "${fullpath}" is acceptable but isn't obisdian or local files.`
+                `File node path: "${fullPath}" is acceptable but isn't obisdian or local files.`
             )
         );
+    }
+
+    @Span()
+    @PromiseResultSpanError
+    public static async getTouchedFileNodes(
+        app: App,
+        config: LatestSyncConfigVersion,
+        touchedFiles: Set<FilePathType>
+    ): Promise<Result<MapOfFileNodes, StatusError>> {
+        const touchedFileNodes = new Map<FilePathType, FileNode>();
+        const readFile = async (path: string): Promise<StatusResult<StatusError>> => {
+            const fileStatResult = await WrapPromise(
+                app.vault.adapter.stat(normalizePath(path)),
+                /*textForUnknown=*/ `Failed to stat "${path}"`
+            );
+            if (fileStatResult.err) {
+                return fileStatResult;
+            }
+
+            const stat = WrapOptional(fileStatResult.safeUnwrap());
+            if (stat.none) {
+                return Ok(None);
+            }
+
+            const fileNode = await this.getFileNode(
+                app,
+                path as FilePathType,
+                config,
+                /*ignoreMissingFile=*/ true,
+                /*ignoreInvalidPath=*/ true
+            );
+            if (fileNode.err) {
+                return fileNode;
+            }
+            if (fileNode.safeUnwrap().type === FileNodeType.INVALID) {
+                return Ok();
+            }
+
+            touchedFileNodes.set(fileNode.safeUnwrap().fileData.fullPath, fileNode.safeUnwrap());
+            return Ok();
+        };
+        const touchedFileFetchResult = await Promise.all(
+            touchedFiles.values().map((val) => {
+                return readFile(val);
+            })
+        );
+        const combinedResults = CombineResults(touchedFileFetchResult);
+        if (combinedResults.err) {
+            return combinedResults;
+        }
+        return Ok(touchedFileNodes);
     }
 
     /** Gets all the file nodes from the filesystem. */
@@ -159,7 +251,7 @@ export class FileAccess {
 
         const iterateFiles = async (path: string): Promise<StatusResult<StatusError>> => {
             const fileNamesResult = await WrapPromise(
-                app.vault.adapter.list(path),
+                app.vault.adapter.list(normalizePath(path)),
                 /*textForUnknown=*/ `Failed to list(${path})`
             );
             if (fileNamesResult.err) {

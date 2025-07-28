@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-extraneous-class */
 /**
  * File utils that are specific to raw files.
  */

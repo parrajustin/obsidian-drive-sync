@@ -26,17 +26,42 @@ export interface FileData {
     fileHash: string;
 }
 
-export class LocalFileNode {
-    public type = "LOCAL";
-    constructor(
-        public filedata: FileData,
-        public firebaseData: Optional<LatestNotesSchema>
-    ) {}
+interface OnlyFilePath {
+    // Full filepath.
+    fullPath: FilePathType;
 }
 
-export class DeletedNode {
-    public type = "REMOTE";
-    constructor(public firebaseData: LatestNotesSchema) {}
+export enum FileNodeType {
+    INVALID = "INVALID",
+    LOCAL_FILE = "LOCAL",
+    LOCAL_MISSING = "LOCAL_MISSING",
+    REMOTE_ONLY = "REMOTE_ONLY"
 }
 
-export type FileNode = DeletedNode | LocalFileNode;
+// File node is invalid and should be ignored.
+export interface InvalidFileNode {
+    type: FileNodeType.INVALID;
+    fileData: OnlyFilePath;
+}
+
+// A local file node with possible cloud data.
+export interface LocalFileNode {
+    type: FileNodeType.LOCAL_FILE;
+    fileData: FileData;
+    firebaseData: Optional<LatestNotesSchema>;
+}
+
+// A file node where it is misisng locally, maybe it was deleted?
+export interface MissingFileNode {
+    type: FileNodeType.LOCAL_MISSING;
+    fileData: OnlyFilePath;
+}
+
+// File exist remotely but missing locally.
+export interface DeletedNode {
+    type: FileNodeType.REMOTE_ONLY;
+    fileData: OnlyFilePath;
+    firebaseData: LatestNotesSchema;
+}
+
+export type FileNode = DeletedNode | LocalFileNode | InvalidFileNode | MissingFileNode;

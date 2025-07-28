@@ -13,8 +13,8 @@ import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import { uuidv7 } from "../lib/uuid";
 import { ShouldHaveFileId } from "../sync/query_util";
-import type { FilePathType } from "../sync/file_node";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
+import type { FilePathType } from "./file_node";
 
 export const FILE_ID_FRONTMATTER_KEY = "File Id";
 

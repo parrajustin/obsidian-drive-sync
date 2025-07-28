@@ -8,7 +8,7 @@ export class FileMapUtil {
     public static convertNodeToMap(allNodes: FileNode[]): MapOfFileNodes {
         const map = new Map<FilePathType, FileNode>();
         for (const node of allNodes) {
-            map.set(node.filedata.fullPath, node);
+            map.set(node.fileData.fullPath, node);
         }
         return map;
     }
