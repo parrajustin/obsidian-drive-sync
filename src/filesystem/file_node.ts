@@ -1,5 +1,7 @@
 import type { Optional } from "../lib/option";
 import type { LatestNotesSchema } from "../schema/notes/notes.schema";
+import type { SchemaWithId } from "../sync/firebase_cache";
+import type { MsFromEpoch } from "../types";
 
 export interface Tag<T> {
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -48,20 +50,30 @@ export interface InvalidFileNode {
 export interface LocalFileNode {
     type: FileNodeType.LOCAL_FILE;
     fileData: FileData;
-    firebaseData: Optional<LatestNotesSchema>;
+    localTime: MsFromEpoch;
+    firebaseData: Optional<SchemaWithId<LatestNotesSchema>>;
 }
 
-// A file node where it is misisng locally, maybe it was deleted?
+// A file node where it is missing locally, maybe it was deleted?
 export interface MissingFileNode {
     type: FileNodeType.LOCAL_MISSING;
+    localTime: MsFromEpoch;
     fileData: OnlyFilePath;
 }
 
 // File exist remotely but missing locally.
-export interface DeletedNode {
+export interface RemoteOnlyNode {
     type: FileNodeType.REMOTE_ONLY;
     fileData: OnlyFilePath;
-    firebaseData: LatestNotesSchema;
+    localTime: MsFromEpoch;
+    firebaseData: SchemaWithId<LatestNotesSchema>;
 }
 
-export type FileNode = DeletedNode | LocalFileNode | InvalidFileNode | MissingFileNode;
+// All file node types that are valid.
+export type AllValidFileNodeTypes = RemoteOnlyNode | LocalFileNode | MissingFileNode;
+// All possible file node types.
+export type AllFileNodeTypes = RemoteOnlyNode | LocalFileNode | InvalidFileNode | MissingFileNode;
+// All the possible local file node types.
+export type LocalFileNodeTypes = LocalFileNode | InvalidFileNode | MissingFileNode;
+// All the file nodes types the syncer keep because they are meaningful.
+export type AllExistingFileNodeTypes = RemoteOnlyNode | LocalFileNode;

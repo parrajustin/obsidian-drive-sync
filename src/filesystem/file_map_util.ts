@@ -1,12 +1,12 @@
 import { Span } from "../logging/tracing/span.decorator";
-import { FileNode, FilePathType } from "./file_node";
+import { FilePathType, AllFileNodeTypes } from "./file_node";
 
-export type MapOfFileNodes = Map<FilePathType, FileNode>;
+export type MapOfFileNodes<T> = Map<FilePathType, T>;
 
 export class FileMapUtil {
     @Span()
-    public static convertNodeToMap(allNodes: FileNode[]): MapOfFileNodes {
-        const map = new Map<FilePathType, FileNode>();
+    public static convertNodeToMap<T extends AllFileNodeTypes>(allNodes: T[]): MapOfFileNodes<T> {
+        const map = new Map<FilePathType, T>();
         for (const node of allNodes) {
             map.set(node.fileData.fullPath, node);
         }

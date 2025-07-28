@@ -13,7 +13,7 @@ import GetSha256Hash from "../lib/sha";
 import { FileUtilObsidian } from "./file_util_obsidian_api";
 import { FileUtilRaw } from "./file_util_raw_api";
 import {
-    FileNode,
+    LocalFileNodeTypes,
     FileNodeType,
     InvalidFileNode,
     LocalFileNode,
@@ -21,6 +21,7 @@ import {
 } from "./file_node";
 import type { FilePathType } from "./file_node";
 import { MapOfFileNodes } from "./file_map_util";
+import { MsFromEpoch } from "../types";
 
 export class FileAccess {
     /** Gets the obsidian file node. */
@@ -29,7 +30,7 @@ export class FileAccess {
     public static async getObsidianNode(
         app: App,
         fileName: FilePathType
-    ): Promise<Result<Optional<FileNode>, StatusError>> {
+    ): Promise<Result<Optional<LocalFileNodeTypes>, StatusError>> {
         const file = app.vault.fileMap[fileName]!;
         if (!(file instanceof TFile)) {
             return Ok(None);
@@ -59,6 +60,7 @@ export class FileAccess {
                 deleted: false,
                 fileHash: fileHash.safeUnwrap()
             },
+            localTime: file.stat.mtime,
             firebaseData: None
         };
         return Ok(Some(node));
@@ -70,7 +72,7 @@ export class FileAccess {
     public static async getRawNode(
         app: App,
         fileName: FilePathType
-    ): Promise<Result<Optional<FileNode>, StatusError>> {
+    ): Promise<Result<Optional<LocalFileNodeTypes>, StatusError>> {
         const fileStat = await WrapPromise(
             app.vault.adapter.stat(fileName),
             /*textForUnknown=*/ `Failed to stat ${fileName}`
@@ -109,6 +111,7 @@ export class FileAccess {
                 deleted: false,
                 fileHash: fileHash.safeUnwrap()
             },
+            localTime: stat.mtime,
             firebaseData: None
         };
         return Ok(Some(node));
@@ -130,7 +133,7 @@ export class FileAccess {
         config: LatestSyncConfigVersion,
         ignoreMissingFile = false,
         ignoreInvalidPath = false
-    ): Promise<Result<FileNode, StatusError>> {
+    ): Promise<Result<LocalFileNodeTypes, StatusError>> {
         if (!IsAcceptablePath(fullPath, config)) {
             if (ignoreInvalidPath) {
                 const invalid: InvalidFileNode = {
@@ -153,6 +156,7 @@ export class FileAccess {
             if (ignoreMissingFile) {
                 const missing: MissingFileNode = {
                     type: FileNodeType.LOCAL_MISSING,
+                    localTime: Date.now(),
                     fileData: { fullPath }
                 };
                 return Ok(missing);
@@ -170,6 +174,7 @@ export class FileAccess {
             if (ignoreMissingFile) {
                 const missing: MissingFileNode = {
                     type: FileNodeType.LOCAL_MISSING,
+                    localTime: Date.now(),
                     fileData: { fullPath }
                 };
                 return Ok(missing);
@@ -194,10 +199,13 @@ export class FileAccess {
     public static async getTouchedFileNodes(
         app: App,
         config: LatestSyncConfigVersion,
-        touchedFiles: Set<FilePathType>
-    ): Promise<Result<MapOfFileNodes, StatusError>> {
-        const touchedFileNodes = new Map<FilePathType, FileNode>();
-        const readFile = async (path: string): Promise<StatusResult<StatusError>> => {
+        touchedFiles: Map<FilePathType, MsFromEpoch>
+    ): Promise<Result<MapOfFileNodes<LocalFileNodeTypes>, StatusError>> {
+        const touchedFileNodes = new Map<FilePathType, LocalFileNodeTypes>();
+        const readFile = async (
+            path: string,
+            time: MsFromEpoch
+        ): Promise<StatusResult<StatusError>> => {
             const fileStatResult = await WrapPromise(
                 app.vault.adapter.stat(normalizePath(path)),
                 /*textForUnknown=*/ `Failed to stat "${path}"`
@@ -211,26 +219,28 @@ export class FileAccess {
                 return Ok(None);
             }
 
-            const fileNode = await this.getFileNode(
+            const fileNodeResult = await this.getFileNode(
                 app,
                 path as FilePathType,
                 config,
                 /*ignoreMissingFile=*/ true,
                 /*ignoreInvalidPath=*/ true
             );
-            if (fileNode.err) {
-                return fileNode;
+            if (fileNodeResult.err) {
+                return fileNodeResult;
             }
-            if (fileNode.safeUnwrap().type === FileNodeType.INVALID) {
+            const fileNode = fileNodeResult.safeUnwrap();
+            if (fileNode.type === FileNodeType.INVALID) {
                 return Ok();
             }
+            fileNode.localTime = time;
 
-            touchedFileNodes.set(fileNode.safeUnwrap().fileData.fullPath, fileNode.safeUnwrap());
+            touchedFileNodes.set(fileNode.fileData.fullPath, fileNode);
             return Ok();
         };
         const touchedFileFetchResult = await Promise.all(
-            touchedFiles.values().map((val) => {
-                return readFile(val);
+            touchedFiles.entries().map((val) => {
+                return readFile(val[0], val[1]);
             })
         );
         const combinedResults = CombineResults(touchedFileFetchResult);
@@ -246,8 +256,8 @@ export class FileAccess {
     public static async getAllFileNodes(
         app: App,
         config: LatestSyncConfigVersion
-    ): Promise<Result<FileNode[], StatusError>> {
-        const files: FileNode[] = [];
+    ): Promise<Result<LocalFileNodeTypes[], StatusError>> {
+        const files: LocalFileNodeTypes[] = [];
 
         const iterateFiles = async (path: string): Promise<StatusResult<StatusError>> => {
             const fileNamesResult = await WrapPromise(
