@@ -26,7 +26,7 @@ import {
 import { PromiseResultSpanError, ResultSpanError } from "../logging/tracing/result_span.decorator";
 import { Span } from "../logging/tracing/span.decorator";
 import { WrapToResult } from "../lib/wrap_to_result";
-import { FirebaseCache, type FirebaseStoredData } from "./firebase_cache";
+import { FirebaseCache, SchemaWithId, type FirebaseStoredData } from "./firebase_cache";
 import { CreateLogger } from "../logging/logger";
 
 const LOGGER = CreateLogger("firebase_syncer");
@@ -46,7 +46,7 @@ export class FirebaseSyncer {
         private _app: App,
         private _syncer: FileSyncer,
         private _config: LatestSyncConfigVersion,
-        public cloudNodes: Map<string, LatestNotesSchema>,
+        public cloudNodes: Map<string, SchemaWithId<LatestNotesSchema>>,
         private _query: Query
     ) {}
 
@@ -59,7 +59,7 @@ export class FirebaseSyncer {
         firebaseApp: FirebaseApp,
         config: LatestSyncConfigVersion,
         creds: UserCredential,
-        cache: FirebaseStoredData<LatestNotesSchema>
+        cache: FirebaseStoredData<SchemaWithId<LatestNotesSchema>>
     ): Promise<Result<FirebaseSyncer, StatusError>> {
         const db = GetFirestore(firebaseApp);
 
@@ -85,21 +85,21 @@ export class FirebaseSyncer {
             return querySnapshotResult;
         }
 
-        const cloudMapFilePathToFirebaseEntry = new Map<string, LatestNotesSchema>();
+        const cloudMapFilePathToFirebaseEntry = new Map<string, SchemaWithId<LatestNotesSchema>>();
         // First load up all the cached firebase note data.
         for (const entry of cache.cache) {
-            cloudMapFilePathToFirebaseEntry.set(entry.path, entry);
+            cloudMapFilePathToFirebaseEntry.set(entry.data.path, entry);
         }
         for (const change of querySnapshotResult.safeUnwrap().docs) {
-            const cloudNote = change as unknown as AnyVersionNotesSchema;
+            const cloudNote = change.data() as unknown as AnyVersionNotesSchema;
             const updatedCloudNote = NOTES_SCHEMA_MANAGER.updateSchema(cloudNote);
             if (updatedCloudNote.err) {
                 return updatedCloudNote;
             }
-            cloudMapFilePathToFirebaseEntry.set(
-                updatedCloudNote.safeUnwrap().path,
-                updatedCloudNote.safeUnwrap()
-            );
+            cloudMapFilePathToFirebaseEntry.set(updatedCloudNote.safeUnwrap().path, {
+                id: change.id,
+                data: updatedCloudNote.safeUnwrap()
+            });
         }
 
         // Update the cache if there were any changes.
@@ -259,12 +259,15 @@ export class FirebaseSyncer {
     ): Promise<StatusResult<StatusError>> {
         // First get all the query snapshot docs and overwrite the cloudnodes in this firebase syncer.
         for (const entry of querySnapshot.docs) {
-            const cloudNote = entry as unknown as AnyVersionNotesSchema;
+            const cloudNote = entry.data() as unknown as AnyVersionNotesSchema;
             const updatedCloudNote = NOTES_SCHEMA_MANAGER.updateSchema(cloudNote);
             if (updatedCloudNote.err) {
                 return updatedCloudNote;
             }
-            this.cloudNodes.set(updatedCloudNote.safeUnwrap().path, updatedCloudNote.safeUnwrap());
+            this.cloudNodes.set(updatedCloudNote.safeUnwrap().path, {
+                id: entry.id,
+                data: updatedCloudNote.safeUnwrap()
+            });
         }
         if (querySnapshot.docs.length > 0) {
             LOGGER.debug(`onSnapshotCallback updating cache with new entries`, {
