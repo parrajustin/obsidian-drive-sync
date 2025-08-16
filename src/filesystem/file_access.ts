@@ -59,7 +59,7 @@ export class FileAccess {
             return fileHash;
         }
         const node: LocalFileNode = {
-            type: FileNodeType.LOCAL_FILE,
+            type: FileNodeType.LOCAL_ONLY_FILE,
             fileData: {
                 fullPath: fileName,
                 cTime: file.stat.ctime,
@@ -70,8 +70,7 @@ export class FileAccess {
                 deleted: false,
                 fileHash: fileHash.safeUnwrap()
             },
-            localTime: file.stat.mtime,
-            firebaseData: None
+            localTime: file.stat.mtime
         };
         return Ok(Some(node));
     }
@@ -110,7 +109,7 @@ export class FileAccess {
             return fileHash;
         }
         const node: LocalFileNode = {
-            type: FileNodeType.LOCAL_FILE,
+            type: FileNodeType.LOCAL_ONLY_FILE,
             fileData: {
                 fullPath: fileName,
                 cTime: stat.ctime,
@@ -121,8 +120,7 @@ export class FileAccess {
                 deleted: false,
                 fileHash: fileHash.safeUnwrap()
             },
-            localTime: stat.mtime,
-            firebaseData: None
+            localTime: stat.mtime
         };
         return Ok(Some(node));
     }

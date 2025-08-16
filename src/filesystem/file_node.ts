@@ -1,4 +1,3 @@
-import type { Optional } from "../lib/option";
 import type { LatestNotesSchema } from "../schema/notes/notes.schema";
 import type { SchemaWithId } from "../sync/firebase_cache";
 import type { MsFromEpoch } from "../types";
@@ -35,8 +34,9 @@ interface OnlyFilePath {
 
 export enum FileNodeType {
     INVALID = "INVALID",
-    LOCAL_FILE = "LOCAL",
+    LOCAL_ONLY_FILE = "LOCAL_ONLY",
     LOCAL_MISSING = "LOCAL_MISSING",
+    LOCAL_CLOUD_FILE = "LOCAL_CLOUD",
     REMOTE_ONLY = "REMOTE_ONLY"
 }
 
@@ -48,17 +48,21 @@ export interface InvalidFileNode {
 
 // A local file node with possible cloud data.
 export interface LocalFileNode {
-    type: FileNodeType.LOCAL_FILE;
+    type: FileNodeType.LOCAL_ONLY_FILE;
     fileData: FileData;
     localTime: MsFromEpoch;
-    firebaseData: Optional<SchemaWithId<LatestNotesSchema>>;
 }
 
 // A file node where it is missing locally, maybe it was deleted?
 export interface MissingFileNode {
     type: FileNodeType.LOCAL_MISSING;
-    localTime: MsFromEpoch;
     fileData: OnlyFilePath;
+    localTime: MsFromEpoch;
+}
+
+// A file node where it had cloud data.
+export interface LocalCloudFileNode extends LocalFileNode {
+    firebaseData: SchemaWithId<LatestNotesSchema>;
 }
 
 // File exist remotely but missing locally.
@@ -70,10 +74,19 @@ export interface RemoteOnlyNode {
 }
 
 // All file node types that are valid.
-export type AllValidFileNodeTypes = RemoteOnlyNode | LocalFileNode | MissingFileNode;
+export type AllValidFileNodeTypes =
+    | RemoteOnlyNode
+    | LocalFileNode
+    | MissingFileNode
+    | LocalCloudFileNode;
 // All possible file node types.
-export type AllFileNodeTypes = RemoteOnlyNode | LocalFileNode | InvalidFileNode | MissingFileNode;
+export type AllFileNodeTypes =
+    | RemoteOnlyNode
+    | LocalFileNode
+    | InvalidFileNode
+    | MissingFileNode
+    | LocalCloudFileNode;
 // All the possible local file node types.
 export type LocalFileNodeTypes = LocalFileNode | InvalidFileNode | MissingFileNode;
 // All the file nodes types the syncer keep because they are meaningful.
-export type AllExistingFileNodeTypes = RemoteOnlyNode | LocalFileNode;
+export type AllExistingFileNodeTypes = RemoteOnlyNode | LocalFileNode | LocalCloudFileNode;
