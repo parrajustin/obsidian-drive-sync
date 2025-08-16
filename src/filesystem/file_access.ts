@@ -19,7 +19,7 @@ import {
     LocalFileNode,
     MissingFileNode
 } from "./file_node";
-import type { FilePathType } from "./file_node";
+import type { AllExistingFileNodeTypes, FilePathType } from "./file_node";
 import { MapOfFileNodes } from "./file_map_util";
 import { MsFromEpoch } from "../types";
 
@@ -205,6 +205,41 @@ export class FileAccess {
                 `File node path: "${fullPath}" is acceptable but isn't obisdian or local files.`
             )
         );
+    }
+
+    /**
+     * Deletes a file node.
+     * @param app the obsidian app
+     * @param fileNode the file node to delete
+     * @param config the syncer config used in this
+     * @returns the status of deleting the file
+     */
+    @Span()
+    @PromiseResultSpanError
+    public static async deleteFileNode(
+        app: App,
+        fileNode: AllExistingFileNodeTypes,
+        config: LatestSyncConfigVersion
+    ): Promise<StatusResult<StatusError>> {
+        if (!IsAcceptablePath(fileNode.fileData.fullPath, config)) {
+            return Ok();
+        }
+        if (IsObsidianFile(fileNode.fileData.fullPath, config)) {
+            const fileResult = await FileUtilObsidian.deleteObsidianFile(
+                app,
+                fileNode.fileData.fullPath
+            );
+            if (fileResult.err) {
+                return fileResult;
+            }
+        }
+        if (IsLocalFileRaw(fileNode.fileData.fullPath, config)) {
+            const fileResult = await FileUtilRaw.deleteRawFile(app, fileNode.fileData.fullPath);
+            if (fileResult.err) {
+                return fileResult;
+            }
+        }
+        return Ok();
     }
 
     @Span()
