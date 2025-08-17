@@ -47,7 +47,7 @@ export interface InvalidFileNode {
 }
 
 // A local file node with possible cloud data.
-export interface LocalFileNode {
+export interface LocalOnlyFileNode {
     type: FileNodeType.LOCAL_ONLY_FILE;
     fileData: FileData;
     localTime: MsFromEpoch;
@@ -61,7 +61,10 @@ export interface MissingFileNode {
 }
 
 // A file node where it had cloud data.
-export interface LocalCloudFileNode extends LocalFileNode {
+export interface LocalCloudFileNode {
+    type: FileNodeType.LOCAL_CLOUD_FILE;
+    fileData: FileData;
+    localTime: MsFromEpoch;
     firebaseData: SchemaWithId<LatestNotesSchema>;
 }
 
@@ -76,17 +79,17 @@ export interface RemoteOnlyNode {
 // All file node types that are valid.
 export type AllValidFileNodeTypes =
     | RemoteOnlyNode
-    | LocalFileNode
+    | LocalOnlyFileNode
     | MissingFileNode
     | LocalCloudFileNode;
 // All possible file node types.
 export type AllFileNodeTypes =
     | RemoteOnlyNode
-    | LocalFileNode
+    | LocalOnlyFileNode
     | InvalidFileNode
     | MissingFileNode
     | LocalCloudFileNode;
 // All the possible local file node types.
-export type LocalFileNodeTypes = LocalFileNode | InvalidFileNode | MissingFileNode;
+export type LocalFileNodeTypes = LocalOnlyFileNode | InvalidFileNode | MissingFileNode;
 // All the file nodes types the syncer keep because they are meaningful.
-export type AllExistingFileNodeTypes = RemoteOnlyNode | LocalFileNode | LocalCloudFileNode;
+export type AllExistingFileNodeTypes = RemoteOnlyNode | LocalOnlyFileNode | LocalCloudFileNode;

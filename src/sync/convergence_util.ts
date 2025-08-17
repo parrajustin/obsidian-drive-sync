@@ -5,10 +5,9 @@ import {
     RemoteOnlyNode,
     FileNodeType,
     FilePathType,
-    AllFileNodeTypes,
-    AllValidFileNodeTypes,
-    LocalFileNode,
-    AllExistingFileNodeTypes
+    LocalOnlyFileNode,
+    AllExistingFileNodeTypes,
+    LocalCloudFileNode
 } from "../filesystem/file_node";
 import { Span } from "../logging/tracing/span.decorator";
 import { LatestNotesSchema } from "../schema/notes/notes.schema";
@@ -17,10 +16,11 @@ import type { Result } from "../lib/result";
 import { Ok } from "../lib/result";
 import { StatusError } from "../lib/status_error";
 import { PromiseResultSpanError } from "../logging/tracing/result_span.decorator";
-import { Some, WrapOptional } from "../lib/option";
+import { None, Optional, Some, WrapOptional } from "../lib/option";
 import { SchemaWithId } from "./firebase_cache";
 import { CreateLogger } from "../logging/logger";
 import { MsFromEpoch } from "../types";
+import { SYNCER_ID_SPAN_ATTR } from "../constants";
 
 const LOGGER = CreateLogger("convergence_util");
 
@@ -35,46 +35,37 @@ export enum ConvergenceActionType {
 export interface NewLocalFileAction {
     fullPath: FilePathType;
     action: ConvergenceActionType.NEW_LOCAL_FILE;
-    localNode: LocalFileNode;
+    localNode: LocalOnlyFileNode;
 }
 
 // Action to update the firebase data entry for a local file.
 export interface UpdateCloudAction {
     fullPath: FilePathType;
     action: ConvergenceActionType.UPDATE_CLOUD;
-    localNode: LocalFileNode;
-    cloudData: SchemaWithId<LatestNotesSchema>;
+    localNode: LocalCloudFileNode;
 }
 
 // Action to delete local file based on cloud data.
 export interface DeleteLocalFileAction {
     fullPath: FilePathType;
     action: ConvergenceActionType.DELETE_LOCAL;
-    localNode: LocalFileNode;
-    cloudData: SchemaWithId<LatestNotesSchema>;
+    localNode: LocalCloudFileNode;
 }
 
 // Action to update local data fetching from the cloud.
 export interface UpdateLocalFileAction {
     fullPath: FilePathType;
     action: ConvergenceActionType.UPDATE_LOCAL;
-    localNode: LocalFileNode | RemoteOnlyNode;
-    cloudData: SchemaWithId<LatestNotesSchema>;
+    localNode: LocalCloudFileNode | RemoteOnlyNode;
 }
 
-// interface ConvergenceAction {
-//     file: FilePathType;
-//     action: ConvergenceActionType;
-//     localNode: AllValidFileNodeTypes;
-//     cloudData: SchemaWithId<LatestNotesSchema>;
-// }
 export type ConvergenceAction =
     | NewLocalFileAction
     | UpdateCloudAction
     | DeleteLocalFileAction
     | UpdateLocalFileAction;
 
-interface ConvergenceStateReturnType {
+export interface ConvergenceStateReturnType {
     mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>;
     actions: ConvergenceAction[];
 }
@@ -85,7 +76,7 @@ export class ConvergenceUtil {
     public static async createStateConvergenceActions(
         app: App,
         config: LatestSyncConfigVersion,
-        mapOfFileNodes: MapOfFileNodes<AllValidFileNodeTypes>,
+        mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
         touchedFiles: Map<FilePathType, MsFromEpoch>,
         mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema>>
     ): Promise<Result<ConvergenceStateReturnType, StatusError>> {
@@ -107,56 +98,52 @@ export class ConvergenceUtil {
         );
 
         // Now we have an updated state of what all the nodes should be.
+        // Go through them and check for any necessary convergence actions.
         const actions: ConvergenceAction[] = [];
-        const fileMapOfFileNodes = new Map<FilePathType, AllExistingFileNodeTypes>();
         for (const [fullPath, entry] of mapWithCloudData) {
             switch (entry.type) {
-                case FileNodeType.LOCAL_FILE: {
+                case FileNodeType.LOCAL_ONLY_FILE: {
+                    // There is only local data, we need to push it to the cloud.
+                    const newFileAction: NewLocalFileAction = {
+                        action: ConvergenceActionType.NEW_LOCAL_FILE,
+                        fullPath,
+                        localNode: entry
+                    };
+                    actions.push(newFileAction);
+                    break;
+                }
+                case FileNodeType.LOCAL_CLOUD_FILE: {
                     // The file only needs to be updated:
-                    // - if there is no remote data (new file).
                     // - if the hash states don't match
                     // - if remote is marked as deleted
 
-                    // Check if there is any remote data.
-                    const remoteData = entry.firebaseData;
-                    if (remoteData.none) {
-                        const newFileAction: NewLocalFileAction = {
-                            action: ConvergenceActionType.NEW_LOCAL_FILE,
-                            fullPath,
-                            localNode: entry
-                        };
-                        actions.push(newFileAction);
-                        break;
-                    }
-
                     // Check if any action is even necessary.
                     const isActionNecessary =
-                        remoteData.safeValue().data.deleted ||
-                        remoteData.safeValue().data.fileHash != entry.fileData.fileHash;
+                        entry.firebaseData.data.deleted ||
+                        entry.firebaseData.data.fileHash != entry.fileData.fileHash;
                     if (!isActionNecessary) {
                         break;
                     }
 
                     // Check if the local node is newer than the cloud node.
-                    const isLocalNewer = entry.localTime > remoteData.safeValue().data.entryTime;
+                    const isLocalNewer = entry.localTime > entry.firebaseData.data.entryTime;
                     if (isLocalNewer) {
                         const action: UpdateCloudAction = {
                             action: ConvergenceActionType.UPDATE_CLOUD,
                             fullPath,
-                            localNode: entry,
-                            cloudData: remoteData.safeValue()
+                            localNode: entry
                         };
                         actions.push(action);
                         break;
                     }
 
-                    // Check if the cloud node says the local node has been deleted.
-                    if (remoteData.safeValue().data.deleted) {
+                    // Check for deletion update state.
+                    if (entry.firebaseData.data.deleted) {
+                        // Cloud node marked deleted but we still have local data, we need to remove it.
                         const action: DeleteLocalFileAction = {
                             action: ConvergenceActionType.DELETE_LOCAL,
                             fullPath,
-                            localNode: entry,
-                            cloudData: remoteData.safeValue()
+                            localNode: entry
                         };
                         actions.push(action);
                         break;
@@ -166,27 +153,20 @@ export class ConvergenceUtil {
                     const action: UpdateLocalFileAction = {
                         action: ConvergenceActionType.UPDATE_LOCAL,
                         fullPath,
-                        localNode: entry,
-                        cloudData: remoteData.safeValue()
+                        localNode: entry
                     };
                     actions.push(action);
                     break;
                 }
-                case FileNodeType.LOCAL_MISSING: {
-                    // The local file is missing and not connected to any remote data.
-                    // We can just ignore this file, who cares...
-                    break;
-                }
                 case FileNodeType.REMOTE_ONLY: {
-                    // We only update the data if the cloud marks it no longer deleted.
+                    // We only need to do an update if the remote data isn't marked deleted.
                     if (entry.firebaseData.data.deleted) {
                         break;
                     }
                     const action: UpdateLocalFileAction = {
                         action: ConvergenceActionType.UPDATE_LOCAL,
                         fullPath,
-                        localNode: entry,
-                        cloudData: entry.firebaseData
+                        localNode: entry
                     };
                     actions.push(action);
                     break;
@@ -194,19 +174,22 @@ export class ConvergenceUtil {
             }
         }
 
-        return Ok({ mapOfFileNodes: fileMapOfFileNodes, actions });
+        return Ok({ mapOfFileNodes: mapWithCloudData, actions });
     }
 
     @Span()
     public static updateWithCloudData(
-        mapOfFileNodes: MapOfFileNodes<AllValidFileNodeTypes>,
+        mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
         mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema>>
-    ): MapOfFileNodes<AllValidFileNodeTypes> {
+    ): MapOfFileNodes<AllExistingFileNodeTypes> {
+        const outputMap = new Map<FilePathType, AllExistingFileNodeTypes>();
+        const visitedPaths = new Set<FilePathType>();
         for (const [filePath, cloudData] of mapOfCloudData.entries()) {
             const fullPath = filePath as FilePathType;
+            visitedPaths.add(fullPath);
 
             // Get the local information of this cloud entry.
-            const originalFileNodeOpt = WrapOptional(mapOfFileNodes.get(filePath as FilePathType));
+            const originalFileNodeOpt = WrapOptional(mapOfFileNodes.get(fullPath));
 
             // There is no local entry, so it is a remote only node.
             if (originalFileNodeOpt.none) {
@@ -216,39 +199,66 @@ export class ConvergenceUtil {
                     localTime: cloudData.data.entryTime,
                     fileData: { fullPath }
                 };
-                mapOfFileNodes.set(filePath as FilePathType, node);
+                outputMap.set(fullPath, node);
                 continue;
             }
             const originalFileNode = originalFileNodeOpt.safeValue();
 
             switch (originalFileNode.type) {
-                case FileNodeType.LOCAL_FILE:
-                    originalFileNode.firebaseData = Some(cloudData);
+                case FileNodeType.LOCAL_ONLY_FILE:
+                // Current state only has the local data, addin cloud data.
+                // eslint-disable-next-line no-fallthrough
+                case FileNodeType.LOCAL_CLOUD_FILE: {
+                    // Update file node with new cloud data.
+                    const node: LocalCloudFileNode = {
+                        type: FileNodeType.LOCAL_CLOUD_FILE,
+                        fileData: originalFileNode.fileData,
+                        localTime: originalFileNode.localTime,
+                        firebaseData: { id: cloudData.id, data: cloudData.data }
+                    };
+                    outputMap.set(fullPath, node);
                     break;
-                case FileNodeType.LOCAL_MISSING:
+                }
                 case FileNodeType.REMOTE_ONLY: {
+                    // Update the cloud data.
                     const node: RemoteOnlyNode = {
                         type: FileNodeType.REMOTE_ONLY,
                         fileData: originalFileNode.fileData,
-                        localTime: cloudData.data.entryTime,
-                        firebaseData: cloudData
+                        localTime: originalFileNode.localTime,
+                        firebaseData: { id: cloudData.id, data: cloudData.data }
                     };
-                    mapOfFileNodes.set(originalFileNode.fileData.fullPath, node);
+                    outputMap.set(fullPath, node);
                     break;
                 }
             }
         }
-        return mapOfFileNodes;
+
+        // Add all the untouched file nodes.
+        for (const [filePath, oldFileNode] of mapOfFileNodes.entries()) {
+            if (visitedPaths.has(filePath)) {
+                continue;
+            }
+            outputMap.set(filePath, oldFileNode);
+        }
+        return outputMap;
     }
 
+    /**
+     * Updates the current file nodes by looking at all touched file nodes to find changes.
+     * @param app obsidian app
+     * @param config the syncer config
+     * @param mapOfFileNodes the current state of file nodes we have
+     * @param touchedFiles the files that were monitored with a change
+     * @returns the new state of files nodes
+     */
     @Span()
     @PromiseResultSpanError
     public static async updateWithNewNodes(
         app: App,
         config: LatestSyncConfigVersion,
-        mapOfFileNodes: MapOfFileNodes<AllValidFileNodeTypes>,
+        mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
         touchedFiles: Map<FilePathType, MsFromEpoch>
-    ): Promise<Result<MapOfFileNodes<AllValidFileNodeTypes>, StatusError>> {
+    ): Promise<Result<MapOfFileNodes<AllExistingFileNodeTypes>, StatusError>> {
         // First get the new file nodes based on the file handlers.
         const newFileNodes = await FileAccess.getTouchedFileNodes(app, config, touchedFiles);
         if (newFileNodes.err) {
@@ -256,70 +266,104 @@ export class ConvergenceUtil {
         }
 
         // Now first combine the new file nodes.
+        const outputMap = new Map<FilePathType, AllExistingFileNodeTypes>();
+        const visitedPaths = new Set<FilePathType>();
         for (const [filePath, newFileNode] of newFileNodes.safeUnwrap().entries()) {
+            // Filter out invalid file node types.
             if (newFileNode.type === FileNodeType.INVALID) {
                 LOGGER.debug(`Found invalid file node: "${filePath}"`, {
-                    node: JSON.stringify(newFileNode)
+                    node: JSON.stringify(newFileNode),
+                    [SYNCER_ID_SPAN_ATTR]: config.syncerId
                 });
                 continue;
             }
+            visitedPaths.add(filePath);
 
+            // Check to see if we have a file node of this path already.
             const originalFileNodeOpt = WrapOptional(mapOfFileNodes.get(filePath));
             if (originalFileNodeOpt.none) {
-                mapOfFileNodes.set(filePath, newFileNode);
+                switch (newFileNode.type) {
+                    case FileNodeType.LOCAL_ONLY_FILE:
+                        // There isn't an original file to merge data with.
+                        outputMap.set(filePath, newFileNode);
+                        break;
+                    case FileNodeType.LOCAL_MISSING:
+                        // There isn't an original file and we didn't find new data, don't need to continue.
+                        break;
+                }
                 continue;
             }
             const originalFileNode = originalFileNodeOpt.safeValue();
 
             // Combine the two file data.
+            let finalNode: Optional<AllExistingFileNodeTypes> = None;
             switch (newFileNode.type) {
-                case FileNodeType.LOCAL_FILE:
-                    mapOfFileNodes.set(filePath, newFileNode);
+                case FileNodeType.LOCAL_ONLY_FILE:
+                    // The new file node was found.
                     switch (originalFileNode.type) {
-                        case FileNodeType.LOCAL_MISSING:
-                            // There is no connected remote, but now there is a local file.
-                            break;
-                        case FileNodeType.LOCAL_FILE:
+                        case FileNodeType.LOCAL_ONLY_FILE:
                             // File existed before, maybe a change in data?
-                            newFileNode.firebaseData = originalFileNode.firebaseData;
+                            finalNode = Some(newFileNode);
                             break;
-                        case FileNodeType.REMOTE_ONLY:
+                        case FileNodeType.LOCAL_CLOUD_FILE: {
+                            // File existed before and connected to remote data, update with local data.
+                            const newNode: LocalCloudFileNode = {
+                                type: FileNodeType.LOCAL_CLOUD_FILE,
+                                localTime: newFileNode.localTime,
+                                fileData: newFileNode.fileData,
+                                firebaseData: originalFileNode.firebaseData
+                            };
+                            finalNode = Some(newNode);
+                            break;
+                        }
+                        case FileNodeType.REMOTE_ONLY: {
                             // File didn't exist locally but is connected remote and now exists locally.
-                            newFileNode.firebaseData = Some(originalFileNode.firebaseData);
+                            const newNode: LocalCloudFileNode = {
+                                type: FileNodeType.LOCAL_CLOUD_FILE,
+                                localTime: newFileNode.localTime,
+                                fileData: newFileNode.fileData,
+                                firebaseData: originalFileNode.firebaseData
+                            };
+                            finalNode = Some(newNode);
                             break;
+                        }
                     }
                     break;
                 case FileNodeType.LOCAL_MISSING:
                     switch (originalFileNode.type) {
-                        case FileNodeType.LOCAL_FILE: {
+                        case FileNodeType.LOCAL_ONLY_FILE: {
                             // File existed before but now is deleted locally.
-                            // Convert the file to a remote_only type.
-                            let finalNode: AllFileNodeTypes;
-                            if (originalFileNode.firebaseData.some) {
-                                finalNode = {
-                                    type: FileNodeType.REMOTE_ONLY,
-                                    fileData: { fullPath: originalFileNode.fileData.fullPath },
-                                    localTime: newFileNode.localTime,
-                                    firebaseData: originalFileNode.firebaseData.safeValue()
-                                };
-                            } else {
-                                finalNode = newFileNode;
-                            }
-                            mapOfFileNodes.set(filePath, finalNode);
+                            // Was never synced to cloud so we no longer needs this file node.
                             break;
                         }
-                        case FileNodeType.LOCAL_MISSING:
-                            // Missing in the past and now.
-                            mapOfFileNodes.set(filePath, newFileNode);
+                        case FileNodeType.LOCAL_CLOUD_FILE:
+                        case FileNodeType.REMOTE_ONLY: {
+                            // Either way file is connected to cloud only.
+                            const newNode: RemoteOnlyNode = {
+                                type: FileNodeType.REMOTE_ONLY,
+                                localTime: newFileNode.localTime,
+                                fileData: newFileNode.fileData,
+                                firebaseData: originalFileNode.firebaseData
+                            };
+                            finalNode = Some(newNode);
                             break;
-                        case FileNodeType.REMOTE_ONLY:
-                            // File is still missing locally but connected to cloud.
-                            break;
+                        }
                     }
                     break;
             }
+            if (finalNode.some) {
+                outputMap.set(filePath, finalNode.safeValue());
+            }
         }
 
-        return Ok(mapOfFileNodes);
+        // Add all the untouched file nodes.
+        for (const [filePath, oldFileNode] of mapOfFileNodes.entries()) {
+            if (visitedPaths.has(filePath)) {
+                continue;
+            }
+            outputMap.set(filePath, oldFileNode);
+        }
+
+        return Ok(outputMap);
     }
 }

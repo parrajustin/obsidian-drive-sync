@@ -16,7 +16,7 @@ import {
     LocalFileNodeTypes,
     FileNodeType,
     InvalidFileNode,
-    LocalFileNode,
+    LocalOnlyFileNode,
     MissingFileNode
 } from "./file_node";
 import type { AllExistingFileNodeTypes, FilePathType } from "./file_node";
@@ -29,7 +29,7 @@ import { MsFromEpoch } from "../types";
  * - If CanHaveInvalid is true, includes IgnoredNode.
  */
 type GetNodeTypes<CanHaveMissing extends boolean, CanHaveInvalid extends boolean> =
-    | LocalFileNode
+    | LocalOnlyFileNode
     | (CanHaveMissing extends true ? MissingFileNode : never)
     | (CanHaveInvalid extends true ? InvalidFileNode : never);
 
@@ -40,7 +40,7 @@ export class FileAccess {
     public static async getObsidianNode(
         app: App,
         fileName: FilePathType
-    ): Promise<Result<Optional<LocalFileNode>, StatusError>> {
+    ): Promise<Result<Optional<LocalOnlyFileNode>, StatusError>> {
         const file = app.vault.fileMap[fileName]!;
         if (!(file instanceof TFile)) {
             return Ok(None);
@@ -58,7 +58,7 @@ export class FileAccess {
         if (fileHash.err) {
             return fileHash;
         }
-        const node: LocalFileNode = {
+        const node: LocalOnlyFileNode = {
             type: FileNodeType.LOCAL_ONLY_FILE,
             fileData: {
                 fullPath: fileName,
@@ -81,7 +81,7 @@ export class FileAccess {
     public static async getRawNode(
         app: App,
         fileName: FilePathType
-    ): Promise<Result<Optional<LocalFileNode>, StatusError>> {
+    ): Promise<Result<Optional<LocalOnlyFileNode>, StatusError>> {
         const fileStat = await WrapPromise(
             app.vault.adapter.stat(fileName),
             /*textForUnknown=*/ `Failed to stat ${fileName}`
@@ -108,7 +108,7 @@ export class FileAccess {
         if (fileHash.err) {
             return fileHash;
         }
-        const node: LocalFileNode = {
+        const node: LocalOnlyFileNode = {
             type: FileNodeType.LOCAL_ONLY_FILE,
             fileData: {
                 fullPath: fileName,
@@ -302,8 +302,8 @@ export class FileAccess {
     public static async getAllFileNodes(
         app: App,
         config: LatestSyncConfigVersion
-    ): Promise<Result<LocalFileNode[], StatusError>> {
-        const files: LocalFileNode[] = [];
+    ): Promise<Result<LocalOnlyFileNode[], StatusError>> {
+        const files: LocalOnlyFileNode[] = [];
 
         const iterateFiles = async (path: string): Promise<StatusResult<StatusError>> => {
             const fileNamesResult = await WrapPromise(
