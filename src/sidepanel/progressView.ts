@@ -1,20 +1,20 @@
 import type { App, WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
-import { ConvergenceAction } from "../sync/converge_file_models";
 import { None, Some, type Option } from "../lib/option";
 import { ErrorCode, type StatusError } from "../lib/status_error";
-import type { FirebaseHistory } from "../history/firebase_hist";
+// import type { FirebaseHistory } from "../history/firebase_hist";
 import type FirestoreSyncPlugin from "../main";
-import type { FilePathType } from "../sync/file_node";
 import { CreateIcon, IconName } from "../ui/icon";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
+import { ConvergenceActionType } from "../sync/convergence_util";
+import type { FilePathType } from "../filesystem/file_node";
 
 export const PROGRESS_VIEW_TYPE = "drive-sync-progress-view";
 const MAX_NUMBER_OF_CYCLES = 50;
 
 interface SyncProgress {
     filePath: FilePathType;
-    actionTaken: Exclude<ConvergenceAction, ConvergenceAction.NULL_UPDATE>;
+    actionTaken: ConvergenceActionType;
     progress: number;
     updateProgress?: (amount: number) => void;
 }
@@ -68,8 +68,8 @@ export class SyncProgressView extends ItemView {
     private _syncerConfigs: LatestSyncConfigVersion[] = [];
     /** Statuses of individal syncers. */
     private _syncerStatuses = new Map<string, HTMLSpanElement>();
-    /** Reference to the firebase history elements. */
-    private _syncerHistory = new Map<string, FirebaseHistory>();
+    // /** Reference to the firebase history elements. */
+    // private _syncerHistory = new Map<string, FirebaseHistory>();
     /** The buttons to click to see a syncer history panel. */
     private _syncerHistBtn = new Map<string, HTMLDivElement>();
     /** firestore sync plugin. */
@@ -110,7 +110,7 @@ export class SyncProgressView extends ItemView {
         this._currentCycleChanges = [];
         this._mapSyncerCycleToCurrentProgress = new Map();
         this._syncerConfigs = [];
-        this._syncerHistory = new Map<string, FirebaseHistory>();
+        // this._syncerHistory = new Map<string, FirebaseHistory>();
         this._syncerHistBtn = new Map<string, HTMLDivElement>();
         this.updateProgressView();
     }
@@ -122,19 +122,19 @@ export class SyncProgressView extends ItemView {
         this.renderSyncers();
     }
 
-    /** Sets the syncer history for a specific id. */
-    public setSyncerHistory(config: LatestSyncConfigVersion, history: FirebaseHistory) {
-        this._syncerHistory.set(config.syncerId, history);
-        const containerEl = this._syncerHistBtn.get(config.syncerId);
-        if (containerEl !== undefined) {
-            containerEl.empty();
-            const btnEl = containerEl.createEl("button");
-            btnEl.onclick = () => {
-                void history.openPanel();
-            };
-            btnEl.innerText = "Open History";
-        }
-    }
+    // /** Sets the syncer history for a specific id. */
+    // public setSyncerHistory(config: LatestSyncConfigVersion, history: FirebaseHistory) {
+    //     this._syncerHistory.set(config.syncerId, history);
+    //     const containerEl = this._syncerHistBtn.get(config.syncerId);
+    //     if (containerEl !== undefined) {
+    //         containerEl.empty();
+    //         const btnEl = containerEl.createEl("button");
+    //         btnEl.onclick = () => {
+    //             void history.openPanel();
+    //         };
+    //         btnEl.innerText = "Open History";
+    //     }
+    // }
 
     /** Set an individual syncer status text. */
     public setSyncerStatus(syncerId: string, status: string, color?: string) {
@@ -225,11 +225,7 @@ export class SyncProgressView extends ItemView {
      * @param filePath the file full path
      * @param actionTaken the action that is taken to converge
      */
-    public addEntry(
-        syncerId: string,
-        filePath: FilePathType,
-        actionTaken: Exclude<ConvergenceAction, ConvergenceAction.NULL_UPDATE>
-    ) {
+    public addEntry(syncerId: string, filePath: FilePathType, actionTaken: ConvergenceActionType) {
         const cycle = this._mapSyncerCycleToCurrentProgress.get(syncerId);
         if (cycle === undefined) {
             return;
@@ -420,17 +416,20 @@ export class SyncProgressView extends ItemView {
         entryDiv.style.flexDirection = "row";
         let iconName = IconName.FILE_QUESTION;
         switch (syncProgress.actionTaken) {
-            case ConvergenceAction.USE_LOCAL_DELETE_CLOUD:
-                iconName = IconName.TRASH_2;
-                break;
-            case ConvergenceAction.USE_CLOUD:
-                iconName = IconName.CLOUD_DOWNLOAD;
-                break;
-            case ConvergenceAction.USE_CLOUD_DELETE_LOCAL:
-                iconName = IconName.TRASH_2;
-                break;
-            case ConvergenceAction.USE_LOCAL:
+            case ConvergenceActionType.NEW_LOCAL_FILE:
                 iconName = IconName.HARD_DRIVE_UPLOAD;
+                break;
+            case ConvergenceActionType.UPDATE_CLOUD:
+                iconName = IconName.HARD_DRIVE_UPLOAD;
+                break;
+            case ConvergenceActionType.DELETE_LOCAL:
+                iconName = IconName.TRASH_2;
+                break;
+            case ConvergenceActionType.MARK_CLOUD_DELETED:
+                iconName = IconName.HARD_DRIVE_UPLOAD;
+                break;
+            case ConvergenceActionType.UPDATE_LOCAL:
+                iconName = IconName.CLOUD_DOWNLOAD;
                 break;
         }
         const iconSpan = CreateIcon(syncProgress.filePath, iconName);

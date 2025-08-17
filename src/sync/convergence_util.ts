@@ -28,6 +28,7 @@ export enum ConvergenceActionType {
     NEW_LOCAL_FILE = "NEW_LOCAL_FILE",
     UPDATE_CLOUD = "UPDATE_CLOUD",
     DELETE_LOCAL = "DELETE_LOCAL_FILE",
+    MARK_CLOUD_DELETED = "MARK_CLOUD_DELETED",
     UPDATE_LOCAL = "UPDATE_LOCAL"
 }
 
@@ -59,11 +60,19 @@ export interface UpdateLocalFileAction {
     localNode: LocalCloudFileNode | RemoteOnlyNode;
 }
 
+// Action to mark the cloud data as deleted.
+export interface MarkCloudDeletedAction {
+    fullPath: FilePathType;
+    action: ConvergenceActionType.MARK_CLOUD_DELETED;
+    localNode: RemoteOnlyNode;
+}
+
 export type ConvergenceAction =
     | NewLocalFileAction
     | UpdateCloudAction
     | DeleteLocalFileAction
-    | UpdateLocalFileAction;
+    | UpdateLocalFileAction
+    | MarkCloudDeletedAction;
 
 export interface ConvergenceStateReturnType {
     mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>;
@@ -159,6 +168,18 @@ export class ConvergenceUtil {
                     break;
                 }
                 case FileNodeType.REMOTE_ONLY: {
+                    // If the localtime is newer than the firebasedata the local file was
+                    // recently deleted.
+                    if (entry.localTime > entry.firebaseData.data.entryTime) {
+                        const action: MarkCloudDeletedAction = {
+                            action: ConvergenceActionType.MARK_CLOUD_DELETED,
+                            fullPath,
+                            localNode: entry
+                        };
+                        actions.push(action);
+                        break;
+                    }
+
                     // We only need to do an update if the remote data isn't marked deleted.
                     if (entry.firebaseData.data.deleted) {
                         break;
