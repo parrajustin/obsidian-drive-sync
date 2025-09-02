@@ -1,9 +1,9 @@
+import type { FilePathType } from "../filesystem/file_node";
 import { SearchString } from "../lib/search_string_parser";
 import {
     RootSyncType,
     type LatestSyncConfigVersion
 } from "../schema/settings/syncer_config.schema";
-import type { FilePathType } from "./file_node";
 
 const SEARCH_STRING_CACHE = new Map<string, SearchString>();
 

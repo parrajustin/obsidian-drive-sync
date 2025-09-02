@@ -107,7 +107,7 @@ const config = tseslint.config({
         ],
         "@typescript-eslint/no-confusing-void-expression": "error",
         "@typescript-eslint/no-confusing-non-null-assertion": "error",
-        "@typescript-eslint/no-extraneous-class": "error",
+        "@typescript-eslint/no-extraneous-class": "off",
         "@typescript-eslint/no-floating-promises": "error",
         "@typescript-eslint/no-misused-promises": "error",
         "@typescript-eslint/no-for-in-array": "error",

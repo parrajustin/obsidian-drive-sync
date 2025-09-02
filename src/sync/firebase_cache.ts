@@ -2,6 +2,7 @@ import { Ok, StatusResult, type Result } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import {
+    LatestNotesSchemaWithoutData,
     NOTES_SCHEMA_MANAGER,
     type AnyVersionNotesSchema,
     type LatestNotesSchema
@@ -11,6 +12,7 @@ import { Span } from "../logging/tracing/span.decorator";
 import { App } from "obsidian";
 import { FileUtilRaw } from "../filesystem/file_util_raw_api";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
+import { WrapToResult } from "../lib/wrap_to_result";
 
 export interface SchemaWithId<T> {
     id: string;
@@ -32,23 +34,26 @@ export class FirebaseCache {
         data: string,
         reason: string
     ): Promise<Result<ArrayBuffer, StatusError>> {
+        const encoder = new TextEncoder();
+        const chunk = encoder.encode(data);
+        return FirebaseCache.compressData(chunk, reason);
+    }
+    /** Compress string data to base64 gzip data. */
+    @Span()
+    @PromiseResultSpanError
+    public static async compressData(
+        data: Uint8Array,
+        reason: string
+    ): Promise<Result<ArrayBuffer, StatusError>> {
         // Create the read stream and compress the data.
-        const readableStream = await WrapPromise(
-            Promise.resolve(
+        const readableStream = WrapToResult(
+            () =>
                 new ReadableStream({
                     start(controller) {
-                        // Convert the input string into a Uint8Array (binary form)
-                        const encoder = new TextEncoder();
-                        const chunk = encoder.encode(data);
-
-                        // Push the chunk into the stream
-                        controller.enqueue(chunk);
-
-                        // Close the stream
+                        controller.enqueue(data);
                         controller.close();
                     }
-                }).pipeThrough(new CompressionStream("gzip"))
-            ),
+                }).pipeThrough(new CompressionStream("gzip")),
             /*textForUnknown=*/ `Failed to create stream and compress "${reason}"`
         );
         if (readableStream.err) {
@@ -61,28 +66,25 @@ export class FirebaseCache {
             wrappedResponse.arrayBuffer(),
             /*textForUnknown=*/ `[CompressStringData] Failed to convert to array buffer "${reason}"`
         );
-        // return outData
-        //     .map((n) => Bytes.fromUint8Array(new Uint8Array(n)).toBase64())
-        //     .map((val) => new window.TextEncoder().encode(val));
     }
 
     /** Decompress string data. */
     @Span()
     @PromiseResultSpanError
-    public static async decompressStringData(
+    public static async decompressData(
         data: Uint8Array,
         reason: string
     ): Promise<Result<ArrayBuffer, StatusError>> {
         // Create the read stream and decompress the data.
-        const readableStream = await WrapPromise(
-            Promise.resolve(
+        const readableStream = WrapToResult(
+            () =>
                 new ReadableStream<Uint8Array>({
                     start(controller) {
                         controller.enqueue(data);
                         controller.close();
                     }
-                }).pipeThrough(new DecompressionStream("gzip"))
-            ),
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+                }).pipeThrough(new DecompressionStream("gzip") as any),
             /*textForUnknown=*/ `Failed to create stream and decompress "${reason}"`
         );
         if (readableStream.err) {
@@ -102,9 +104,9 @@ export class FirebaseCache {
     public static async writeToFirebaseCache(
         app: App,
         config: LatestSyncConfigVersion,
-        cloudData: SchemaWithId<LatestNotesSchema>[]
+        cloudData: SchemaWithId<LatestNotesSchema | LatestNotesSchemaWithoutData>[]
     ): Promise<StatusResult<StatusError>> {
-        let cachedData: FirebaseStoredData<SchemaWithId<LatestNotesSchema>> = {
+        let cachedData: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>> = {
             lastUpdate: -1,
             cache: []
         };
@@ -118,7 +120,17 @@ export class FirebaseCache {
             }
             cachedData = {
                 lastUpdate,
-                cache: cloudData
+                cache: cloudData.map((n) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                    if ((n.data as any).data === undefined) {
+                        return n;
+                    }
+
+                    const newNode: SchemaWithId<LatestNotesSchemaWithoutData> = structuredClone(n);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                    delete (newNode.data as any).data;
+                    return newNode;
+                })
             };
         }
 
@@ -139,28 +151,32 @@ export class FirebaseCache {
     public static async readFirebaseCache(
         app: App,
         config: LatestSyncConfigVersion
-    ): Promise<Result<FirebaseStoredData<SchemaWithId<LatestNotesSchema>>, StatusError>> {
+    ): Promise<
+        Result<FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>>, StatusError>
+    > {
         const fileData = await FileUtilRaw.readRawFile(app, config.firebaseCachePath);
         if (fileData.err) {
             return fileData;
         }
 
-        const decompressed = await this.decompressStringData(
-            fileData.safeUnwrap(),
-            "Firebase Cache"
-        );
+        const decompressed = await this.decompressData(fileData.safeUnwrap(), "Firebase Cache");
         const parsedJson = decompressed
             // Convert to unit8array.
             .map((n) => new Uint8Array(n))
             // Convert to a string.
             .map((n) => new window.TextDecoder("utf-8").decode(n))
             // Parse the string as json.
-            .map((n) => JSON.parse(n) as FirebaseStoredData<SchemaWithId<AnyVersionNotesSchema>>);
+            .map(
+                (n) =>
+                    JSON.parse(n) as FirebaseStoredData<
+                        SchemaWithId<Omit<AnyVersionNotesSchema, "data">>
+                    >
+            );
         if (parsedJson.err) {
             return parsedJson;
         }
 
-        const updatedCache: SchemaWithId<LatestNotesSchema>[] = [];
+        const updatedCache: SchemaWithId<Omit<LatestNotesSchema, "data">>[] = [];
         for (const entry of parsedJson.safeUnwrap().cache) {
             const updatedEntry = NOTES_SCHEMA_MANAGER.updateSchema(entry.data);
             if (updatedEntry.err) {

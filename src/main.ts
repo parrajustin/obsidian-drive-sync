@@ -123,7 +123,7 @@ export default class FirestoreSyncPlugin extends Plugin {
             SETTINGS_CONFIG_SCHEMA_MANAGER.getDefault(),
             await this.loadData()
         );
-        this.settings = SETTINGS_CONFIG_SCHEMA_MANAGER.loadData(dataFromObsidian);
+        this.settings = SETTINGS_CONFIG_SCHEMA_MANAGER.updateSchema(dataFromObsidian);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         LOGGER.debug("loaded settings", { dataFromObsidian, parsedSettings: this.settings });
         this.startupSyncers();

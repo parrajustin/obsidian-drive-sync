@@ -60,6 +60,9 @@ export type AnyVersionNotesSchema = Version0NotesSchema;
 
 export type LatestNotesSchema = Version0NotesSchema;
 
+// Latest schema but with the data field removed. Only fetched on updates.
+export type LatestNotesSchemaWithoutData = Omit<LatestNotesSchema, "data">;
+
 export const NOTES_SCHEMA_MANAGER = new SchemaManager<[Version0NotesSchema], 0>(
     "Firebase Notes",
     []

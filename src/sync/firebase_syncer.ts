@@ -21,6 +21,7 @@ import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.s
 import {
     AnyVersionNotesSchema,
     LatestNotesSchema,
+    LatestNotesSchemaWithoutData,
     NOTES_SCHEMA_MANAGER
 } from "../schema/notes/notes.schema";
 import { PromiseResultSpanError, ResultSpanError } from "../logging/tracing/result_span.decorator";
@@ -46,7 +47,10 @@ export class FirebaseSyncer {
         private _app: App,
         private _syncer: FileSyncer,
         private _config: LatestSyncConfigVersion,
-        public cloudNodes: Map<string, SchemaWithId<LatestNotesSchema>>,
+        public cloudNodes: Map<
+            string,
+            SchemaWithId<LatestNotesSchemaWithoutData | LatestNotesSchema>
+        >,
         private _query: Query
     ) {}
 
@@ -59,7 +63,7 @@ export class FirebaseSyncer {
         firebaseApp: FirebaseApp,
         config: LatestSyncConfigVersion,
         creds: UserCredential,
-        cache: FirebaseStoredData<SchemaWithId<LatestNotesSchema>>
+        cache: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>>
     ): Promise<Result<FirebaseSyncer, StatusError>> {
         const db = GetFirestore(firebaseApp);
 
@@ -85,7 +89,10 @@ export class FirebaseSyncer {
             return querySnapshotResult;
         }
 
-        const cloudMapFilePathToFirebaseEntry = new Map<string, SchemaWithId<LatestNotesSchema>>();
+        const cloudMapFilePathToFirebaseEntry = new Map<
+            string,
+            SchemaWithId<LatestNotesSchemaWithoutData | LatestNotesSchema>
+        >();
         // First load up all the cached firebase note data.
         for (const entry of cache.cache) {
             cloudMapFilePathToFirebaseEntry.set(entry.data.path, entry);

@@ -65,7 +65,7 @@ export interface LocalCloudFileNode {
     type: FileNodeType.LOCAL_CLOUD_FILE;
     fileData: FileData;
     localTime: MsFromEpoch;
-    firebaseData: SchemaWithId<LatestNotesSchema>;
+    firebaseData: SchemaWithId<Omit<LatestNotesSchema, "data">>;
 }
 
 // File exist remotely but missing locally.
@@ -73,7 +73,7 @@ export interface RemoteOnlyNode {
     type: FileNodeType.REMOTE_ONLY;
     fileData: OnlyFilePath;
     localTime: MsFromEpoch;
-    firebaseData: SchemaWithId<LatestNotesSchema>;
+    firebaseData: SchemaWithId<Omit<LatestNotesSchema, "data">>;
 }
 
 // All file node types that are valid.

@@ -51,3 +51,12 @@ export const SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR = "syncer.cycle.id";
 
 // Logging attribute name for the full syncer config.
 export const LOGGING_SYNCER_CONFIG_ATTR = "syncer.config";
+
+// The file id.
+export const FIREBASE_NOTE_ID = "firebase.notes.id";
+export const CLOUDSTORAGE_FILE_ID = "cloudstorage.file.id";
+
+export class FileConst {
+    // The local file path of a file.
+    public static FILE_PATH = "local.filepath";
+}

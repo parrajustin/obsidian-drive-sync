@@ -6,7 +6,7 @@
 import type FirestoreSyncPlugin from "../main";
 import { InternalError, UnimplementedError, type StatusError } from "../lib/status_error";
 import type { Option } from "../lib/option";
-import { None, Some } from "../lib/option";
+import { None, Some, WrapOptional } from "../lib/option";
 import type { FileMapOfNodes } from "./file_node_util";
 import {
     ConvertArrayOfNodesToMap,
@@ -24,22 +24,42 @@ import { LogError } from "../logging/log";
 import { CleanUpLeftOverLocalFiles } from "./syncer_update_util";
 import type { UnsubFunc } from "../watcher";
 import { AddWatchHandler } from "../watcher";
-import type { FilePathType, LocalNode } from "./file_node";
 import type { ConvergenceUpdate, NullUpdate } from "./converge_file_models";
 import { ConvergenceAction } from "./converge_file_models";
 import { uuidv7 } from "../lib/uuid";
 import { FirebaseHistory } from "../history/firebase_hist";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { RootSyncType } from "../schema/settings/syncer_config.schema";
+import { Span } from "../logging/tracing/span.decorator";
+import { setAttributeOnActiveSpan } from "../logging/tracing/set-attributes-on-active-span";
+import { SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR, SYNCER_ID_SPAN_ATTR } from "../constants";
+import { SetSpanStatusFromResult } from "../logging/tracing/set-span-status";
+import { FileAccess } from "../filesystem/file_access";
+import { FileMapUtil, MapOfFileNodes } from "../filesystem/file_map_util";
+import {
+    RemoteOnlyNode,
+    FilePathType,
+    AllExistingFileNodeTypes,
+    FileNodeType
+} from "../filesystem/file_node";
+import { FirebaseCache } from "./firebase_cache";
+import { App } from "obsidian";
+import type { LatestSettingsConfigVersion } from "../schema/settings/settings_config.schema";
+import { LatestNotesSchema } from "../schema/notes/notes.schema";
+import { CreateLogger } from "../logging/logger";
+import { MsFromEpoch } from "../types";
+import { ConvergenceUtil } from "./convergence_util";
+
+const LOGGER = CreateLogger("drive_syncer");
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
 export class FileSyncer {
     /** firebase syncer if one has been created. */
     private _firebaseSyncer: Option<FirebaseSyncer> = None;
     /** firebase syncer if one has been created. */
-    private _firebaseHistory: Option<FirebaseHistory> = None;
+    // private _firebaseHistory: Option<FirebaseHistory> = None;
     /** Identified file changes to check for changes. */
-    private _touchedFilepaths = new Set<FilePathType>();
+    private _touchedFilepaths = new Map<FilePathType, MsFromEpoch>();
     /** Function to handle unsubing the watch func. */
     private _unsubWatchHandler: Option<UnsubFunc> = None;
     /** timeid to kill the tick function. */
@@ -48,17 +68,21 @@ export class FileSyncer {
     private _isDead = false;
 
     private constructor(
+        private _app: App,
         private _plugin: FirestoreSyncPlugin,
         private _firebaseApp: FirebaseApp,
         private _config: LatestSyncConfigVersion,
-        private _mapOfFileNodes: FileMapOfNodes<LocalNode>
+        private _mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>
     ) {}
 
     /** Constructs the file syncer. */
+    @Span()
     public static async constructFileSyncer(
+        app: App,
         plugin: FirestoreSyncPlugin,
         config: LatestSyncConfigVersion
     ): Promise<Result<FileSyncer, StatusError>> {
+        setAttributeOnActiveSpan(SYNCER_ID_SPAN_ATTR, config.syncerId);
         const view = await GetOrCreateSyncProgressView(plugin.app, /*reveal=*/ false);
         view.setSyncerStatus(config.syncerId, "Waiting for layout...");
         // Wait till the workspace loads to reduce watcher noise.
@@ -76,101 +100,127 @@ export class FileSyncer {
         //     return fileUidWrite;
         // }
 
-        view.setSyncerStatus(config.syncerId, "Getting file nodes");
-        // Get the file map of the filesystem.
-        const buildMapOfNodesResult = await GetFileMapOfNodes(plugin.app, config);
-        if (buildMapOfNodesResult.err) {
-            return buildMapOfNodesResult;
-        }
-
         view.setSyncerStatus(config.syncerId, "checking firebase app");
         // Make sure firebase is not none.
         const firebaseApp = plugin.firebaseApp;
         if (firebaseApp.none) {
-            return Err(InternalError("No firebase app defined"));
+            const error = Err(InternalError("No firebase app defined"));
+            SetSpanStatusFromResult(error);
+            return error;
         }
         // Build the file syncer
-        return Ok(
-            new FileSyncer(
-                plugin,
-                firebaseApp.safeValue(),
-                config,
-                buildMapOfNodesResult.safeUnwrap()
-            )
-        );
+        return Ok(new FileSyncer(app, plugin, firebaseApp.safeValue(), config, new Map()));
     }
 
+    @Span()
     public getId(): string {
         return this._config.syncerId;
     }
 
     /** Initialize the file syncer. */
+    @Span()
     public async init(): Promise<StatusResult<StatusError>> {
-        return await this._plugin.loggedIn.then<StatusResult<StatusError>>(
-            async (creds: UserCredential) => {
-                const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
+        const creds = await this._plugin.loggedIn;
+        const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
 
-                view.setSyncerStatus(this._config.syncerId, "setting up obsidian watcher");
-                // Also setup the internal files watched now.
-                this.listenForFileChanges();
+        // Also setup the internal files watched now.
+        view.setSyncerStatus(this._config.syncerId, "Setting up obsidian watcher");
+        this.listenForFileChanges();
 
-                view.setSyncerStatus(this._config.syncerId, "building firebase history");
-                const buildFirebaseHistory = await FirebaseHistory.buildFirebaseHistory(
-                    this._plugin,
-                    this._firebaseApp,
-                    this._config,
-                    creds,
-                    this._mapOfFileNodes
-                );
-                if (buildFirebaseHistory.err) {
-                    return buildFirebaseHistory;
-                }
-                this._firebaseHistory = Some(buildFirebaseHistory.safeUnwrap());
-                this._firebaseHistory.safeValue().initailizeRealTimeUpdates();
-                this._firebaseHistory.safeValue().updateMapOfLocalNodes(this._mapOfFileNodes);
-                view.setSyncerHistory(this._config, buildFirebaseHistory.safeUnwrap());
+        // Get the file map of the filesystem.
+        view.setSyncerStatus(this._config.syncerId, "Getting file nodes");
+        const fileNodes = await FileAccess.getAllFileNodes(this._app, this._config);
+        if (fileNodes.err) {
+            SetSpanStatusFromResult(fileNodes);
+            return fileNodes;
+        }
+        this._mapOfFileNodes = FileMapUtil.convertNodeToMap(fileNodes.safeUnwrap());
 
-                // Save the cache for firebase.
-                await this._plugin.saveSettings(/*startupSyncer=*/ false);
-
-                view.setSyncerStatus(this._config.syncerId, "building firebase syncer");
-                // Build the firebase syncer and init it.
-                const buildFirebaseSyncer = await FirebaseSyncer.buildFirebaseSyncer(
-                    this,
-                    this._firebaseApp,
-                    this._config,
-                    creds
-                );
-                if (buildFirebaseSyncer.err) {
-                    return buildFirebaseSyncer;
-                }
-                // Save the cache for firebase.
-                await this._plugin.saveSettings(/*startupSyncer=*/ false);
-
-                // Now initalize firebase.
-                const firebaseSyncer = buildFirebaseSyncer.safeUnwrap();
-                this._firebaseSyncer = Some(firebaseSyncer);
-                view.setSyncerStatus(this._config.syncerId, "firebase building realtime sync");
-                firebaseSyncer.initailizeRealTimeUpdates();
-
-                view.setSyncerStatus(this._config.syncerId, "running first tick");
-                if (this._config.type !== RootSyncType.ROOT_SYNCER) {
-                    return Err(UnimplementedError(`Type "${this._config.type}" not implemented`));
-                }
-                // Start the file syncer repeating tick.
-                await this.fileSyncerTick();
-
-                view.setSyncerStatus(this._config.syncerId, "good", "green");
-                return Ok();
+        // Load cache of firebase nodes and assign them to filenodes.
+        view.setSyncerStatus(this._config.syncerId, "Loading cached firebase information");
+        const cache = await FirebaseCache.readFirebaseCache(this._app, this._config);
+        if (cache.err) {
+            return cache;
+        }
+        for (const cachedCloudData of cache.safeUnwrap().cache) {
+            const loadedFileNode = WrapOptional(
+                this._mapOfFileNodes.get(cachedCloudData.data.path as FilePathType)
+            );
+            if (loadedFileNode.some) {
+                loadedFileNode.safeValue().firebaseData = Some(cachedCloudData);
+            } else {
+                // FileNode not found, so it doesn't exist.
+                const newNode: RemoteOnlyNode = {
+                    localTime: cachedCloudData.data.entryTime,
+                    fileData: { fullPath: cachedCloudData.data.path as FilePathType },
+                    firebaseData: cachedCloudData,
+                    type: FileNodeType.REMOTE_ONLY
+                };
+                this._mapOfFileNodes.set(cachedCloudData.data.path as FilePathType, newNode);
             }
+        }
+
+        // TODO: Enable history again.
+        // view.setSyncerStatus(this._config.syncerId, "building firebase history");
+        // const buildFirebaseHistory = await FirebaseHistory.buildFirebaseHistory(
+        //     this._plugin,
+        //     this._firebaseApp,
+        //     this._config,
+        //     creds,
+        //     this._mapOfFileNodes
+        // );
+        // if (buildFirebaseHistory.err) {
+        //     buildFirebaseHistory.val.with(
+        //         InjectStatusMsg(`Failed to init file syncer's firebase history module.`, {
+        //             [LOGGING_SYNCER_CONFIG_ATTR]: JSON.stringify(
+        //                 SyncerConfigRemoveCache(this._config)
+        //             )
+        //         })
+        //     );
+        //     return buildFirebaseHistory;
+        // // }
+        // this._firebaseHistory = Some(buildFirebaseHistory.safeUnwrap());
+        // this._firebaseHistory.safeValue().initailizeRealTimeUpdates();
+        // this._firebaseHistory.safeValue().updateMapOfLocalNodes(this._mapOfFileNodes);
+        // view.setSyncerHistory(this._config, buildFirebaseHistory.safeUnwrap());
+
+        view.setSyncerStatus(this._config.syncerId, "building firebase syncer");
+        // Build the firebase syncer and init it.
+        const buildFirebaseSyncer = await FirebaseSyncer.buildFirebaseSyncer(
+            this._app,
+            this,
+            this._firebaseApp,
+            this._config,
+            creds,
+            cache.safeUnwrap()
         );
+        if (buildFirebaseSyncer.err) {
+            return buildFirebaseSyncer;
+        }
+
+        // Now initalize firebase.
+        const firebaseSyncer = buildFirebaseSyncer.safeUnwrap();
+        this._firebaseSyncer = Some(firebaseSyncer);
+        view.setSyncerStatus(this._config.syncerId, "firebase building realtime sync");
+        const rtuResult = firebaseSyncer.initailizeRealTimeUpdates();
+        if (rtuResult.err) {
+            return rtuResult;
+        }
+
+        view.setSyncerStatus(this._config.syncerId, "running first tick");
+        if (this._config.type !== RootSyncType.ROOT_SYNCER) {
+            return Err(UnimplementedError(`Type "${this._config.type}" not implemented`));
+        }
+        view.setSyncerStatus(this._config.syncerId, "good", "green");
+
+        // Start the file syncer repeating tick.
+        await this.fileSyncerTick();
+
+        return Ok();
     }
 
+    @Span()
     public teardown() {
-        void (async () => {
-            const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
-            view.setSyncerStatus(this._config.syncerId, "TearDown!", "red");
-        });
         this._isDead = true;
         if (this._firebaseSyncer.some) {
             this._firebaseSyncer.safeValue().teardown();
@@ -181,9 +231,18 @@ export class FileSyncer {
         if (this._timeoutId.some) {
             clearTimeout(this._timeoutId.safeValue());
         }
+        void (async () => {
+            const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
+            view.setSyncerStatus(this._config.syncerId, "TearDown!", "red");
+        });
     }
 
+    @Span()
     private listenForFileChanges() {
+        if (this._unsubWatchHandler.some) {
+            return;
+        }
+
         this._unsubWatchHandler = Some(
             AddWatchHandler(
                 this._plugin.app,
@@ -200,25 +259,25 @@ export class FileSyncer {
                         case "folder-created":
                             break;
                         case "file-created":
-                            this._touchedFilepaths.add(path);
+                            this._touchedFilepaths.set(path, Date.now());
                             break;
                         case "modified":
-                            this._touchedFilepaths.add(path);
+                            this._touchedFilepaths.set(path, Date.now());
                             break;
                         case "file-removed":
-                            this._touchedFilepaths.add(path);
+                            this._touchedFilepaths.set(path, Date.now());
                             break;
                         case "renamed":
-                            this._touchedFilepaths.add(path);
+                            this._touchedFilepaths.set(path, Date.now());
                             if (oldPath !== undefined) {
-                                this._touchedFilepaths.add(oldPath);
+                                this._touchedFilepaths.set(oldPath, Date.now());
                             }
                             break;
                         case "closed":
-                            this._touchedFilepaths.add(path);
+                            this._touchedFilepaths.set(path, Date.now());
                             break;
                         case "raw":
-                            this._touchedFilepaths.add(path);
+                            this._touchedFilepaths.set(path, Date.now());
                             break;
                     }
                     return;
@@ -228,39 +287,30 @@ export class FileSyncer {
     }
 
     /** Execute a filesyncer tick. */
+    @Span({ newContext: true })
     private async fileSyncerTick() {
+        setAttributeOnActiveSpan(SYNCER_ID_SPAN_ATTR, this._config.syncerId);
         if (this._isDead) {
             const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
             view.setSyncerStatus(this._config.syncerId, "TearDown!", "red");
+            LOGGER.error(`Syncer is dead!`, {
+                [SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR]: this._config.syncerId
+            });
             return;
         }
         const tickResult = await this.fileSyncerTickLogic();
         if (tickResult.err) {
-            LogError(tickResult.val);
+            LogError(LOGGER, tickResult.val);
             const view = await GetOrCreateSyncProgressView(this._plugin.app);
             view.publishSyncerError(this._config.syncerId, tickResult.val);
             view.setSyncerStatus(this._config.syncerId, "Tick Crash!", "red");
-            return;
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (this._isDead) {
-            const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
-            view.setSyncerStatus(this._config.syncerId, "TearDown!", "red");
+            this._isDead = true;
             return;
         }
         this._timeoutId = Some(
             window.setTimeout(
                 () => {
-                    if (!this._isDead) {
-                        void this.fileSyncerTick();
-                    } else {
-                        void GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false).then(
-                            (view) => {
-                                view.setSyncerStatus(this._config.syncerId, "TearDown!", "red");
-                            }
-                        );
-                    }
+                    void this.fileSyncerTick();
                 },
                 Math.max(1000 - tickResult.safeUnwrap(), 0)
             )
@@ -268,6 +318,7 @@ export class FileSyncer {
     }
 
     /** The logic that runs for the file syncer very tick. Returns ms it took to do the update. */
+    @Span()
     private async fileSyncerTickLogic(): Promise<Result<number, StatusError>> {
         if (this._firebaseSyncer.none) {
             return Err(InternalError(`Firebase syncer hasn't been initialized!`));
@@ -275,11 +326,28 @@ export class FileSyncer {
 
         // Id for the cycle.
         const cycleId = uuidv7();
+        setAttributeOnActiveSpan(SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR, cycleId);
         // Setup the progress view.
         const view = await GetOrCreateSyncProgressView(this._plugin.app, /*reveal=*/ false);
         view.newSyncerCycle(this._config.syncerId, cycleId);
 
         const startTime = window.performance.now();
+
+        // Get the current state of firebase information in cloud nodes.
+        const cloudData = this._firebaseSyncer.safeValue().cloudNodes;
+        // Given the current state of files and the firebase cloud nodes create the actions
+        // needed to converge them.
+        const convergenceData = await ConvergenceUtil.createStateConvergenceActions(
+            this._app,
+            this._config,
+            this._mapOfFileNodes,
+            this._touchedFilepaths,
+            cloudData
+        );
+        if (convergenceData.err) {
+            return convergenceData;
+        }
+
         // First converge the file updates.
         const touchedFilePaths = this._touchedFilepaths;
         this._touchedFilepaths = new Set();
@@ -300,7 +368,7 @@ export class FileSyncer {
         // Get the updates necessary.
         const convergenceUpdates = this._firebaseSyncer
             .safeValue()
-            .getConvergenceUpdates(this._mapOfFileNodes);
+            .GetConvergenceUpdates(this._mapOfFileNodes);
         if (convergenceUpdates.err) {
             return convergenceUpdates;
         }
@@ -325,7 +393,7 @@ export class FileSyncer {
         // Build the operations necessary to sync.
         const buildConvergenceOperations = this._firebaseSyncer
             .safeValue()
-            .resolveConvergenceUpdates(
+            .ResolveConvergenceUpdates(
                 {
                     syncerId: this._config.syncerId,
                     cycleId,
@@ -406,36 +474,5 @@ export class FileSyncer {
             endTime - startTime
         );
         return Ok(endTime - startTime);
-    }
-
-    /** Resolve the logic for null updates removing them. */
-    private resolveNullUpdates(
-        updates: ConvergenceUpdate[]
-    ): [Exclude<ConvergenceUpdate, NullUpdate>[], NullUpdate[]] {
-        const results: Exclude<ConvergenceUpdate, NullUpdate>[] = [];
-        const nulls: NullUpdate[] = [];
-        for (const update of updates) {
-            switch (update.action) {
-                case ConvergenceAction.USE_CLOUD:
-                case ConvergenceAction.USE_CLOUD_DELETE_LOCAL:
-                case ConvergenceAction.USE_LOCAL:
-                case ConvergenceAction.USE_LOCAL_DELETE_CLOUD:
-                    results.push(update);
-                    break;
-                case ConvergenceAction.NULL_UPDATE:
-                    if (
-                        !update.localState
-                            .safeValue()
-                            .metadataAreEqual(update.cloudState.safeValue())
-                    ) {
-                        update.newLocalFile = update.localState
-                            .safeValue()
-                            .overwriteMetadataWithCloudNode(update.cloudState.safeValue());
-                        nulls.push(update);
-                    }
-                    break;
-            }
-        }
-        return [results, nulls];
     }
 }

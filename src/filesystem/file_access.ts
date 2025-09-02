@@ -19,9 +19,11 @@ import {
     LocalOnlyFileNode,
     MissingFileNode
 } from "./file_node";
-import type { AllExistingFileNodeTypes, FilePathType } from "./file_node";
+import type { AllExistingFileNodeTypes, FilePathType, LocalCloudFileNode } from "./file_node";
 import { MapOfFileNodes } from "./file_map_util";
 import { MsFromEpoch } from "../types";
+import { InjectMeta } from "../lib/inject_status_msg";
+import { FileConst } from "../constants";
 
 /**
  * Defines the concrete node type based on the generic boolean flags.
@@ -238,6 +240,54 @@ export class FileAccess {
             }
         }
         return Ok();
+    }
+    /**
+     * Deletes a file node.
+     * @param app the obsidian app
+     * @param fileNode the file node to delete
+     * @param config the syncer config used in this
+     * @returns the status of deleting the file
+     */
+    @Span()
+    @PromiseResultSpanError
+    public static async readFileNode(
+        app: App,
+        fileNode: LocalOnlyFileNode | LocalCloudFileNode,
+        config: LatestSyncConfigVersion
+    ): Promise<Result<Uint8Array, StatusError>> {
+        if (!IsAcceptablePath(fileNode.fileData.fullPath, config)) {
+            return Err(
+                NotFoundError("File node not found").with(
+                    InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
+                )
+            );
+        }
+        if (IsObsidianFile(fileNode.fileData.fullPath, config)) {
+            const fileResult = await FileUtilObsidian.readObsidianFile(
+                app,
+                fileNode.fileData.fullPath
+            );
+            if (fileResult.err) {
+                fileResult.val.with(
+                    InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
+                );
+            }
+            return fileResult;
+        }
+        if (IsLocalFileRaw(fileNode.fileData.fullPath, config)) {
+            const fileResult = await FileUtilRaw.readRawFile(app, fileNode.fileData.fullPath);
+            if (fileResult.err) {
+                fileResult.val.with(
+                    InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
+                );
+            }
+            return fileResult;
+        }
+        return Err(
+            NotFoundError("File node not found").with(
+                InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
+            )
+        );
     }
 
     @Span()
