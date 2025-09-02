@@ -10,6 +10,7 @@ import {
     AllExistingFileNodeTypes,
     FileNodeType,
     LocalCloudFileNode,
+    LocalOnlyFileNode,
     RemoteOnlyNode
 } from "../filesystem/file_node";
 import { Ok, StatusResult } from "../lib/result";
@@ -25,6 +26,7 @@ import type {
     ConvergenceStateReturnType,
     DeleteLocalFileAction,
     MarkCloudDeletedAction,
+    NewLocalFileAction,
     UpdateCloudAction
 } from "./convergence_util";
 import type { UserCredential } from "firebase/auth";
@@ -528,7 +530,6 @@ export class SyncerUpdateUtil {
     ): Promise<Result<AllExistingFileNodeTypes, StatusError>> {
         switch (action.action) {
             case ConvergenceActionType.NEW_LOCAL_FILE:
-                break;
             case ConvergenceActionType.UPDATE_CLOUD:
                 return SyncerUpdateUtil.executeUpdateCloud(
                     app,
@@ -563,11 +564,16 @@ export class SyncerUpdateUtil {
         db: Firestore,
         clientId: string,
         syncerConfig: LatestSyncConfigVersion,
-        action: UpdateCloudAction,
+        action: NewLocalFileAction | UpdateCloudAction,
         transaction: Transaction,
         creds: UserCredential,
         view: SyncProgressView
     ): Promise<Result<LocalCloudFileNode, StatusError>> {
+        const firestoreDocId =
+            action.action === ConvergenceActionType.NEW_LOCAL_FILE
+                ? uuidv7()
+                : action.localNode.firebaseData.id;
+
         const readDataResult = await FileAccess.readFileNode(app, action.localNode, syncerConfig);
         view.setEntryProgress(syncerConfig.syncerId, action.localNode.fileData.fullPath, 0.3);
         if (readDataResult.err) {
@@ -587,14 +593,13 @@ export class SyncerUpdateUtil {
         if (!tooBigForFirestore) {
             // When the data is small enough compress it and upload to firebase.
 
-            const fileId = action.localNode.firebaseData.id;
             const uploadToFirestore = FirestoreUtil.uploadDataToFirestore(
                 db,
                 clientId,
                 syncerConfig,
                 transaction,
                 creds,
-                fileId,
+                firestoreDocId,
                 action.localNode,
                 new Uint8Array(compressedData.safeUnwrap())
             );
@@ -626,14 +631,13 @@ export class SyncerUpdateUtil {
         }
         view.setEntryProgress(syncerConfig.syncerId, action.localNode.fileData.fullPath, 0.7);
 
-        const fileId = action.localNode.firebaseData.id;
         const uploadToFirestore = FirestoreUtil.uploadCloudNodeToFirestore(
             db,
             clientId,
             syncerConfig,
             transaction,
             creds,
-            fileId,
+            firestoreDocId,
             action.localNode,
             uploadResult.safeUnwrap()
         );
