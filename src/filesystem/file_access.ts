@@ -1,4 +1,5 @@
 import { App, normalizePath, TFile } from "obsidian";
+import type { DataWriteOptions } from "obsidian";
 import { Result, StatusResult, Ok, Err } from "../lib/result";
 import { InvalidArgumentError, NotFoundError, StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
@@ -240,6 +241,65 @@ export class FileAccess {
             }
         }
         return Ok();
+    }
+    /**
+     * Writes to a file node.
+     * @param app the obsidian app
+     * @param fileNode the file node to write to
+     * @param data the data to write
+     * @param config the syncer config used in this
+     * @param opts the write options
+     * @returns the status of writing the file
+     */
+    @Span()
+    @PromiseResultSpanError
+    public static async writeFileNode(
+        app: App,
+        fileNode: AllExistingFileNodeTypes,
+        data: Uint8Array,
+        config: LatestSyncConfigVersion,
+        opts?: DataWriteOptions
+    ): Promise<StatusResult<StatusError>> {
+        if (!IsAcceptablePath(fileNode.fileData.fullPath, config)) {
+            return Err(
+                NotFoundError("File node not found within acceptable path").with(
+                    InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
+                )
+            );
+        }
+        if (IsObsidianFile(fileNode.fileData.fullPath, config)) {
+            const fileResult = await FileUtilObsidian.writeToObsidianFile(
+                app,
+                fileNode.fileData.fullPath,
+                data,
+                opts
+            );
+            if (fileResult.err) {
+                fileResult.val.with(
+                    InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
+                );
+            }
+            return fileResult;
+        }
+        if (IsLocalFileRaw(fileNode.fileData.fullPath, config)) {
+            const fileResult = await FileUtilRaw.writeToRawFile(
+                app,
+                fileNode.fileData.fullPath,
+                data,
+                opts
+            );
+            if (fileResult.err) {
+                fileResult.val.with(
+                    InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
+                );
+            }
+            return fileResult;
+        }
+        return Err(
+            NotFoundError("File node path didn't match any type").with(
+                InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
+            )
+        );
     }
     /**
      * Deletes a file node.
