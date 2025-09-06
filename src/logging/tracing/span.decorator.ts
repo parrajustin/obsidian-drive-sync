@@ -1,6 +1,7 @@
 import { context, ROOT_CONTEXT, trace } from "@opentelemetry/api";
 import type { SpanOptions as OTELSpanOptions, Span } from "@opentelemetry/api";
 import { TRACER } from "./tracer";
+import { IS_TEST_ENV } from "../../constants";
 
 export interface SpanOptions extends OTELSpanOptions {
     /**
@@ -104,6 +105,11 @@ export function Span(nameOrOptions?: string | SpanOptions, options?: SpanOptions
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             if (TRACER === undefined) {
                 // OTEL is disabled. Probably running in a test environment.
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                return originalMethod.apply(this, args);
+            }
+
+            if (IS_TEST_ENV) {
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                 return originalMethod.apply(this, args);
             }

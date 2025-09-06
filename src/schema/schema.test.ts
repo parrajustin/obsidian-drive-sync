@@ -14,6 +14,7 @@ interface Version2 {
     otherData: "lol";
 }
 const MANAGER = new SchemaManager<[Version0, Version1, Version2], 2>(
+    "Test",
     [
         (data) => {
             return { name: data.name === "true", version: 1 };
