@@ -2,6 +2,10 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 import { uuidv7 } from "./lib/uuid";
 
+// If this environment is a test.
+// eslint-disable-next-line prefer-const
+export let IS_TEST_ENV = false;
+
 export const SERVICE_NAME = "obsidian-sync";
 
 /**

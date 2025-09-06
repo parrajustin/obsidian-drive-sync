@@ -1,14 +1,19 @@
+/* eslint-disable @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/naming-convention */
+/* eslint-disable @typescript-eslint/no-empty-function */
 import { describe, expect, jest, test, beforeEach } from "@jest/globals";
 import type { App, DataWriteOptions } from "obsidian";
 import { FileUtilRaw } from "./file_util_raw_api";
+import type { StatusError } from "../lib/status_error";
 
 const mockAdapter = {
     readBinary: jest.fn<(path: string) => Promise<ArrayBuffer>>(),
-    writeBinary: jest.fn<(path: string, data: ArrayBuffer, opts?: DataWriteOptions) => Promise<void>>(),
+    writeBinary:
+        jest.fn<(path: string, data: ArrayBuffer, opts?: DataWriteOptions) => Promise<void>>(),
     mkdir: jest.fn<(path: string) => Promise<void>>(),
     trashSystem: jest.fn<(path: string) => Promise<boolean>>(),
     trashLocal: jest.fn<(path: string) => Promise<void>>(),
-    getFullPath: jest.fn<(path: string) => string>(),
+    getFullPath: jest.fn<(path: string) => string>()
 };
 
 const mockApp = {
@@ -17,14 +22,13 @@ const mockApp = {
     }
 } as unknown as App;
 
-
 jest.mock(
     "obsidian",
     () => {
         return {
             __esModule: true,
             normalizePath: (path: string) => path,
-            FuzzySuggestModal: class MockFuzzySuggestModal {},
+            FuzzySuggestModal: class MockFuzzySuggestModal {}
         };
     },
     { virtual: true }
@@ -35,8 +39,8 @@ jest.mock("../logging/logger", () => ({
         debug: () => {},
         info: () => {},
         warn: () => {},
-        error: () => {},
-    }),
+        error: () => {}
+    })
 }));
 
 describe("FileUtilRaw", () => {
@@ -92,6 +96,9 @@ describe("FileUtilRaw", () => {
         const result = await FileUtilRaw.writeToRawFile(mockApp, filePath, fileData);
 
         expect(result.ok).toBe(false);
+        expect((result.val as StatusError).toString()).toContain(
+            `Failed to mkdir "folder/test.md" [mkdir failed]`
+        );
         expect(mockAdapter.mkdir).toHaveBeenCalledWith("folder");
         expect(mockAdapter.writeBinary).not.toHaveBeenCalled();
     });
@@ -125,7 +132,6 @@ describe("FileUtilRaw", () => {
         mockAdapter.trashSystem.mockResolvedValue(false);
         mockAdapter.trashLocal.mockResolvedValue(undefined);
         mockAdapter.getFullPath.mockReturnValue(filePath);
-
 
         const result = await FileUtilRaw.deleteRawFile(mockApp, filePath);
 
