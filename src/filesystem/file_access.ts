@@ -8,7 +8,6 @@ import { Span } from "../logging/tracing/span.decorator";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { IsAcceptablePath, IsObsidianFile, IsLocalFileRaw } from "../sync/query_util";
 import { AsyncForEach, CombineResults } from "../util";
-import { Bytes } from "firebase/firestore";
 import { None, Optional, Some, WrapOptional } from "../lib/option";
 import GetSha256Hash from "../lib/sha";
 import { FileUtilObsidian } from "./file_util_obsidian_api";
@@ -25,6 +24,7 @@ import { MapOfFileNodes } from "./file_map_util";
 import { MsFromEpoch } from "../types";
 import { InjectMeta } from "../lib/inject_status_msg";
 import { FileConst } from "../constants";
+import { Bytes } from "firebase/firestore";
 
 /**
  * Defines the concrete node type based on the generic boolean flags.
@@ -55,9 +55,7 @@ export class FileAccess {
         // }
 
         const fileContents = await FileUtilObsidian.readObsidianFile(app, fileName);
-        const fileHash = fileContents.map((f) =>
-            Bytes.fromUint8Array(GetSha256Hash(new Uint8Array(f))).toBase64()
-        );
+        const fileHash = fileContents.map((f) => Bytes.fromUint8Array(GetSha256Hash(f)).toBase64());
         if (fileHash.err) {
             return fileHash;
         }
