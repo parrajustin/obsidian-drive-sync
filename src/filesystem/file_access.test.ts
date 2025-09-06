@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
+/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/naming-convention */
 import { describe, expect, jest, test, beforeEach } from "@jest/globals";
@@ -6,20 +8,24 @@ import { FileAccess } from "./file_access";
 import { FileUtilObsidian } from "./file_util_obsidian_api";
 import { FileUtilRaw } from "./file_util_raw_api";
 import * as queryUtil from "../sync/query_util";
-import { Ok, Err, Result } from "../lib/result";
+import type { Result } from "../lib/result";
+import { Ok, Err } from "../lib/result";
 import { NotFoundError, StatusError, ErrorCode } from "../lib/status_error";
 import { Bytes } from "firebase/firestore";
 import GetSha256Hash from "../lib/sha";
-import {
-    FileNodeType,
+import { FileNodeType } from "./file_node";
+import type {
+    FilePathType,
+    AllExistingFileNodeTypes,
+    LocalFileNodeTypes,
     LocalOnlyFileNode,
     MissingFileNode,
-    InvalidFileNode,
+    InvalidFileNode
 } from "./file_node";
-import type { FilePathType, AllExistingFileNodeTypes, LocalFileNodeTypes } from "./file_node";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { RootSyncType } from "../schema/settings/syncer_config.schema";
 import { Some, None } from "../lib/option";
+
 
 // Mock the 'obsidian' module
 jest.mock(
@@ -27,7 +33,7 @@ jest.mock(
     () => ({
         __esModule: true,
         normalizePath: (path: string) => path,
-        TFile: class TFile {},
+        TFile: class TFile {}
     }),
     { virtual: true }
 );
@@ -45,7 +51,7 @@ const mockGetSha256Hash = jest.mocked(GetSha256Hash);
 
 const mockVault = {
     getName: () => "test-vault",
-    getAbstractFileByPath: jest.fn(),
+    getAbstractFileByPath: jest.fn()
     // Add other mocked methods and properties as needed by the code under test
 } as unknown as Vault;
 
@@ -61,9 +67,9 @@ const mockApp = {
             trashSystem: jest.fn(),
             trashLocal: jest.fn(),
             getFullPath: jest.fn(),
-            list: jest.fn(),
-        },
-    },
+            list: jest.fn()
+        }
+    }
 } as unknown as App;
 
 const mockConfig: LatestSyncConfigVersion = {
@@ -80,7 +86,7 @@ const mockConfig: LatestSyncConfigVersion = {
     nestedRootPath: "",
     sharedSettings: { pathToFolder: "" },
     firebaseCachePath: "",
-    version: 0,
+    version: 0
 };
 
 const createMockTFile = (path: FilePathType, stat: Partial<Stat> = {}): TFile => {
@@ -91,13 +97,12 @@ const createMockTFile = (path: FilePathType, stat: Partial<Stat> = {}): TFile =>
         extension: path.split(".").pop() ?? "",
         vault: mockVault,
         name: path.split("/").pop() ?? "",
-        parent: {} as TFolder,
+        parent: {} as TFolder
     } as TFile;
     // Mock the constructor check
     Object.defineProperty(file, "constructor", { value: function TFile() {} });
     return file;
 };
-
 
 describe("FileAccess", () => {
     beforeEach(() => {
@@ -123,7 +128,9 @@ describe("FileAccess", () => {
             const nodeOpt = result.unsafeUnwrap();
             expect(nodeOpt.some).toBe(true);
             const node = (nodeOpt as Some<LocalOnlyFileNode>).val;
-            expect(node.fileData.fileHash).toEqual(Bytes.fromUint8Array(Buffer.from(hash)).toBase64());
+            expect(node.fileData.fileHash).toEqual(
+                Bytes.fromUint8Array(Buffer.from(hash)).toBase64()
+            );
         });
 
         test("should return None if file is not a TFile", async () => {
@@ -168,7 +175,9 @@ describe("FileAccess", () => {
             const nodeOpt = result.unsafeUnwrap();
             expect(nodeOpt.some).toBe(true);
             const node = (nodeOpt as Some<LocalOnlyFileNode>).val;
-            expect(node.fileData.fileHash).toEqual(Bytes.fromUint8Array(Buffer.from(hash)).toBase64());
+            expect(node.fileData.fileHash).toEqual(
+                Bytes.fromUint8Array(Buffer.from(hash)).toBase64()
+            );
         });
 
         test("should return None if path is a folder", async () => {
@@ -218,13 +227,11 @@ describe("FileAccess", () => {
 
     describe("getFileNode", () => {
         const mockLocalNode = {
-            type: FileNodeType.LOCAL_ONLY_FILE,
+            type: FileNodeType.LOCAL_ONLY_FILE
         } as LocalOnlyFileNode;
 
         beforeEach(() => {
-            jest.spyOn(FileAccess, "getObsidianNode").mockResolvedValue(
-                Ok(Some(mockLocalNode))
-            );
+            jest.spyOn(FileAccess, "getObsidianNode").mockResolvedValue(Ok(Some(mockLocalNode)));
             jest.spyOn(FileAccess, "getRawNode").mockResolvedValue(Ok(Some(mockLocalNode)));
             mockQueryUtil.IsAcceptablePath.mockReturnValue(true);
             mockQueryUtil.IsObsidianFile.mockReturnValue(false);
@@ -234,7 +241,11 @@ describe("FileAccess", () => {
         test("should return InvalidFileNode if path is not acceptable and ignoreInvalidPath is true", async () => {
             mockQueryUtil.IsAcceptablePath.mockReturnValue(false);
             const result = await FileAccess.getFileNode(
-                mockApp, "p" as FilePathType, mockConfig, false, true
+                mockApp,
+                "p" as FilePathType,
+                mockConfig,
+                false,
+                true
             );
             expect(result.ok).toBe(true);
             expect(result.unsafeUnwrap().type).toBe(FileNodeType.INVALID);
@@ -243,7 +254,11 @@ describe("FileAccess", () => {
         test("should return NotFoundError if path is not acceptable and ignoreInvalidPath is false", async () => {
             mockQueryUtil.IsAcceptablePath.mockReturnValue(false);
             const result = await FileAccess.getFileNode(
-                mockApp, "p" as FilePathType, mockConfig, false, false
+                mockApp,
+                "p" as FilePathType,
+                mockConfig,
+                false,
+                false
             );
             expect(result.err).toBe(true);
             expect(result.val).toBeInstanceOf(NotFoundError);
@@ -251,9 +266,7 @@ describe("FileAccess", () => {
 
         test("should return LocalOnlyFileNode for an obsidian file", async () => {
             mockQueryUtil.IsObsidianFile.mockReturnValue(true);
-            const result = await FileAccess.getFileNode(
-                mockApp, "p" as FilePathType, mockConfig
-            );
+            const result = await FileAccess.getFileNode(mockApp, "p" as FilePathType, mockConfig);
             expect(result.ok).toBe(true);
             expect(result.unsafeUnwrap()).toBe(mockLocalNode);
             expect(FileAccess.getObsidianNode).toHaveBeenCalled();
@@ -263,7 +276,10 @@ describe("FileAccess", () => {
             mockQueryUtil.IsObsidianFile.mockReturnValue(true);
             jest.spyOn(FileAccess, "getObsidianNode").mockResolvedValue(Ok(None));
             const result = await FileAccess.getFileNode(
-                mockApp, "p" as FilePathType, mockConfig, true
+                mockApp,
+                "p" as FilePathType,
+                mockConfig,
+                true
             );
             expect(result.ok).toBe(true);
             expect(result.unsafeUnwrap().type).toBe(FileNodeType.LOCAL_MISSING);
@@ -271,9 +287,7 @@ describe("FileAccess", () => {
 
         test("should return LocalOnlyFileNode for a raw file", async () => {
             mockQueryUtil.IsLocalFileRaw.mockReturnValue(true);
-            const result = await FileAccess.getFileNode(
-                mockApp, "p" as FilePathType, mockConfig
-            );
+            const result = await FileAccess.getFileNode(mockApp, "p" as FilePathType, mockConfig);
             expect(result.ok).toBe(true);
             expect(result.unsafeUnwrap()).toBe(mockLocalNode);
             expect(FileAccess.getRawNode).toHaveBeenCalled();
@@ -283,7 +297,10 @@ describe("FileAccess", () => {
             mockQueryUtil.IsLocalFileRaw.mockReturnValue(true);
             jest.spyOn(FileAccess, "getRawNode").mockResolvedValue(Ok(None));
             const result = await FileAccess.getFileNode(
-                mockApp, "p" as FilePathType, mockConfig, true
+                mockApp,
+                "p" as FilePathType,
+                mockConfig,
+                true
             );
             expect(result.ok).toBe(true);
             expect(result.unsafeUnwrap().type).toBe(FileNodeType.LOCAL_MISSING);
@@ -292,7 +309,7 @@ describe("FileAccess", () => {
 
     describe("deleteFileNode", () => {
         const mockFileNode = {
-            fileData: { fullPath: "p" as FilePathType },
+            fileData: { fullPath: "p" as FilePathType }
         } as AllExistingFileNodeTypes;
 
         beforeEach(() => {
@@ -326,7 +343,7 @@ describe("FileAccess", () => {
 
     describe("writeFileNode", () => {
         const mockFileNode = {
-            fileData: { fullPath: "p" as FilePathType },
+            fileData: { fullPath: "p" as FilePathType }
         } as AllExistingFileNodeTypes;
         const data = new Uint8Array([1]);
 
@@ -340,9 +357,7 @@ describe("FileAccess", () => {
 
         test("should return error if path is not acceptable", async () => {
             mockQueryUtil.IsAcceptablePath.mockReturnValue(false);
-            const result = await FileAccess.writeFileNode(
-                mockApp, mockFileNode, data, mockConfig
-            );
+            const result = await FileAccess.writeFileNode(mockApp, mockFileNode, data, mockConfig);
             expect(result.err).toBe(true);
             expect(result.val).toBeInstanceOf(NotFoundError);
         });
@@ -350,19 +365,29 @@ describe("FileAccess", () => {
         test("should call writeToObsidianFile for an obsidian file", async () => {
             mockQueryUtil.IsObsidianFile.mockReturnValue(true);
             await FileAccess.writeFileNode(mockApp, mockFileNode, data, mockConfig);
-            expect(mockFileUtilObsidian.writeToObsidianFile).toHaveBeenCalledWith(mockApp, "p", data, undefined);
+            expect(mockFileUtilObsidian.writeToObsidianFile).toHaveBeenCalledWith(
+                mockApp,
+                "p",
+                data,
+                undefined
+            );
         });
 
         test("should call writeToRawFile for a raw file", async () => {
             mockQueryUtil.IsLocalFileRaw.mockReturnValue(true);
             await FileAccess.writeFileNode(mockApp, mockFileNode, data, mockConfig);
-            expect(mockFileUtilRaw.writeToRawFile).toHaveBeenCalledWith(mockApp, "p", data, undefined);
+            expect(mockFileUtilRaw.writeToRawFile).toHaveBeenCalledWith(
+                mockApp,
+                "p",
+                data,
+                undefined
+            );
         });
     });
 
     describe("readFileNode", () => {
         const mockFileNode = {
-            fileData: { fullPath: "p" as FilePathType },
+            fileData: { fullPath: "p" as FilePathType }
         } as LocalOnlyFileNode;
         const data = new Uint8Array([1]);
 
@@ -406,20 +431,20 @@ describe("FileAccess", () => {
                         return Ok({
                             type: FileNodeType.LOCAL_ONLY_FILE,
                             fileData: { fullPath },
-                            localTime: 0,
+                            localTime: 0
                         } as LocalOnlyFileNode);
                     }
                     if (fullPath === "missing.md") {
                         return Ok({
                             type: FileNodeType.LOCAL_MISSING,
                             fileData: { fullPath },
-                            localTime: 0,
+                            localTime: 0
                         } as MissingFileNode);
                     }
                     if (fullPath === "invalid.md") {
                         return Ok({
                             type: FileNodeType.INVALID,
-                            fileData: { fullPath },
+                            fileData: { fullPath }
                         } as InvalidFileNode);
                     }
                     return Err(NotFoundError("File not found"));
@@ -427,7 +452,7 @@ describe("FileAccess", () => {
             );
 
             jest.spyOn(mockApp.vault.adapter, "stat").mockImplementation(async (path) => {
-                if ((path as string).includes("error")) {
+                if (path.includes("error")) {
                     throw new Error("Stat failed");
                 }
                 return { type: "file", ctime: 1, mtime: 1, size: 1 };
@@ -438,12 +463,10 @@ describe("FileAccess", () => {
             const touchedFiles = new Map<FilePathType, number>([
                 ["valid.md" as FilePathType, 12345],
                 ["missing.md" as FilePathType, 67890],
-                ["invalid.md" as FilePathType, 11223],
+                ["invalid.md" as FilePathType, 11223]
             ]);
 
-            const result = await FileAccess.getTouchedFileNodes(
-                mockApp, mockConfig, touchedFiles
-            );
+            const result = await FileAccess.getTouchedFileNodes(mockApp, mockConfig, touchedFiles);
 
             expect(result.ok).toBe(true);
             const nodes = result.unsafeUnwrap();
@@ -459,12 +482,14 @@ describe("FileAccess", () => {
 
     describe("getAllFileNodes", () => {
         beforeEach(() => {
-            jest.spyOn(FileAccess, "getFileNode").mockImplementation(async (_app, fullPath): Promise<Result<LocalOnlyFileNode, StatusError>> => {
-                return Ok({
-                    type: FileNodeType.LOCAL_ONLY_FILE,
-                    fileData: { fullPath },
-                } as LocalOnlyFileNode);
-            });
+            jest.spyOn(FileAccess, "getFileNode").mockImplementation(
+                async (_app, fullPath): Promise<Result<LocalOnlyFileNode, StatusError>> => {
+                    return Ok({
+                        type: FileNodeType.LOCAL_ONLY_FILE,
+                        fileData: { fullPath }
+                    } as LocalOnlyFileNode);
+                }
+            );
 
             jest.spyOn(mockApp.vault.adapter, "list").mockImplementation(async (path) => {
                 if (path === "") {
