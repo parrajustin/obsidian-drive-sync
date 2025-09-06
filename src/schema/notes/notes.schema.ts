@@ -1,21 +1,6 @@
 import type { Bytes } from "firebase/firestore";
 import { SchemaManager, type VersionedSchema } from "../schema";
 
-interface DataFieldModel {
-    type: "Raw";
-    /** The data of the file if less than 100Kb */
-    data: Bytes;
-    /** The location of the file in cloud storage if not in `data`. */
-    fileStorageRef: null;
-}
-interface StorageFieldModel {
-    type: "Ref";
-    /** The data of the file if less than 100Kb */
-    data: null;
-    /** The location of the file in cloud storage if not in `data`. */
-    fileStorageRef: string;
-}
-
 /** Data for the file. */
 export interface FileDataDbModel {
     // Full filepath.
@@ -50,11 +35,22 @@ export interface FileDataDbModel {
     /** Time of the change of this file, in ms from unix epoch. */
     entryTime: number;
 }
+interface DataFieldModel extends FileDataDbModel {
+    type: "Raw";
+    /** The data of the file if less than 100Kb */
+    data: Bytes;
+    /** The location of the file in cloud storage if not in `data`. */
+    fileStorageRef: null;
+}
+interface StorageFieldModel extends FileDataDbModel {
+    type: "Ref";
+    /** The data of the file if less than 100Kb */
+    data: null;
+    /** The location of the file in cloud storage if not in `data`. */
+    fileStorageRef: string;
+}
 
-export type Version0NotesSchema = VersionedSchema<
-    FileDataDbModel & (StorageFieldModel | DataFieldModel),
-    0
->;
+export type Version0NotesSchema = VersionedSchema<StorageFieldModel | DataFieldModel, 0>;
 
 export type AnyVersionNotesSchema = Version0NotesSchema;
 

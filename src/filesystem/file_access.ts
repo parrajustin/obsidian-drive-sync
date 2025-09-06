@@ -1,4 +1,5 @@
-import { App, DataWriteOptions, normalizePath, TFile } from "obsidian";
+import { App, normalizePath, TFile } from "obsidian";
+import type { DataWriteOptions } from "obsidian";
 import { Result, StatusResult, Ok, Err } from "../lib/result";
 import { InvalidArgumentError, NotFoundError, StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
@@ -261,7 +262,7 @@ export class FileAccess {
     ): Promise<StatusResult<StatusError>> {
         if (!IsAcceptablePath(fileNode.fileData.fullPath, config)) {
             return Err(
-                NotFoundError("File node not found").with(
+                NotFoundError("File node not found within acceptable path").with(
                     InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
                 )
             );
@@ -295,7 +296,7 @@ export class FileAccess {
             return fileResult;
         }
         return Err(
-            NotFoundError("File node not found").with(
+            NotFoundError("File node path didn't match any type").with(
                 InjectMeta({ [FileConst.FILE_PATH]: fileNode.fileData.fullPath })
             )
         );

@@ -37,11 +37,12 @@ import { GetOrCreateSyncProgressView, SyncProgressView } from "../sidepanel/prog
 import { WrapPromise } from "../lib/wrap_promise";
 import { WrapToResult } from "../lib/wrap_to_result";
 import { InjectMeta } from "../lib/inject_status_msg";
-import { FileConst } from "../constants";
+import { FileConst, FIREBASE_NOTE_ID } from "../constants";
 import { FirebaseCache } from "./firebase_cache";
 import { uuidv7 } from "../lib/uuid";
 import { CloudStorageUtil } from "../firestore/cloud_storage_util";
-import type { LatestNotesSchema } from "../schema/notes/notes.schema";
+import { NOTES_SCHEMA_MANAGER, type LatestNotesSchema } from "../schema/notes/notes.schema";
+import { WrapOptional } from "../lib/option";
 
 // import type { Firestore, Transaction } from "firebase/firestore";
 // import { doc, getDoc, runTransaction } from "firebase/firestore";
@@ -551,7 +552,7 @@ export class SyncerUpdateUtil {
                     db,
                     syncerConfig,
                     action,
-                    creds,
+                    transaction,
                     view
                 );
             case ConvergenceActionType.MARK_CLOUD_DELETED:
@@ -573,40 +574,75 @@ export class SyncerUpdateUtil {
         db: Firestore,
         syncerConfig: LatestSyncConfigVersion,
         action: UpdateLocalFileAction,
-        creds: UserCredential,
+        transaction: Transaction,
         view: SyncProgressView
     ): Promise<Result<LocalCloudFileNode, StatusError>> {
         view.addEntry(syncerConfig.syncerId, action.fullPath, action.action);
 
         // 1. Download data
-        let compressedDataResult: Result<ArrayBuffer, StatusError>;
+        let compressedDataResult: Result<ArrayBufferLike, StatusError>;
 
         const firebaseData = action.localNode.firebaseData.data;
-
         if (firebaseData.type === "Raw") {
             // Data is in firestore, we need to fetch the full document.
             const docRef = doc(db, action.localNode.firebaseData.id);
             const docSnap = await WrapPromise(
-                getDoc(docRef),
-                "Failed to get document for local update"
+                transaction.get(docRef),
+                "Failed to get document for local update."
             );
-
             if (docSnap.err) {
+                docSnap.val.with(
+                    InjectMeta({
+                        [FIREBASE_NOTE_ID]: action.localNode.firebaseData.id,
+                        [FileConst.FILE_PATH]: action.fullPath
+                    })
+                );
                 return docSnap;
             }
-            const docData = docSnap.safeUnwrap().data() as LatestNotesSchema | undefined;
-            if (!docData || !docData.data) {
-                return Err(NotFoundError(`No data found for file ${action.fullPath}`));
+
+            const docData = WrapOptional(
+                docSnap.safeUnwrap().data() as LatestNotesSchema | undefined
+            );
+            if (docData.none) {
+                return Err(
+                    NotFoundError(`No data found for file ${action.fullPath}.`).with(
+                        InjectMeta({
+                            [FIREBASE_NOTE_ID]: action.localNode.firebaseData.id,
+                            [FileConst.FILE_PATH]: action.fullPath
+                        })
+                    )
+                );
             }
-            compressedDataResult = Ok(docData.data.toUint8Array().buffer);
+            const fetchedNode = NOTES_SCHEMA_MANAGER.updateSchema(docData.safeValue());
+            if (fetchedNode.err) {
+                return Err(
+                    InternalError(`Failed to validate the fetched notes schema.`).with(
+                        InjectMeta({
+                            [FIREBASE_NOTE_ID]: action.localNode.firebaseData.id,
+                            [FileConst.FILE_PATH]: action.fullPath
+                        })
+                    )
+                );
+            }
+            const nodeData = fetchedNode.safeUnwrap();
+            if (nodeData.type !== "Raw") {
+                return Err(
+                    InternalError(`Type mismatched expected "RAW" got "REF".`).with(
+                        InjectMeta({
+                            [FIREBASE_NOTE_ID]: action.localNode.firebaseData.id,
+                            [FileConst.FILE_PATH]: action.fullPath
+                        })
+                    )
+                );
+            }
+            compressedDataResult = Ok(nodeData.data.toUint8Array().buffer);
         } else {
-            // type is "Ref"
-            if (!firebaseData.fileStorageRef) {
+            const ref = WrapOptional(firebaseData.fileStorageRef);
+            // type is "Ref"c
+            if (ref.none) {
                 return Err(NotFoundError(`No file storage ref found for file ${action.fullPath}`));
             }
-            compressedDataResult = await CloudStorageUtil.downloadFileFromStorage(
-                firebaseData.fileStorageRef
-            );
+            compressedDataResult = await CloudStorageUtil.downloadFileFromStorage(ref.safeValue());
         }
 
         view.setEntryProgress(syncerConfig.syncerId, action.fullPath, 0.3);
@@ -634,7 +670,7 @@ export class SyncerUpdateUtil {
             syncerConfig,
             {
                 ctime: firebaseData.cTime,
-                mtime: firebaseData.mTime
+                mtime: firebaseData.entryTime
             }
         );
         view.setEntryProgress(syncerConfig.syncerId, action.fullPath, 0.8);
@@ -653,24 +689,16 @@ export class SyncerUpdateUtil {
         if (fileNodeResult.err) {
             return fileNodeResult;
         }
+        view.setEntryProgress(syncerConfig.syncerId, action.fullPath, 0.9);
 
         // This should be a LocalOnlyFileNode
         const fileNode = fileNodeResult.safeUnwrap();
-        if (fileNode.type !== FileNodeType.LOCAL_ONLY_FILE) {
-            return Err(
-                InternalError(
-                    `Expected a local only file node for ${action.fullPath} but got ${fileNode.type}`
-                )
-            );
-        }
-
         const node: LocalCloudFileNode = {
             type: FileNodeType.LOCAL_CLOUD_FILE,
             fileData: fileNode.fileData,
-            localTime: fileNode.localTime,
+            localTime: firebaseData.entryTime,
             firebaseData: action.localNode.firebaseData
         };
-        view.setEntryProgress(syncerConfig.syncerId, action.fullPath, 1.0);
 
         return Ok(node);
     }
