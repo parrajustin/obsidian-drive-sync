@@ -1,19 +1,20 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/no-empty-function */
 import { describe, expect, jest, test, beforeEach } from "@jest/globals";
-import type { App, DataWriteOptions, TAbstractFile } from "obsidian";
+import type { App, DataWriteOptions, FileStats, TAbstractFile, TFolder, Vault } from "obsidian";
 import { TFile } from "obsidian";
 import { FileUtilObsidian } from "./file_util_obsidian_api";
 
 const mockVault = {
     getAbstractFileByPath: jest.fn<(path: string) => TAbstractFile | null>(),
     readBinary: jest.fn<(file: TFile) => Promise<ArrayBuffer>>(),
-    createBinary: jest.fn<(path: string, data: ArrayBuffer, opts?: DataWriteOptions) => Promise<TFile>>(),
-    modifyBinary: jest.fn<(file: TFile, data: ArrayBuffer, opts?: DataWriteOptions) => Promise<void>>(),
+    createBinary:
+        jest.fn<(path: string, data: ArrayBuffer, opts?: DataWriteOptions) => Promise<TFile>>(),
+    modifyBinary:
+        jest.fn<(file: TFile, data: ArrayBuffer, opts?: DataWriteOptions) => Promise<void>>(),
     trash: jest.fn<(file: TFile, system: boolean) => Promise<void>>(),
     adapter: {
-        mkdir: jest.fn<(path: string) => Promise<void>>(),
+        mkdir: jest.fn<(path: string) => Promise<void>>()
     }
 };
 
@@ -27,7 +28,15 @@ jest.mock(
         return {
             __esModule: true,
             normalizePath: (path: string) => path,
-            TFile: class TFile {},
+            TFile: class FakeTfile implements TFile {
+                stat: FileStats;
+                basename: string;
+                extension: string;
+                vault: Vault;
+                path: string;
+                name: string;
+                parent: TFolder | null;
+            },
             FuzzySuggestModal: class MockFuzzySuggestModal {}
         };
     },
@@ -78,6 +87,7 @@ describe("FileUtilObsidian", () => {
         test("should handle non-file type", async () => {
             const filePath = "test.md";
             const mockFile = { path: filePath }; // Not a TFile
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
             mockVault.getAbstractFileByPath.mockReturnValue(mockFile as any);
             const result = await FileUtilObsidian.readObsidianFile(mockApp, filePath);
             expect(result.ok).toBe(false);
@@ -109,7 +119,11 @@ describe("FileUtilObsidian", () => {
             expect(result.ok).toBe(true);
             expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith(filePath);
             expect(mockVault.adapter.mkdir).toHaveBeenCalledWith("folder");
-            expect(mockVault.createBinary).toHaveBeenCalledWith(filePath, fileData.buffer, undefined);
+            expect(mockVault.createBinary).toHaveBeenCalledWith(
+                filePath,
+                fileData.buffer,
+                undefined
+            );
         });
 
         test("should write to an existing file", async () => {
@@ -123,13 +137,18 @@ describe("FileUtilObsidian", () => {
 
             expect(result.ok).toBe(true);
             expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith(filePath);
-            expect(mockVault.modifyBinary).toHaveBeenCalledWith(mockFile, fileData.buffer, undefined);
+            expect(mockVault.modifyBinary).toHaveBeenCalledWith(
+                mockFile,
+                fileData.buffer,
+                undefined
+            );
         });
 
         test("should handle path being a folder", async () => {
             const filePath = "folder";
             const fileData = new Uint8Array([1, 2, 3]);
             const mockFolder = { path: filePath, children: [] }; // Not a TFile
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
             mockVault.getAbstractFileByPath.mockReturnValue(mockFolder as any);
 
             const result = await FileUtilObsidian.writeToObsidianFile(mockApp, filePath, fileData);
@@ -163,7 +182,11 @@ describe("FileUtilObsidian", () => {
             expect(result.ok).toBe(false);
             expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith(filePath);
             expect(mockVault.adapter.mkdir).toHaveBeenCalledWith("folder");
-            expect(mockVault.createBinary).toHaveBeenCalledWith(filePath, fileData.buffer, undefined);
+            expect(mockVault.createBinary).toHaveBeenCalledWith(
+                filePath,
+                fileData.buffer,
+                undefined
+            );
         });
 
         test("should handle modifyBinary errors", async () => {
@@ -177,7 +200,11 @@ describe("FileUtilObsidian", () => {
 
             expect(result.ok).toBe(false);
             expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith(filePath);
-            expect(mockVault.modifyBinary).toHaveBeenCalledWith(mockFile, fileData.buffer, undefined);
+            expect(mockVault.modifyBinary).toHaveBeenCalledWith(
+                mockFile,
+                fileData.buffer,
+                undefined
+            );
         });
     });
 
@@ -208,6 +235,7 @@ describe("FileUtilObsidian", () => {
         test("should handle non-file type", async () => {
             const filePath = "folder";
             const mockFolder = { path: filePath, children: [] }; // Not a TFile
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
             mockVault.getAbstractFileByPath.mockReturnValue(mockFolder as any);
 
             const result = await FileUtilObsidian.deleteObsidianFile(mockApp, filePath);
