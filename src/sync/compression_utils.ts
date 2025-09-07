@@ -85,12 +85,7 @@ export class CompressionUtils {
         data: Uint8Array,
         reason: string
     ): Promise<Result<string, StatusError>> {
-        const decompressedResult = await CompressionUtils.decompressData(
-            data,
-            reason
-        );
-        return decompressedResult.map((buffer) =>
-            new TextDecoder().decode(buffer)
-        );
+        const decompressedResult = await CompressionUtils.decompressData(data, reason);
+        return decompressedResult.map((buffer) => new TextDecoder().decode(buffer));
     }
 }
