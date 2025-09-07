@@ -12,6 +12,7 @@ import { App } from "obsidian";
 import { FileUtilRaw } from "../filesystem/file_util_raw_api";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { CompressionUtils } from "./compression_utils";
+import { ErrorCode } from "../lib/status_error";
 
 export interface SchemaWithId<T> {
     id: string;
@@ -33,7 +34,7 @@ export class FirebaseCache {
         config: LatestSyncConfigVersion,
         cloudData: SchemaWithId<LatestNotesSchema | LatestNotesSchemaWithoutData>[]
     ): Promise<StatusResult<StatusError>> {
-        let cachedData: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>> = {
+        const cachedData: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>> = {
             lastUpdate: -1,
             cache: []
         };
@@ -45,20 +46,18 @@ export class FirebaseCache {
                     lastUpdate = entry.data.entryTime;
                 }
             }
-            cachedData = {
-                lastUpdate,
-                cache: cloudData.map((n) => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                    if ((n.data as any).data === undefined) {
-                        return n;
-                    }
+            cachedData.lastUpdate = lastUpdate;
+            cachedData.cache = cloudData.map((n): SchemaWithId<LatestNotesSchemaWithoutData> => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                if ((n.data as any).data === undefined) {
+                    return n as SchemaWithId<LatestNotesSchemaWithoutData>;
+                }
 
-                    const newNode: SchemaWithId<LatestNotesSchemaWithoutData> = structuredClone(n);
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                    delete (newNode.data as any).data;
-                    return newNode;
-                })
-            };
+                const newNode: SchemaWithId<LatestNotesSchemaWithoutData> = structuredClone(n);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+                delete (newNode.data as any).data;
+                return newNode;
+            });
         }
 
         const compressedCache = await CompressionUtils.compressStringData(
@@ -83,6 +82,10 @@ export class FirebaseCache {
     > {
         const fileData = await FileUtilRaw.readRawFile(app, config.firebaseCachePath);
         if (fileData.err) {
+            // If the cache file doesn't exist, return an empty cache.
+            if (fileData.val.errorCode === ErrorCode.NOT_FOUND) {
+                return Ok({ lastUpdate: -1, cache: [] });
+            }
             return fileData;
         }
 
