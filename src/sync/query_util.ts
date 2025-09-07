@@ -1,7 +1,7 @@
 import type { FilePathType } from "../filesystem/file_node";
 import { SearchString } from "../lib/search_string_parser";
 import {
-    RootSyncType,
+    RootSyncTypeEnum,
     type LatestSyncConfigVersion
 } from "../schema/settings/syncer_config.schema";
 
@@ -55,11 +55,11 @@ export function ShouldHaveFileId(filePath: FilePathType, config: LatestSyncConfi
 
 /** Checks if the file path is acceptable to even be included.  */
 export function IsAcceptablePath(filePath: FilePathType, config: LatestSyncConfigVersion): boolean {
-    if (config.type === RootSyncType.FOLDER_TO_ROOT && config.nestedRootPath === "") {
+    if (config.type === RootSyncTypeEnum.nested && config.nestedRootPath === "") {
         return false;
     }
     if (
-        config.type === RootSyncType.FOLDER_TO_ROOT &&
+        config.type === RootSyncTypeEnum.nested &&
         !filePath.startsWith(config.nestedRootPath)
     ) {
         return false;

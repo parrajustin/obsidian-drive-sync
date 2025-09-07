@@ -1,50 +1,61 @@
 import type { App } from "obsidian";
+import { z } from "zod";
 import { uuidv7 } from "../../lib/uuid";
-import type { VersionedSchema } from "../schema";
-import { SchemaManager } from "../schema";
+import { SchemaManager, type VersionedSchema } from "../schema";
 
-export enum RootSyncType {
-    ROOT_SYNCER = "root",
-    FOLDER_TO_ROOT = "nested",
-    // When the syncer is shared with other users.
-    SHARED = "shared"
-}
+export const RootSyncTypeSchema = z.enum([
+    "root",
+    "nested",
+    "shared"
+]);
+export type RootSyncType = z.infer<typeof RootSyncTypeSchema>;
+export const RootSyncTypeEnum = RootSyncTypeSchema.enum;
 
-interface SharedSyncerSettings {
+const SharedSyncerSettingsSchema = z.object({
     /** Root folder to the shared data. */
-    pathToFolder: string;
-}
+    pathToFolder: z.string(),
+});
 
-export interface SyncerConfigV1 {
-    type: RootSyncType;
+const SyncerConfigDataModelSchema = z.object({
+    type: RootSyncTypeSchema,
     /** The name of the vault, to connect remote syncers. */
-    vaultName: string;
+    vaultName: z.string(),
     /** Sync config identifier. */
-    syncerId: string;
+    syncerId: z.string(),
     /** Max syncs per file update. */
-    maxUpdatePerSyncer: number;
+    maxUpdatePerSyncer: z.number(),
     /** If data storage encryption is enabled. Only encrypts the data. */
-    dataStorageEncrypted: boolean;
+    dataStorageEncrypted: z.boolean(),
     /** The password for encryption, all locations must have the same. */
-    encryptionPassword?: string;
+    encryptionPassword: z.string().optional(),
     /** Filter for files. */
-    syncQuery: string;
+    syncQuery: z.string(),
     /** Query to denote raw files to add to syncing. */
-    rawFileSyncQuery: string;
+    rawFileSyncQuery: z.string(),
     /** Query to denote obsidian files to add to syncing. */
-    obsidianFileSyncQuery: string;
+    obsidianFileSyncQuery: z.string(),
     /** Query where not to write file ids. */
-    fileIdFileQuery: string;
+    fileIdFileQuery: z.string(),
     /** Enables the file id writing. */
-    enableFileIdWriting: boolean;
+    enableFileIdWriting: z.boolean(),
     /** 'nested' syncer type root path for the nested vault. */
-    nestedRootPath: string;
-    sharedSettings: SharedSyncerSettings;
+    nestedRootPath: z.string(),
+    sharedSettings: SharedSyncerSettingsSchema,
     /** The firebase cloud data cache path */
-    firebaseCachePath: string;
-}
+    firebaseCachePath: z.string(),
+    /** Stored firebase cache, this is not synced. */
+    storedFirebaseCache: z.any(),
+    /** Stored firebase history, this is not synced. */
+    storedFirebaseHistory: z.any(),
+});
 
-export type Version0SyncConfig = VersionedSchema<SyncerConfigV1, 0>;
+type SyncerConfigDataModel = z.infer<typeof SyncerConfigDataModelSchema>;
+
+export type Version0SyncConfig = VersionedSchema<SyncerConfigDataModel, 0>;
+
+const Version0SyncConfigZodSchema = SyncerConfigDataModelSchema.extend({
+    version: z.literal(0),
+});
 
 export type AnyVerionSyncConfig = Version0SyncConfig;
 
@@ -52,10 +63,11 @@ export type LatestSyncConfigVersion = Version0SyncConfig;
 
 export const SYNCER_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SyncConfig], 0>(
     "Syncer Config",
+    [Version0SyncConfigZodSchema],
     [],
     () => {
         return {
-            type: RootSyncType.ROOT_SYNCER,
+            type: RootSyncTypeEnum.root,
             syncerId: uuidv7(),
             dataStorageEncrypted: false,
             syncQuery: "*",

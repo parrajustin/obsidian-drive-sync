@@ -1,56 +1,61 @@
-import type { Bytes } from "firebase/firestore";
+import { Bytes } from "firebase/firestore";
+import { z } from "zod";
 import { SchemaManager, type VersionedSchema } from "../schema";
 
-/** Data for the file. */
-export interface FileDataDbModel {
+const FileDataDbModelSchema = z.object({
     // Full filepath.
-    path: string;
+    path: z.string(),
     // The file creation time.
-    cTime: number;
+    cTime: z.number(),
     // The file modification time.
-    mTime: number;
+    mTime: z.number(),
     /** Size of the file in bytes. */
-    size: number;
+    size: z.number(),
     /** File name without the extension. */
-    baseName: string;
+    baseName: z.string(),
     /** File extension (example ".md"). */
-    ext: string;
+    ext: z.string(),
     /** The id of the user. */
-    userId: string;
+    userId: z.string(),
     /** If the file has been deleted. */
-    deleted: boolean;
+    deleted: z.boolean(),
     /** The hash of the file contents. */
-    fileHash: string;
+    fileHash: z.string(),
 
     //
     // Metadata.
     //
 
     /** The name of the vault. */
-    vaultName: string;
+    vaultName: z.string(),
     /** The id of the device. */
-    deviceId: string;
+    deviceId: z.string(),
     /** The syncer config id that pushed the update. */
-    syncerConfigId: string;
+    syncerConfigId: z.string(),
     /** Time of the change of this file, in ms from unix epoch. */
-    entryTime: number;
-}
-interface DataFieldModel extends FileDataDbModel {
-    type: "Raw";
-    /** The data of the file if less than 100Kb */
-    data: Bytes;
-    /** The location of the file in cloud storage if not in `data`. */
-    fileStorageRef: null;
-}
-interface StorageFieldModel extends FileDataDbModel {
-    type: "Ref";
-    /** The data of the file if less than 100Kb */
-    data: null;
-    /** The location of the file in cloud storage if not in `data`. */
-    fileStorageRef: string;
-}
+    entryTime: z.number(),
+});
 
-export type Version0NotesSchema = VersionedSchema<StorageFieldModel | DataFieldModel, 0>;
+const NotesDataModelSchema = z.union([
+    FileDataDbModelSchema.extend({
+        type: z.literal("Raw"),
+        data: z.instanceof(Bytes),
+        fileStorageRef: z.null(),
+    }),
+    FileDataDbModelSchema.extend({
+        type: z.literal("Ref"),
+        data: z.null(),
+        fileStorageRef: z.string(),
+    })
+]);
+
+type NotesDataModel = z.infer<typeof NotesDataModelSchema>;
+
+export type Version0NotesSchema = VersionedSchema<NotesDataModel, 0>;
+
+export const Version0NotesZodSchema = NotesDataModelSchema.extend({
+    version: z.literal(0)
+});
 
 export type AnyVersionNotesSchema = Version0NotesSchema;
 
@@ -61,5 +66,6 @@ export type LatestNotesSchemaWithoutData = Omit<LatestNotesSchema, "data">;
 
 export const NOTES_SCHEMA_MANAGER = new SchemaManager<[Version0NotesSchema], 0>(
     "Firebase Notes",
+    [Version0NotesZodSchema],
     []
 );

@@ -1,20 +1,26 @@
+import { z } from "zod";
 import { uuidv7 } from "../../lib/uuid";
-import type { VersionedSchema } from "../schema";
-import { SchemaManager } from "../schema";
-import type { AnyVerionSyncConfig } from "./syncer_config.schema";
+import { SchemaManager, type VersionedSchema } from "../schema";
+import { Version0SyncConfigZodSchema, type AnyVerionSyncConfig } from "./syncer_config.schema";
 
-export interface SettingConfigV1 {
+const SettingsConfigDataModelSchema = z.object({
     /** Unique client id for each device. */
-    clientId: string;
+    clientId: z.string(),
     /** Firestore email. */
-    email?: string;
+    email: z.string().optional(),
     /** Firestore password. */
-    password?: string;
+    password: z.string().optional(),
     /** Individual syncer configs. */
-    syncers: AnyVerionSyncConfig[];
-}
+    syncers: z.array(Version0SyncConfigZodSchema),
+});
 
-export type Version0SettingsConfig = VersionedSchema<SettingConfigV1, 0>;
+type SettingsConfigDataModel = z.infer<typeof SettingsConfigDataModelSchema>;
+
+export type Version0SettingsConfig = VersionedSchema<SettingsConfigDataModel, 0>;
+
+const Version0SettingsConfigZodSchema = SettingsConfigDataModelSchema.extend({
+    version: z.literal(0),
+});
 
 export type AnyVerionSettingsConfig = Version0SettingsConfig;
 
@@ -22,6 +28,7 @@ export type LatestSettingsConfigVersion = Version0SettingsConfig;
 
 export const SETTINGS_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SettingsConfig], 0>(
     "Settings",
+    [Version0SettingsConfigZodSchema],
     [],
     () => {
         return {

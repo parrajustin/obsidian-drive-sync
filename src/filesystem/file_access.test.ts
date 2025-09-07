@@ -24,7 +24,7 @@ import type {
     InvalidFileNode
 } from "./file_node";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
-import { RootSyncType } from "../schema/settings/syncer_config.schema";
+import { RootSyncTypeEnum } from "../schema/settings/syncer_config.schema";
 import { Some, None } from "../lib/option";
 
 // Mock the 'obsidian' module
@@ -112,7 +112,7 @@ const mockApp = {
 } as App;
 
 const mockConfig: LatestSyncConfigVersion = {
-    type: RootSyncType.ROOT_SYNCER,
+    type: RootSyncTypeEnum.root,
     vaultName: "test-vault",
     syncerId: "test-syncer-id",
     maxUpdatePerSyncer: 50,
