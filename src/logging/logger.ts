@@ -12,7 +12,7 @@ import {
 import { format } from "logform";
 import type { Logger } from "winston";
 import winston, { createLogger, transports } from "winston";
-import { THIS_APP } from "../main";
+import { THIS_APP } from "../main_app";
 
 const USER_ID_FORMAT = format((info, _opts) => {
     if (THIS_APP.none) {

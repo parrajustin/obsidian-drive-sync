@@ -34,10 +34,9 @@ import { SETTINGS_CONFIG_SCHEMA_MANAGER } from "./schema/settings/settings_confi
 import { CreateLogger } from "./logging/logger";
 import "disposablestack/auto";
 import { Span } from "./logging/tracing/span.decorator";
+import { SetThisApp } from "./main_app";
 
 const LOGGER = CreateLogger("main");
-
-export let THIS_APP: Option<FirestoreSyncPlugin> = None;
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
@@ -58,7 +57,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         const { promise, resolve } = CreateExternallyResolvablePromise<UserCredential>();
         this.loggedIn = promise;
         this.loggedInResolve = resolve;
-        THIS_APP = Some(this);
+        SetThisApp(this);
     }
 
     @Span()

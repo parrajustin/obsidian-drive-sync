@@ -63,8 +63,8 @@ export const SYNCER_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SyncConfi
             obsidianFileSyncQuery: "-f:^.obsidian",
             enableFileIdWriting: false,
             fileIdFileQuery: "-f:template -f:templator",
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-            vaultName: ((window as any).app as App).vault.getName(),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+            vaultName: (((window as any).app as App).vault as any).getName() as string,
             maxUpdatePerSyncer: 50,
             storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
             nestedRootPath: "",
