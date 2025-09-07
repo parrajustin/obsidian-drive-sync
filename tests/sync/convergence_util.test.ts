@@ -1,36 +1,36 @@
-import { App } from "obsidian";
+import type { App } from "obsidian";
 import { describe, expect, test, beforeEach, jest, afterEach } from "@jest/globals";
 import { ConvergenceUtil } from "../../src/sync/convergence_util";
-import {
+import type {
     AllExistingFileNodeTypes,
     FileData,
-    FileNodeType,
     FilePathType,
     LocalCloudFileNode,
     LocalFileNodeTypes,
     LocalOnlyFileNode,
     MissingFileNode,
-    RemoteOnlyNode,
+    RemoteOnlyNode
 } from "../../src/filesystem/file_node";
-import { LatestSyncConfigVersion } from "../../src/schema/settings/syncer_config.schema";
-import { MapOfFileNodes } from "../../src/filesystem/file_map_util";
-import { MsFromEpoch } from "../../src/types";
+import { FileNodeType } from "../../src/filesystem/file_node";
+import type { LatestSyncConfigVersion } from "../../src/schema/settings/syncer_config.schema";
+import type { MapOfFileNodes } from "../../src/filesystem/file_map_util";
+import type { MsFromEpoch } from "../../src/types";
 import { Ok } from "../../src/lib/result";
 import { FileAccess } from "../../src/filesystem/file_access";
-import { SchemaWithId } from "../../src/sync/firebase_cache";
-import { LatestNotesSchema } from "../../src/schema/notes/notes.schema";
+import type { SchemaWithId } from "../../src/sync/firebase_cache";
+import type { LatestNotesSchema } from "../../src/schema/notes/notes.schema";
 
 // Mocking FileAccess
 jest.mock("../../src/filesystem/file_access");
 
-const MockedFileAccess = jest.mocked(FileAccess);
+const mockedFileAccess = jest.mocked(FileAccess);
 
-const createMockApp = (): App => ({} as App);
+const createMockApp = (): App => ({}) as App;
 
 const createMockConfig = (): LatestSyncConfigVersion =>
     ({
-        syncerId: "test-syncer",
-    } as LatestSyncConfigVersion);
+        syncerId: "test-syncer"
+    }) as LatestSyncConfigVersion;
 
 const createFileData = (
     fullPath: FilePathType,
@@ -44,7 +44,7 @@ const createFileData = (
     baseName: fullPath.split("/").pop()?.split(".")[0] ?? "",
     extension: fullPath.split(".").pop() ?? "",
     deleted: false,
-    fileHash,
+    fileHash
 });
 
 const createLocalOnlyFileNode = (
@@ -54,7 +54,7 @@ const createLocalOnlyFileNode = (
 ): LocalOnlyFileNode => ({
     type: FileNodeType.LOCAL_ONLY_FILE,
     fileData: createFileData(fullPath, mtime, fileHash),
-    localTime: mtime,
+    localTime: mtime
 });
 
 const createLocalCloudFileNode = (
@@ -86,8 +86,9 @@ const createLocalCloudFileNode = (
             syncerConfigId: "test-syncer",
             type: "Ref",
             fileStorageRef: "ref",
-        } as any,
-    },
+            version: 0
+        }
+    }
 });
 
 const createRemoteOnlyNode = (
@@ -117,8 +118,9 @@ const createRemoteOnlyNode = (
             syncerConfigId: "test-syncer",
             type: "Ref",
             fileStorageRef: "ref",
-        } as any,
-    },
+            version: 0
+        }
+    }
 });
 
 describe("ConvergenceUtil.updateWithNewNodes", () => {
@@ -128,13 +130,13 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
     beforeEach(() => {
         app = createMockApp();
         config = createMockConfig();
-        MockedFileAccess.getTouchedFileNodes.mockClear();
+        mockedFileAccess.getTouchedFileNodes.mockClear();
     });
 
     test("should add a new local file", async () => {
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map();
-        const touchedFiles: Map<FilePathType, MsFromEpoch> = new Map([
-            ["new_file.md" as FilePathType, 1000 as MsFromEpoch],
+        const touchedFiles = new Map<FilePathType, MsFromEpoch>([
+            ["new_file.md" as FilePathType, 1000 as MsFromEpoch]
         ]);
         const newFileNode = createLocalOnlyFileNode(
             "new_file.md" as FilePathType,
@@ -142,7 +144,7 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
             "hash1"
         );
 
-        MockedFileAccess.getTouchedFileNodes.mockResolvedValue(
+        mockedFileAccess.getTouchedFileNodes.mockResolvedValue(
             Ok(new Map([[newFileNode.fileData.fullPath, newFileNode]]))
         );
 
@@ -166,10 +168,10 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
             "hash1"
         );
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map([
-            [originalNode.fileData.fullPath, originalNode],
+            [originalNode.fileData.fullPath, originalNode]
         ]);
-        const touchedFiles: Map<FilePathType, MsFromEpoch> = new Map([
-            ["file.md" as FilePathType, 2000 as MsFromEpoch],
+        const touchedFiles = new Map<FilePathType, MsFromEpoch>([
+            ["file.md" as FilePathType, 2000 as MsFromEpoch]
         ]);
         const updatedFileNode = createLocalOnlyFileNode(
             "file.md" as FilePathType,
@@ -177,7 +179,7 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
             "hash2"
         );
 
-        MockedFileAccess.getTouchedFileNodes.mockResolvedValue(
+        mockedFileAccess.getTouchedFileNodes.mockResolvedValue(
             Ok(new Map([[updatedFileNode.fileData.fullPath, updatedFileNode]]))
         );
 
@@ -203,10 +205,10 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
             "hash1"
         );
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map([
-            [originalNode.fileData.fullPath, originalNode],
+            [originalNode.fileData.fullPath, originalNode]
         ]);
-        const touchedFiles: Map<FilePathType, MsFromEpoch> = new Map([
-            ["file.md" as FilePathType, 2000 as MsFromEpoch],
+        const touchedFiles = new Map<FilePathType, MsFromEpoch>([
+            ["file.md" as FilePathType, 2000 as MsFromEpoch]
         ]);
         const updatedFileNode = createLocalOnlyFileNode(
             "file.md" as FilePathType,
@@ -214,7 +216,7 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
             "hash2"
         );
 
-        MockedFileAccess.getTouchedFileNodes.mockResolvedValue(
+        mockedFileAccess.getTouchedFileNodes.mockResolvedValue(
             Ok(new Map([[updatedFileNode.fileData.fullPath, updatedFileNode]]))
         );
 
@@ -242,10 +244,10 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
             "hash1"
         );
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map([
-            [originalNode.fileData.fullPath, originalNode],
+            [originalNode.fileData.fullPath, originalNode]
         ]);
-        const touchedFiles: Map<FilePathType, MsFromEpoch> = new Map([
-            ["file.md" as FilePathType, 2000 as MsFromEpoch],
+        const touchedFiles = new Map<FilePathType, MsFromEpoch>([
+            ["file.md" as FilePathType, 2000 as MsFromEpoch]
         ]);
         const newFileNode = createLocalOnlyFileNode(
             "file.md" as FilePathType,
@@ -253,7 +255,7 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
             "hash2"
         );
 
-        MockedFileAccess.getTouchedFileNodes.mockResolvedValue(
+        mockedFileAccess.getTouchedFileNodes.mockResolvedValue(
             Ok(new Map([[newFileNode.fileData.fullPath, newFileNode]]))
         );
 
@@ -281,19 +283,23 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
             "hash1"
         );
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map([
-            [originalNode.fileData.fullPath, originalNode],
+            [originalNode.fileData.fullPath, originalNode]
         ]);
-        const touchedFiles: Map<FilePathType, MsFromEpoch> = new Map([
-            ["file.md" as FilePathType, 2000 as MsFromEpoch],
+        const touchedFiles = new Map<FilePathType, MsFromEpoch>([
+            ["file.md" as FilePathType, 2000 as MsFromEpoch]
         ]);
         const deletedFileNode: MissingFileNode = {
             type: FileNodeType.LOCAL_MISSING,
             fileData: { fullPath: "file.md" as FilePathType },
-            localTime: 2000 as MsFromEpoch,
+            localTime: 2000 as MsFromEpoch
         };
 
-        MockedFileAccess.getTouchedFileNodes.mockResolvedValue(
-            Ok(new Map([[deletedFileNode.fileData.fullPath, deletedFileNode as LocalFileNodeTypes]]))
+        mockedFileAccess.getTouchedFileNodes.mockResolvedValue(
+            Ok(
+                new Map([
+                    [deletedFileNode.fileData.fullPath, deletedFileNode as LocalFileNodeTypes]
+                ])
+            )
         );
 
         const result = await ConvergenceUtil.updateWithNewNodes(
@@ -317,19 +323,23 @@ describe("ConvergenceUtil.updateWithNewNodes", () => {
             "hash1"
         );
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map([
-            [originalNode.fileData.fullPath, originalNode],
+            [originalNode.fileData.fullPath, originalNode]
         ]);
-        const touchedFiles: Map<FilePathType, MsFromEpoch> = new Map([
-            ["file.md" as FilePathType, 2000 as MsFromEpoch],
+        const touchedFiles = new Map<FilePathType, MsFromEpoch>([
+            ["file.md" as FilePathType, 2000 as MsFromEpoch]
         ]);
         const deletedFileNode: MissingFileNode = {
             type: FileNodeType.LOCAL_MISSING,
             fileData: { fullPath: "file.md" as FilePathType },
-            localTime: 2000 as MsFromEpoch,
+            localTime: 2000 as MsFromEpoch
         };
 
-        MockedFileAccess.getTouchedFileNodes.mockResolvedValue(
-            Ok(new Map([[deletedFileNode.fileData.fullPath, deletedFileNode as LocalFileNodeTypes]]))
+        mockedFileAccess.getTouchedFileNodes.mockResolvedValue(
+            Ok(
+                new Map([
+                    [deletedFileNode.fileData.fullPath, deletedFileNode as LocalFileNodeTypes]
+                ])
+            )
         );
 
         const result = await ConvergenceUtil.updateWithNewNodes(
@@ -373,7 +383,9 @@ describe("ConvergenceUtil.updateWithCloudData", () => {
             syncerConfigId: "test-syncer",
             type: "Ref",
             fileStorageRef: "ref",
-        } as any,
+            data: null,
+            version: 0
+        }
     });
 
     test("should add a new remote-only file from cloud data", () => {
@@ -383,14 +395,9 @@ describe("ConvergenceUtil.updateWithCloudData", () => {
             1000 as MsFromEpoch,
             "hash1"
         );
-        const mapOfCloudData = new Map([
-            ["new_cloud_file.md" as FilePathType, cloudData],
-        ]);
+        const mapOfCloudData = new Map([["new_cloud_file.md" as FilePathType, cloudData]]);
 
-        const newMap = ConvergenceUtil.updateWithCloudData(
-            mapOfFileNodes,
-            mapOfCloudData
-        );
+        const newMap = ConvergenceUtil.updateWithCloudData(mapOfFileNodes, mapOfCloudData);
 
         expect(newMap.size).toBe(1);
         const newNode = newMap.get("new_cloud_file.md" as FilePathType) as RemoteOnlyNode;
@@ -405,21 +412,12 @@ describe("ConvergenceUtil.updateWithCloudData", () => {
             "hash1"
         );
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map([
-            [localNode.fileData.fullPath, localNode],
+            [localNode.fileData.fullPath, localNode]
         ]);
-        const cloudData = createCloudData(
-            "file.md" as FilePathType,
-            500 as MsFromEpoch,
-            "hash1"
-        );
-        const mapOfCloudData = new Map([
-            ["file.md" as FilePathType, cloudData],
-        ]);
+        const cloudData = createCloudData("file.md" as FilePathType, 500 as MsFromEpoch, "hash1");
+        const mapOfCloudData = new Map([["file.md" as FilePathType, cloudData]]);
 
-        const newMap = ConvergenceUtil.updateWithCloudData(
-            mapOfFileNodes,
-            mapOfCloudData
-        );
+        const newMap = ConvergenceUtil.updateWithCloudData(mapOfFileNodes, mapOfCloudData);
 
         expect(newMap.size).toBe(1);
         const mergedNode = newMap.get("file.md" as FilePathType) as LocalCloudFileNode;
@@ -438,7 +436,7 @@ describe("ConvergenceUtil.updateWithCloudData", () => {
             "hash1"
         );
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map([
-            [originalNode.fileData.fullPath, originalNode],
+            [originalNode.fileData.fullPath, originalNode]
         ]);
         const cloudData = createCloudData(
             "file.md" as FilePathType,
@@ -446,14 +444,9 @@ describe("ConvergenceUtil.updateWithCloudData", () => {
             "hash2",
             true
         );
-        const mapOfCloudData = new Map([
-            ["file.md" as FilePathType, cloudData],
-        ]);
+        const mapOfCloudData = new Map([["file.md" as FilePathType, cloudData]]);
 
-        const newMap = ConvergenceUtil.updateWithCloudData(
-            mapOfFileNodes,
-            mapOfCloudData
-        );
+        const newMap = ConvergenceUtil.updateWithCloudData(mapOfFileNodes, mapOfCloudData);
 
         expect(newMap.size).toBe(1);
         const updatedNode = newMap.get("file.md" as FilePathType) as LocalCloudFileNode;
@@ -470,21 +463,12 @@ describe("ConvergenceUtil.updateWithCloudData", () => {
             "hash1"
         );
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map([
-            [originalNode.fileData.fullPath, originalNode],
+            [originalNode.fileData.fullPath, originalNode]
         ]);
-        const cloudData = createCloudData(
-            "file.md" as FilePathType,
-            1500 as MsFromEpoch,
-            "hash2"
-        );
-        const mapOfCloudData = new Map([
-            ["file.md" as FilePathType, cloudData],
-        ]);
+        const cloudData = createCloudData("file.md" as FilePathType, 1500 as MsFromEpoch, "hash2");
+        const mapOfCloudData = new Map([["file.md" as FilePathType, cloudData]]);
 
-        const newMap = ConvergenceUtil.updateWithCloudData(
-            mapOfFileNodes,
-            mapOfCloudData
-        );
+        const newMap = ConvergenceUtil.updateWithCloudData(mapOfFileNodes, mapOfCloudData);
 
         expect(newMap.size).toBe(1);
         const updatedNode = newMap.get("file.md" as FilePathType) as RemoteOnlyNode;
@@ -500,21 +484,16 @@ describe("ConvergenceUtil.updateWithCloudData", () => {
             "hash_untouched"
         );
         const mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map([
-            [untouchedNode.fileData.fullPath, untouchedNode],
+            [untouchedNode.fileData.fullPath, untouchedNode]
         ]);
         const cloudData = createCloudData(
             "new_cloud_file.md" as FilePathType,
             1000 as MsFromEpoch,
             "hash1"
         );
-        const mapOfCloudData = new Map([
-            ["new_cloud_file.md" as FilePathType, cloudData],
-        ]);
+        const mapOfCloudData = new Map([["new_cloud_file.md" as FilePathType, cloudData]]);
 
-        const newMap = ConvergenceUtil.updateWithCloudData(
-            mapOfFileNodes,
-            mapOfCloudData
-        );
+        const newMap = ConvergenceUtil.updateWithCloudData(mapOfFileNodes, mapOfCloudData);
 
         expect(newMap.size).toBe(2);
         expect(newMap.has("untouched.md" as FilePathType)).toBe(true);
@@ -529,37 +508,10 @@ describe("ConvergenceUtil.createStateConvergenceActions", () => {
     beforeEach(() => {
         app = createMockApp();
         config = createMockConfig();
-        jest.spyOn(ConvergenceUtil, "updateWithNewNodes").mockImplementation(async (_, __, map) => Ok(map));
-        jest.spyOn(ConvergenceUtil, "updateWithCloudData").mockImplementation((map, cloudData) => {
-            const newMap = new Map(map);
-            for (const [key, value] of cloudData.entries()) {
-                const existing = newMap.get(key as FilePathType);
-                if (existing) {
-                    if (existing.type === FileNodeType.LOCAL_ONLY_FILE) {
-                        const updatedNode: LocalCloudFileNode = {
-                            type: FileNodeType.LOCAL_CLOUD_FILE,
-                            fileData: existing.fileData,
-                            localTime: existing.localTime,
-                            firebaseData: value
-                        }
-                        newMap.set(key as FilePathType, updatedNode);
-                    } else if (existing.type === FileNodeType.LOCAL_CLOUD_FILE || existing.type === FileNodeType.REMOTE_ONLY) {
-                        const updatedNode = { ...existing, firebaseData: value };
-                        newMap.set(key as FilePathType, updatedNode);
-                    }
-
-                } else {
-                    const remoteNode: RemoteOnlyNode = {
-                        type: FileNodeType.REMOTE_ONLY,
-                        fileData: { fullPath: key as FilePathType },
-                        localTime: value.data.entryTime,
-                        firebaseData: value
-                    }
-                    newMap.set(key as FilePathType, remoteNode);
-                }
-            }
-            return newMap
-        });
+        // eslint-disable-next-line @typescript-eslint/naming-convention, @typescript-eslint/require-await
+        jest.spyOn(ConvergenceUtil, "updateWithNewNodes").mockImplementation(async (_, __, map) =>
+            Ok(map)
+        );
     });
 
     afterEach(() => {
@@ -567,9 +519,19 @@ describe("ConvergenceUtil.createStateConvergenceActions", () => {
     });
 
     test("should create NEW_LOCAL_FILE action for a new local file", async () => {
-        const localNode = createLocalOnlyFileNode("file.md" as FilePathType, 1000 as MsFromEpoch, "hash1");
+        const localNode = createLocalOnlyFileNode(
+            "file.md" as FilePathType,
+            1000 as MsFromEpoch,
+            "hash1"
+        );
         const mapOfFileNodes = new Map([[localNode.fileData.fullPath, localNode]]);
-        const result = await ConvergenceUtil.createStateConvergenceActions(app, config, mapOfFileNodes, new Map(), new Map());
+        const result = await ConvergenceUtil.createStateConvergenceActions(
+            app,
+            config,
+            mapOfFileNodes,
+            new Map(),
+            new Map()
+        );
         expect(result.ok).toBe(true);
         const { actions } = result.unsafeUnwrap();
         expect(actions.length).toBe(1);
@@ -579,9 +541,21 @@ describe("ConvergenceUtil.createStateConvergenceActions", () => {
     });
 
     test("should create UPDATE_CLOUD action for a modified local file", async () => {
-        const localNode = createLocalCloudFileNode("file.md" as FilePathType, 2000 as MsFromEpoch, "hash2", 1000 as MsFromEpoch, "hash1");
+        const localNode = createLocalCloudFileNode(
+            "file.md" as FilePathType,
+            2000 as MsFromEpoch,
+            "hash2",
+            1000 as MsFromEpoch,
+            "hash1"
+        );
         const mapOfFileNodes = new Map([[localNode.fileData.fullPath, localNode]]);
-        const result = await ConvergenceUtil.createStateConvergenceActions(app, config, mapOfFileNodes, new Map(), new Map());
+        const result = await ConvergenceUtil.createStateConvergenceActions(
+            app,
+            config,
+            mapOfFileNodes,
+            new Map(),
+            new Map()
+        );
         expect(result.ok).toBe(true);
         const { actions } = result.unsafeUnwrap();
         expect(actions.length).toBe(1);
@@ -591,9 +565,22 @@ describe("ConvergenceUtil.createStateConvergenceActions", () => {
     });
 
     test("should create DELETE_LOCAL action for a remotely deleted file", async () => {
-        const localNode = createLocalCloudFileNode("file.md" as FilePathType, 1000 as MsFromEpoch, "hash1", 2000 as MsFromEpoch, "hash1", true);
+        const localNode = createLocalCloudFileNode(
+            "file.md" as FilePathType,
+            1000 as MsFromEpoch,
+            "hash1",
+            2000 as MsFromEpoch,
+            "hash1",
+            true
+        );
         const mapOfFileNodes = new Map([[localNode.fileData.fullPath, localNode]]);
-        const result = await ConvergenceUtil.createStateConvergenceActions(app, config, mapOfFileNodes, new Map(), new Map());
+        const result = await ConvergenceUtil.createStateConvergenceActions(
+            app,
+            config,
+            mapOfFileNodes,
+            new Map(),
+            new Map()
+        );
         expect(result.ok).toBe(true);
         const { actions } = result.unsafeUnwrap();
         expect(actions.length).toBe(1);
@@ -603,9 +590,21 @@ describe("ConvergenceUtil.createStateConvergenceActions", () => {
     });
 
     test("should create UPDATE_LOCAL action for a remotely updated file", async () => {
-        const localNode = createLocalCloudFileNode("file.md" as FilePathType, 1000 as MsFromEpoch, "hash1", 2000 as MsFromEpoch, "hash2");
+        const localNode = createLocalCloudFileNode(
+            "file.md" as FilePathType,
+            1000 as MsFromEpoch,
+            "hash1",
+            2000 as MsFromEpoch,
+            "hash2"
+        );
         const mapOfFileNodes = new Map([[localNode.fileData.fullPath, localNode]]);
-        const result = await ConvergenceUtil.createStateConvergenceActions(app, config, mapOfFileNodes, new Map(), new Map());
+        const result = await ConvergenceUtil.createStateConvergenceActions(
+            app,
+            config,
+            mapOfFileNodes,
+            new Map(),
+            new Map()
+        );
         expect(result.ok).toBe(true);
         const { actions } = result.unsafeUnwrap();
         expect(actions.length).toBe(1);
@@ -615,11 +614,21 @@ describe("ConvergenceUtil.createStateConvergenceActions", () => {
     });
 
     test("should create MARK_CLOUD_DELETED action for a locally deleted file", async () => {
-        const remoteNode = createRemoteOnlyNode("file.md" as FilePathType, 1000 as MsFromEpoch, "hash1");
+        const remoteNode = createRemoteOnlyNode(
+            "file.md" as FilePathType,
+            1000 as MsFromEpoch,
+            "hash1"
+        );
         // localTime > entryTime indicates a local deletion
         remoteNode.localTime = 2000 as MsFromEpoch;
         const mapOfFileNodes = new Map([[remoteNode.fileData.fullPath, remoteNode]]);
-        const result = await ConvergenceUtil.createStateConvergenceActions(app, config, mapOfFileNodes, new Map(), new Map());
+        const result = await ConvergenceUtil.createStateConvergenceActions(
+            app,
+            config,
+            mapOfFileNodes,
+            new Map(),
+            new Map()
+        );
         expect(result.ok).toBe(true);
         const { actions } = result.unsafeUnwrap();
         expect(actions.length).toBe(1);
@@ -629,9 +638,19 @@ describe("ConvergenceUtil.createStateConvergenceActions", () => {
     });
 
     test("should create UPDATE_LOCAL action for a new remote file", async () => {
-        const remoteNode = createRemoteOnlyNode("file.md" as FilePathType, 1000 as MsFromEpoch, "hash1");
+        const remoteNode = createRemoteOnlyNode(
+            "file.md" as FilePathType,
+            1000 as MsFromEpoch,
+            "hash1"
+        );
         const mapOfFileNodes = new Map([[remoteNode.fileData.fullPath, remoteNode]]);
-        const result = await ConvergenceUtil.createStateConvergenceActions(app, config, mapOfFileNodes, new Map(), new Map());
+        const result = await ConvergenceUtil.createStateConvergenceActions(
+            app,
+            config,
+            mapOfFileNodes,
+            new Map(),
+            new Map()
+        );
         expect(result.ok).toBe(true);
         const { actions } = result.unsafeUnwrap();
         expect(actions.length).toBe(1);
@@ -641,18 +660,41 @@ describe("ConvergenceUtil.createStateConvergenceActions", () => {
     });
 
     test("should produce no actions when files are in sync", async () => {
-        const localNode = createLocalCloudFileNode("file.md" as FilePathType, 1000 as MsFromEpoch, "hash1", 1000 as MsFromEpoch, "hash1");
+        const localNode = createLocalCloudFileNode(
+            "file.md" as FilePathType,
+            1000 as MsFromEpoch,
+            "hash1",
+            1000 as MsFromEpoch,
+            "hash1"
+        );
         const mapOfFileNodes = new Map([[localNode.fileData.fullPath, localNode]]);
-        const result = await ConvergenceUtil.createStateConvergenceActions(app, config, mapOfFileNodes, new Map(), new Map());
+        const result = await ConvergenceUtil.createStateConvergenceActions(
+            app,
+            config,
+            mapOfFileNodes,
+            new Map(),
+            new Map()
+        );
         expect(result.ok).toBe(true);
         const { actions } = result.unsafeUnwrap();
         expect(actions.length).toBe(0);
     });
 
     test("should produce no action for a remotely deleted file that is already deleted locally", async () => {
-        const remoteNode = createRemoteOnlyNode("file.md" as FilePathType, 1000 as MsFromEpoch, "hash1", true);
+        const remoteNode = createRemoteOnlyNode(
+            "file.md" as FilePathType,
+            1000 as MsFromEpoch,
+            "hash1",
+            true
+        );
         const mapOfFileNodes = new Map([[remoteNode.fileData.fullPath, remoteNode]]);
-        const result = await ConvergenceUtil.createStateConvergenceActions(app, config, mapOfFileNodes, new Map(), new Map());
+        const result = await ConvergenceUtil.createStateConvergenceActions(
+            app,
+            config,
+            mapOfFileNodes,
+            new Map(),
+            new Map()
+        );
         expect(result.ok).toBe(true);
         const { actions } = result.unsafeUnwrap();
         expect(actions.length).toBe(0);
