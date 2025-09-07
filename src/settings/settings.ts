@@ -8,7 +8,7 @@ import { LogError } from "../logging/log";
 import { FolderFuzzySearch } from "../ui/folderFuzzySearch";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import {
-    RootSyncTypeEnum,
+    rootSyncTypeEnum,
     SYNCER_CONFIG_SCHEMA_MANAGER,
     type RootSyncType
 } from "../schema/settings/syncer_config.schema";
@@ -30,7 +30,7 @@ export interface FolderTemplate {
 function CreateAllFileConfig(): LatestSyncConfigVersion {
     return {
         version: 0,
-        type: RootSyncTypeEnum.root,
+        type: rootSyncTypeEnum.root,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
         syncQuery: "*",
@@ -238,16 +238,16 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     .setName("Syncer Type")
                     .setDesc("The type of syncer. (default: Root)")
                     .addDropdown((cb) => {
-                        cb.addOption(RootSyncTypeEnum.root, "Root")
-                            .addOption(RootSyncTypeEnum.nested, "Nested")
-                            .addOption(RootSyncTypeEnum.shared, SHARED_ENTRIES_FIREBASE_DB_NAME)
+                        cb.addOption(rootSyncTypeEnum.root, "Root")
+                            .addOption(rootSyncTypeEnum.nested, "Nested")
+                            .addOption(rootSyncTypeEnum.shared, SHARED_ENTRIES_FIREBASE_DB_NAME)
                             .setValue(elem.type)
                             .onChange((value: RootSyncType) => {
                                 elem.type = value;
                                 resetList();
                             });
                     });
-                if (elem.type === RootSyncTypeEnum.shared) {
+                if (elem.type === rootSyncTypeEnum.shared) {
                     if (!elem.vaultName.startsWith("___SHAREDSYNCER___")) {
                         elem.vaultName = `___SHAREDSYNCER___-${uuidv7()}`;
                     }

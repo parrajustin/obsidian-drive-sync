@@ -1,23 +1,23 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { z } from "zod";
 import { WrapOptional } from "../lib/option";
-import * as result from "../lib/result";
-import { ErrorCode, NotFoundError, StatusError } from "../lib/status_error";
+import { Err, Ok } from "../lib/result";
+import type { Result } from "../lib/result";
+import { ErrorCode, InvalidArgumentError, NotFoundError, StatusError } from "../lib/status_error";
 import { setAttributeOnActiveSpan } from "../logging/tracing/set-attributes-on-active-span";
 import { Span } from "../logging/tracing/span.decorator";
 
 export type VersionedSchema<UnderlyingSchema, Version> = UnderlyingSchema extends {
     version: number;
 }
-    ? never
+    ? UnderlyingSchema
     : UnderlyingSchema & { version: Version };
 
 type ConverterFunc<
     Prev extends VersionedSchema<any, any>,
     Curr extends VersionedSchema<any, any>
-> = (data: Prev) => result.Result<Curr, StatusError>;
+> = (data: Prev) => Result<Curr, StatusError>;
 
 type IncDigit = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
 type Digit = IncDigit[number];
@@ -60,7 +60,7 @@ type AnyValueInTuple<T extends readonly unknown[]> = T[number];
 export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersion extends number> {
     constructor(
         private _name: string,
-        private _zodSchemas: readonly z.ZodObject<any>[],
+        private _zodSchemas: readonly z.ZodTypeAny[],
         private _converters: GetConverters<Schemas>,
         private _default?: () => Schemas[0]
     ) {}
@@ -73,17 +73,21 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
     @Span()
     public updateSchema<T extends VersionedSchema<unknown, unknown>>(
         data: T | null | undefined
-    ): result.Result<Schemas[MaxVersion], StatusError> {
+    ): Result<Schemas[MaxVersion], StatusError> {
         const dataOpt = WrapOptional<VersionedSchema<unknown, unknown>>(data);
         if (dataOpt.none) {
-            return this.getDefault();
+            return Err(InvalidArgumentError("Input data either null | undefined."));
         }
         const versionOpt = WrapOptional<number>(dataOpt.safeValue().version as number);
         if (versionOpt.none) {
-            return this.getDefault();
+            return Err(InvalidArgumentError("Couldn't get input data version."));
         }
         if (versionOpt.safeValue() < 0 || versionOpt.safeValue() > this._converters.length) {
-            return this.getDefault();
+            return Err(
+                InvalidArgumentError(
+                    `Failed to get a valid verison number found "${versionOpt.safeValue()}" expected (0, ${this._converters.length}).`
+                )
+            );
         }
         return this.loadDataInternal(data, versionOpt.safeValue());
     }
@@ -93,10 +97,10 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
      * @returns latest schema version
      */
     @Span()
-    public getDefault(): result.Result<Schemas[MaxVersion], StatusError> {
+    public getDefault(): Result<Schemas[MaxVersion], StatusError> {
         const defaultFunc = WrapOptional(this._default);
         if (defaultFunc.none) {
-            return result.Err(NotFoundError(`No default schema found for ${this._name}.`));
+            return Err(NotFoundError(`No default schema found for ${this._name}.`));
         }
         return this.loadDataInternal(defaultFunc.safeValue()(), 0);
     }
@@ -105,43 +109,35 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
     private loadDataInternal(
         data: AnyValueInTuple<Schemas>,
         version: number
-    ): result.Result<Schemas[MaxVersion], StatusError> {
+    ): Result<Schemas[MaxVersion], StatusError> {
         setAttributeOnActiveSpan(`version`, version);
 
         const zodSchema = this._zodSchemas[version];
         if (!zodSchema) {
-            return result.Err(new StatusError(ErrorCode.INTERNAL, `No zod schema found for version ${version}`));
+            return Err(
+                new StatusError(ErrorCode.INTERNAL, `No zod schema found for version ${version}`)
+            );
         }
 
         const parseResult = zodSchema.safeParse(data);
-        if (!parseResult.success) {
-            return result.Err(new StatusError(ErrorCode.INVALID_ARGUMENT, `Schema validation failed for ${this._name} version ${version}: ${parseResult.error.message}`));
+        if (parseResult.error) {
+            return Err(
+                new StatusError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    `Schema validation failed for ${this._name} version ${version}: ${parseResult.error.toString()}`
+                )
+            );
         }
 
-        let validatedData: any = parseResult.data;
-        for (let i = version; i < this._converters.length; i++) {
-            const converter = this._converters[i];
-            if (!converter) {
-                return result.Err(new StatusError(ErrorCode.INTERNAL, `No converter found for version ${i}`));
-            }
-            const convertedResult = (converter as ConverterFunc<any, any>)(validatedData);
-            if (result.IsErr(convertedResult)) {
-                return convertedResult;
-            }
-            validatedData = convertedResult.val;
-
-            const nextZodSchema = this._zodSchemas[i + 1];
-            if (!nextZodSchema) {
-                return result.Err(new StatusError(ErrorCode.INTERNAL, `No zod schema found for version ${i + 1}`));
-            }
-            const nextParseResult = nextZodSchema.safeParse(validatedData);
-            if (!nextParseResult.success) {
-                return result.Err(new StatusError(ErrorCode.INVALID_ARGUMENT, `Post-conversion schema validation failed for ${this._name} version ${i+1}: ${nextParseResult.error.message}`));
-            }
-            validatedData = nextParseResult.data;
+        if (version >= this._converters.length) {
+            return Ok(parseResult.data);
         }
-
-        return result.Ok(validatedData);
+        const converter = this._converters[version] as unknown as ConverterFunc<any, any>;
+        const newData = converter(data) as Result<AnyValueInTuple<Schemas>, StatusError>;
+        if (newData.err) {
+            return newData;
+        }
+        return this.loadDataInternal(newData.safeUnwrap(), version + 1);
     }
 
     public getLatestVersion(): number {

@@ -2,45 +2,35 @@ import { describe, expect, test } from "@jest/globals";
 import { z } from "zod";
 import { Ok } from "../lib/result";
 import { SchemaManager, type VersionedSchema } from "./schema";
+import type { StatusError } from "../lib/status_error";
 
-interface Version0 {
-    name: string;
-    otherData: "lol";
-    temp: number;
-}
-interface Version1 {
-    name: boolean;
-}
-interface Version2 {
-    klep: boolean;
-    otherData: "lol";
-}
-
-const Version0ZodSchema = z.object({
+const version0ZodSchema = z.object({
     name: z.string(),
     otherData: z.literal("lol"),
     temp: z.number(),
-    version: z.literal(0),
+    version: z.literal(0)
 });
+type Version0 = z.infer<typeof version0ZodSchema>;
 
-const Version1ZodSchema = z.object({
+const version1ZodSchema = z.object({
     name: z.boolean(),
-    version: z.literal(1),
+    version: z.literal(1)
 });
+type Version1 = z.infer<typeof version1ZodSchema>;
 
-const Version2ZodSchema = z.object({
+const version2ZodSchema = z.object({
     klep: z.boolean(),
     otherData: z.literal("lol"),
-    version: z.literal(2),
+    version: z.literal(2)
 });
+type Version2 = z.infer<typeof version2ZodSchema>;
 
-
-const MANAGER = new SchemaManager<[VersionedSchema<Version0, 0>, VersionedSchema<Version1, 1>, VersionedSchema<Version2, 2>], 2>(
+const MANAGER = new SchemaManager<[Version0, Version1, Version2], 2>(
     "Test",
-    [Version0ZodSchema, Version1ZodSchema, Version2ZodSchema],
+    [version0ZodSchema, version1ZodSchema, version2ZodSchema],
     [
-        (data: VersionedSchema<Version0, 0>) => {
-            const v1: VersionedSchema<Version1, 1> = { name: data.name === "true", version: 1 };
+        (data: Version0) => {
+            const v1: Version1 = { name: data.name === "true", version: 1 };
             return Ok(v1);
         },
         (data: VersionedSchema<Version1, 1>) => {
@@ -51,7 +41,7 @@ const MANAGER = new SchemaManager<[VersionedSchema<Version0, 0>, VersionedSchema
             };
             return Ok(v2);
         }
-    ] as any,
+    ],
     () => {
         return { name: "default", otherData: "lol", temp: 0, version: 0 };
     }
@@ -60,19 +50,15 @@ const MANAGER = new SchemaManager<[VersionedSchema<Version0, 0>, VersionedSchema
 describe("SchemaManager", () => {
     test("null", () => {
         const finalData = MANAGER.updateSchema(null);
-        expect(finalData.unsafeUnwrap()).toEqual({
-            klep: false,
-            otherData: "lol",
-            version: 2
-        });
+        expect((finalData.val as StatusError).toString()).toContain(
+            "Input data either null | undefined"
+        );
     });
     test("undefined", () => {
         const finalData = MANAGER.updateSchema(undefined);
-        expect(finalData.unsafeUnwrap()).toEqual({
-            klep: false,
-            otherData: "lol",
-            version: 2
-        });
+        expect((finalData.val as StatusError).toString()).toContain(
+            "Input data either null | undefined"
+        );
     });
     test("InputData", () => {
         const n = {

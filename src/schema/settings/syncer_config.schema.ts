@@ -3,21 +3,17 @@ import { z } from "zod";
 import { uuidv7 } from "../../lib/uuid";
 import { SchemaManager, type VersionedSchema } from "../schema";
 
-export const RootSyncTypeSchema = z.enum([
-    "root",
-    "nested",
-    "shared"
-]);
-export type RootSyncType = z.infer<typeof RootSyncTypeSchema>;
-export const RootSyncTypeEnum = RootSyncTypeSchema.enum;
+export const rootSyncTypeSchema = z.enum(["root", "nested", "shared"]);
+export type RootSyncType = z.infer<typeof rootSyncTypeSchema>;
+export const rootSyncTypeEnum = rootSyncTypeSchema.enum;
 
-const SharedSyncerSettingsSchema = z.object({
+const sharedSyncerSettingsSchema = z.object({
     /** Root folder to the shared data. */
-    pathToFolder: z.string(),
+    pathToFolder: z.string()
 });
 
-const SyncerConfigDataModelSchema = z.object({
-    type: RootSyncTypeSchema,
+const syncerConfigDataModelSchema = z.object({
+    type: rootSyncTypeSchema,
     /** The name of the vault, to connect remote syncers. */
     vaultName: z.string(),
     /** Sync config identifier. */
@@ -40,21 +36,17 @@ const SyncerConfigDataModelSchema = z.object({
     enableFileIdWriting: z.boolean(),
     /** 'nested' syncer type root path for the nested vault. */
     nestedRootPath: z.string(),
-    sharedSettings: SharedSyncerSettingsSchema,
+    sharedSettings: sharedSyncerSettingsSchema,
     /** The firebase cloud data cache path */
-    firebaseCachePath: z.string(),
-    /** Stored firebase cache, this is not synced. */
-    storedFirebaseCache: z.any(),
-    /** Stored firebase history, this is not synced. */
-    storedFirebaseHistory: z.any(),
+    firebaseCachePath: z.string()
 });
 
-type SyncerConfigDataModel = z.infer<typeof SyncerConfigDataModelSchema>;
+type SyncerConfigDataModel = z.infer<typeof syncerConfigDataModelSchema>;
 
 export type Version0SyncConfig = VersionedSchema<SyncerConfigDataModel, 0>;
 
-const Version0SyncConfigZodSchema = SyncerConfigDataModelSchema.extend({
-    version: z.literal(0),
+export const version0SyncConfigZodSchema = syncerConfigDataModelSchema.extend({
+    version: z.literal(0)
 });
 
 export type AnyVerionSyncConfig = Version0SyncConfig;
@@ -63,11 +55,11 @@ export type LatestSyncConfigVersion = Version0SyncConfig;
 
 export const SYNCER_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SyncConfig], 0>(
     "Syncer Config",
-    [Version0SyncConfigZodSchema],
+    [version0SyncConfigZodSchema],
     [],
     () => {
         return {
-            type: RootSyncTypeEnum.root,
+            type: rootSyncTypeEnum.root,
             syncerId: uuidv7(),
             dataStorageEncrypted: false,
             syncQuery: "*",
@@ -78,21 +70,10 @@ export const SYNCER_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SyncConfi
             // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
             vaultName: (((window as any).app as App).vault as any).getName() as string,
             maxUpdatePerSyncer: 50,
-            storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
             nestedRootPath: "",
-            storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
             sharedSettings: { pathToFolder: "" },
             firebaseCachePath: ".obsidian-drive-sync-firebase-cache.json.gz",
             version: 0
         };
     }
 );
-
-export function SyncerConfigRemoveCache(
-    config: LatestSyncConfigVersion
-): Omit<LatestSyncConfigVersion, "storedFirebaseHistory" | "storedFirebaseCache"> {
-    const copy = structuredClone(config) as unknown as Record<string, unknown>;
-    delete copy.storedFirebaseCache;
-    delete copy.storedFirebaseHistory;
-    return copy as Omit<LatestSyncConfigVersion, "storedFirebaseHistory" | "storedFirebaseCache">;
-}

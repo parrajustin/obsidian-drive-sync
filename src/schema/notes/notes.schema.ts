@@ -2,7 +2,7 @@ import { Bytes } from "firebase/firestore";
 import { z } from "zod";
 import { SchemaManager, type VersionedSchema } from "../schema";
 
-const FileDataDbModelSchema = z.object({
+const notesBaseSchema = z.object({
     // Full filepath.
     path: z.string(),
     // The file creation time.
@@ -33,29 +33,31 @@ const FileDataDbModelSchema = z.object({
     /** The syncer config id that pushed the update. */
     syncerConfigId: z.string(),
     /** Time of the change of this file, in ms from unix epoch. */
-    entryTime: z.number(),
+    entryTime: z.number()
 });
 
-const NotesDataModelSchema = z.union([
-    FileDataDbModelSchema.extend({
+const notesDataModelSchema = z.union([
+    notesBaseSchema.extend({
         type: z.literal("Raw"),
-        data: z.instanceof(Bytes),
-        fileStorageRef: z.null(),
+        data: z.instanceof(Uint8Array),
+        fileStorageRef: z.null()
     }),
-    FileDataDbModelSchema.extend({
+    notesBaseSchema.extend({
         type: z.literal("Ref"),
         data: z.null(),
-        fileStorageRef: z.string(),
+        fileStorageRef: z.string()
     })
 ]);
 
-type NotesDataModel = z.infer<typeof NotesDataModelSchema>;
+type NotesDataModel = z.infer<typeof notesDataModelSchema>;
 
 export type Version0NotesSchema = VersionedSchema<NotesDataModel, 0>;
 
-export const Version0NotesZodSchema = NotesDataModelSchema.extend({
-    version: z.literal(0)
-});
+export const version0NotesZodSchema = notesDataModelSchema.and(
+    z.object({
+        version: z.literal(0)
+    })
+);
 
 export type AnyVersionNotesSchema = Version0NotesSchema;
 
@@ -66,6 +68,6 @@ export type LatestNotesSchemaWithoutData = Omit<LatestNotesSchema, "data">;
 
 export const NOTES_SCHEMA_MANAGER = new SchemaManager<[Version0NotesSchema], 0>(
     "Firebase Notes",
-    [Version0NotesZodSchema],
+    [version0NotesZodSchema],
     []
 );
