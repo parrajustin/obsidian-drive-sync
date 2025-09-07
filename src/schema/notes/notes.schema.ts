@@ -36,10 +36,12 @@ const notesBaseSchema = z.object({
     entryTime: z.number()
 });
 
+const dataSchema = z.custom<Bytes>((data) => data instanceof Bytes);
+
 const notesDataModelSchema = z.union([
     notesBaseSchema.extend({
         type: z.literal("Raw"),
-        data: z.instanceof(Uint8Array),
+        data: dataSchema,
         fileStorageRef: z.null()
     }),
     notesBaseSchema.extend({
