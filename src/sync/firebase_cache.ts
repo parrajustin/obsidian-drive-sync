@@ -1,6 +1,5 @@
 import { Ok, StatusResult, type Result } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
-import { WrapPromise } from "../lib/wrap_promise";
 import {
     LatestNotesSchemaWithoutData,
     NOTES_SCHEMA_MANAGER,
@@ -12,7 +11,7 @@ import { Span } from "../logging/tracing/span.decorator";
 import { App } from "obsidian";
 import { FileUtilRaw } from "../filesystem/file_util_raw_api";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
-import { WrapToResult } from "../lib/wrap_to_result";
+import { CompressionUtils } from "./compression_utils";
 
 export interface SchemaWithId<T> {
     id: string;
@@ -27,78 +26,6 @@ export interface FirebaseStoredData<T> {
 }
 
 export class FirebaseCache {
-    /** Compress string data to base64 gzip data. */
-    @Span()
-    @PromiseResultSpanError
-    public static async compressStringData(
-        data: string,
-        reason: string
-    ): Promise<Result<ArrayBuffer, StatusError>> {
-        const encoder = new TextEncoder();
-        const chunk = encoder.encode(data);
-        return FirebaseCache.compressData(chunk, reason);
-    }
-    /** Compress string data to base64 gzip data. */
-    @Span()
-    @PromiseResultSpanError
-    public static async compressData(
-        data: Uint8Array,
-        reason: string
-    ): Promise<Result<ArrayBuffer, StatusError>> {
-        // Create the read stream and compress the data.
-        const readableStream = WrapToResult(
-            () =>
-                new ReadableStream({
-                    start(controller) {
-                        controller.enqueue(data);
-                        controller.close();
-                    }
-                }).pipeThrough(new CompressionStream("gzip")),
-            /*textForUnknown=*/ `Failed to create stream and compress "${reason}"`
-        );
-        if (readableStream.err) {
-            return readableStream;
-        }
-
-        // Convert data to uint8array.
-        const wrappedResponse = new Response(readableStream.safeUnwrap());
-        return WrapPromise(
-            wrappedResponse.arrayBuffer(),
-            /*textForUnknown=*/ `[CompressStringData] Failed to convert to array buffer "${reason}"`
-        );
-    }
-
-    /** Decompress string data. */
-    @Span()
-    @PromiseResultSpanError
-    public static async decompressData(
-        data: Uint8Array,
-        reason: string
-    ): Promise<Result<ArrayBuffer, StatusError>> {
-        // Create the read stream and decompress the data.
-        const readableStream = WrapToResult(
-            () =>
-                new ReadableStream<Uint8Array>({
-                    start(controller) {
-                        controller.enqueue(data);
-                        controller.close();
-                    }
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-                }).pipeThrough(new DecompressionStream("gzip") as any),
-            /*textForUnknown=*/ `Failed to create stream and decompress "${reason}"`
-        );
-        if (readableStream.err) {
-            return readableStream;
-        }
-
-        // Convert data to uint8array.
-        const wrappedResponse = new Response(readableStream.safeUnwrap());
-        return WrapPromise(
-            wrappedResponse.arrayBuffer(),
-            /*textForUnknown=*/ `[DecompressStringData] Failed to convert to array buffer "${reason}"`
-        );
-    }
-
     @Span()
     @PromiseResultSpanError
     public static async writeToFirebaseCache(
@@ -134,7 +61,7 @@ export class FirebaseCache {
             };
         }
 
-        const compressedCache = await this.compressStringData(
+        const compressedCache = await CompressionUtils.compressStringData(
             JSON.stringify(cachedData),
             /*reason=*/ "Firebase Cache"
         );
@@ -159,7 +86,10 @@ export class FirebaseCache {
             return fileData;
         }
 
-        const decompressed = await this.decompressData(fileData.safeUnwrap(), "Firebase Cache");
+        const decompressed = await CompressionUtils.decompressData(
+            fileData.safeUnwrap(),
+            "Firebase Cache"
+        );
         const parsedJson = decompressed
             // Convert to unit8array.
             .map((n) => new Uint8Array(n))
