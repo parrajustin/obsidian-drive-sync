@@ -1,11 +1,12 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /** @jest-environment node */
-/* eslint-disable @typescript-eslint/no-empty-function */
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/naming-convention */
 import { describe, expect, jest, test, beforeEach, afterEach } from "@jest/globals";
-import type { App, Stat, Vault, DataAdapter } from "obsidian";
-import { TFile, TFolder } from "obsidian";
+import type { App, Stat, Vault, DataAdapter , TFolder, FileStats, TAbstractFile } from "obsidian";
+import { TFile } from "obsidian";
 import { FileAccess } from "./file_access";
 import { FileUtilObsidian } from "./file_util_obsidian_api";
 import { FileUtilRaw } from "./file_util_raw_api";
@@ -32,8 +33,25 @@ jest.mock(
     () => ({
         __esModule: true,
         normalizePath: (path: string) => path,
-        TFile: class TFile {},
-        TFolder: class TFolder {},
+        TFile: class FakeTFile implements TFile {
+            stat: FileStats;
+            basename: string;
+            extension: string;
+            vault: Vault;
+            path: string;
+            name: string;
+            parent: TFolder | null;
+},
+        TFolder: class FakeTFolder implements TFolder {
+            children: TAbstractFile[];
+            vault: Vault;
+            path: string;
+            name: string;
+            parent: TFolder | null;
+            public isRoot(): boolean {
+                throw new Error("Method not implemented.");
+            }
+},
     }),
     { virtual: true }
 );
@@ -155,7 +173,7 @@ describe("FileAccess", () => {
         mockQueryUtil.IsLocalFileRaw.mockReturnValue(false);
         (mockAdapter.stat as jest.MockedFunction<typeof mockAdapter.stat>).mockResolvedValue(null);
         mockGetSha256Hash.mockImplementation(
-            (data) => Buffer.from(new TextDecoder().decode(data))
+            (data) => new Uint8Array(Buffer.from(new TextDecoder().decode(data)))
         );
     });
 
@@ -172,7 +190,7 @@ describe("FileAccess", () => {
 
             (mockVault.fileMap as Record<string, TFile>)[filePath] = mockTFile;
             mockFileUtilObsidian.readObsidianFile.mockResolvedValue(Ok(fileData));
-            mockGetSha256Hash.mockReturnValue(Buffer.from(hash));
+            mockGetSha256Hash.mockReturnValue(new Uint8Array(Buffer.from(hash)));
 
             const result = await FileAccess.getObsidianNode(mockApp, filePath);
 
@@ -183,7 +201,7 @@ describe("FileAccess", () => {
             expect(node.type).toBe(FileNodeType.LOCAL_ONLY_FILE);
             expect(node.fileData.fullPath).toBe(filePath);
             expect(node.fileData.fileHash).toEqual(
-                Bytes.fromUint8Array(Buffer.from(hash)).toBase64()
+                Bytes.fromUint8Array(new Uint8Array(Buffer.from(hash))).toBase64()
             );
             expect(mockFileUtilObsidian.readObsidianFile).toHaveBeenCalledWith(mockApp, filePath);
         });
@@ -221,7 +239,7 @@ describe("FileAccess", () => {
 
             (mockAdapter.stat as jest.MockedFunction<typeof mockAdapter.stat>).mockResolvedValue(stat);
             mockFileUtilRaw.readRawFile.mockResolvedValue(Ok(fileData));
-            mockGetSha256Hash.mockReturnValue(Buffer.from(hash));
+            mockGetSha256Hash.mockReturnValue(new Uint8Array(Buffer.from(hash)));
 
             const result = await FileAccess.getRawNode(mockApp, filePath);
 
@@ -232,7 +250,7 @@ describe("FileAccess", () => {
             expect(node.type).toBe(FileNodeType.LOCAL_ONLY_FILE);
             expect(node.fileData.fullPath).toBe(filePath);
             expect(node.fileData.fileHash).toEqual(
-                Bytes.fromUint8Array(Buffer.from(hash)).toBase64()
+                Bytes.fromUint8Array(new Uint8Array(Buffer.from(hash))).toBase64()
             );
             expect(mockAdapter.stat).toHaveBeenCalledWith(filePath);
             expect(mockFileUtilRaw.readRawFile).toHaveBeenCalledWith(mockApp, filePath);
