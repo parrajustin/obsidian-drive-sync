@@ -74,7 +74,8 @@
         "remeda": "2.16.0",
         "triple-beam": "1.4.1",
         "winston": "3.17.0",
-        "winston-transport": "4.9.0"
+        "winston-transport": "4.9.0",
+        "zod": "3.23.8"
     },
     "packageManager": "pnpm@9.12.3+sha224.23b556d397fe35a0beffec995d343732e4b9fd92abc90135370e6ff2"
 }

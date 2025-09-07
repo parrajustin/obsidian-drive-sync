@@ -8,8 +8,9 @@ import { LogError } from "../logging/log";
 import { FolderFuzzySearch } from "../ui/folderFuzzySearch";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import {
-    RootSyncType,
-    SYNCER_CONFIG_SCHEMA_MANAGER
+    rootSyncTypeEnum,
+    SYNCER_CONFIG_SCHEMA_MANAGER,
+    type RootSyncType
 } from "../schema/settings/syncer_config.schema";
 import {
     SETTINGS_CONFIG_SCHEMA_MANAGER,
@@ -29,7 +30,7 @@ export interface FolderTemplate {
 function CreateAllFileConfig(): LatestSyncConfigVersion {
     return {
         version: 0,
-        type: RootSyncType.ROOT_SYNCER,
+        type: rootSyncTypeEnum.root,
         syncerId: uuidv7(),
         dataStorageEncrypted: false,
         syncQuery: "*",
@@ -237,16 +238,16 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                     .setName("Syncer Type")
                     .setDesc("The type of syncer. (default: Root)")
                     .addDropdown((cb) => {
-                        cb.addOption(RootSyncType.ROOT_SYNCER, "Root")
-                            .addOption(RootSyncType.FOLDER_TO_ROOT, "Nested")
-                            .addOption(RootSyncType.SHARED, SHARED_ENTRIES_FIREBASE_DB_NAME)
+                        cb.addOption(rootSyncTypeEnum.root, "Root")
+                            .addOption(rootSyncTypeEnum.nested, "Nested")
+                            .addOption(rootSyncTypeEnum.shared, SHARED_ENTRIES_FIREBASE_DB_NAME)
                             .setValue(elem.type)
                             .onChange((value: RootSyncType) => {
                                 elem.type = value;
                                 resetList();
                             });
                     });
-                if (elem.type === RootSyncType.SHARED) {
+                if (elem.type === rootSyncTypeEnum.shared) {
                     if (!elem.vaultName.startsWith("___SHAREDSYNCER___")) {
                         elem.vaultName = `___SHAREDSYNCER___-${uuidv7()}`;
                     }

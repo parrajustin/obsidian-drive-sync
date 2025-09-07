@@ -1,50 +1,53 @@
 import type { App } from "obsidian";
+import { z } from "zod";
 import { uuidv7 } from "../../lib/uuid";
-import type { VersionedSchema } from "../schema";
-import { SchemaManager } from "../schema";
+import { SchemaManager, type VersionedSchema } from "../schema";
 
-export enum RootSyncType {
-    ROOT_SYNCER = "root",
-    FOLDER_TO_ROOT = "nested",
-    // When the syncer is shared with other users.
-    SHARED = "shared"
-}
+export const rootSyncTypeSchema = z.enum(["root", "nested", "shared"]);
+export type RootSyncType = z.infer<typeof rootSyncTypeSchema>;
+export const rootSyncTypeEnum = rootSyncTypeSchema.enum;
 
-interface SharedSyncerSettings {
+const sharedSyncerSettingsSchema = z.object({
     /** Root folder to the shared data. */
-    pathToFolder: string;
-}
+    pathToFolder: z.string()
+});
 
-export interface SyncerConfigV1 {
-    type: RootSyncType;
+const syncerConfigDataModelSchema = z.object({
+    type: rootSyncTypeSchema,
     /** The name of the vault, to connect remote syncers. */
-    vaultName: string;
+    vaultName: z.string(),
     /** Sync config identifier. */
-    syncerId: string;
+    syncerId: z.string(),
     /** Max syncs per file update. */
-    maxUpdatePerSyncer: number;
+    maxUpdatePerSyncer: z.number(),
     /** If data storage encryption is enabled. Only encrypts the data. */
-    dataStorageEncrypted: boolean;
+    dataStorageEncrypted: z.boolean(),
     /** The password for encryption, all locations must have the same. */
-    encryptionPassword?: string;
+    encryptionPassword: z.string().optional(),
     /** Filter for files. */
-    syncQuery: string;
+    syncQuery: z.string(),
     /** Query to denote raw files to add to syncing. */
-    rawFileSyncQuery: string;
+    rawFileSyncQuery: z.string(),
     /** Query to denote obsidian files to add to syncing. */
-    obsidianFileSyncQuery: string;
+    obsidianFileSyncQuery: z.string(),
     /** Query where not to write file ids. */
-    fileIdFileQuery: string;
+    fileIdFileQuery: z.string(),
     /** Enables the file id writing. */
-    enableFileIdWriting: boolean;
+    enableFileIdWriting: z.boolean(),
     /** 'nested' syncer type root path for the nested vault. */
-    nestedRootPath: string;
-    sharedSettings: SharedSyncerSettings;
+    nestedRootPath: z.string(),
+    sharedSettings: sharedSyncerSettingsSchema,
     /** The firebase cloud data cache path */
-    firebaseCachePath: string;
-}
+    firebaseCachePath: z.string()
+});
 
-export type Version0SyncConfig = VersionedSchema<SyncerConfigV1, 0>;
+type SyncerConfigDataModel = z.infer<typeof syncerConfigDataModelSchema>;
+
+export type Version0SyncConfig = VersionedSchema<SyncerConfigDataModel, 0>;
+
+export const version0SyncConfigZodSchema = syncerConfigDataModelSchema.extend({
+    version: z.literal(0)
+});
 
 export type AnyVerionSyncConfig = Version0SyncConfig;
 
@@ -52,10 +55,11 @@ export type LatestSyncConfigVersion = Version0SyncConfig;
 
 export const SYNCER_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SyncConfig], 0>(
     "Syncer Config",
+    [version0SyncConfigZodSchema],
     [],
     () => {
         return {
-            type: RootSyncType.ROOT_SYNCER,
+            type: rootSyncTypeEnum.root,
             syncerId: uuidv7(),
             dataStorageEncrypted: false,
             syncQuery: "*",
@@ -66,21 +70,10 @@ export const SYNCER_CONFIG_SCHEMA_MANAGER = new SchemaManager<[Version0SyncConfi
             // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
             vaultName: (((window as any).app as App).vault as any).getName() as string,
             maxUpdatePerSyncer: 50,
-            storedFirebaseCache: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
             nestedRootPath: "",
-            storedFirebaseHistory: { lastUpdate: 0, cache: "", length: 0, versionOfData: null },
             sharedSettings: { pathToFolder: "" },
             firebaseCachePath: ".obsidian-drive-sync-firebase-cache.json.gz",
             version: 0
         };
     }
 );
-
-export function SyncerConfigRemoveCache(
-    config: LatestSyncConfigVersion
-): Omit<LatestSyncConfigVersion, "storedFirebaseHistory" | "storedFirebaseCache"> {
-    const copy = structuredClone(config) as unknown as Record<string, unknown>;
-    delete copy.storedFirebaseCache;
-    delete copy.storedFirebaseHistory;
-    return copy as Omit<LatestSyncConfigVersion, "storedFirebaseHistory" | "storedFirebaseCache">;
-}

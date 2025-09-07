@@ -62,6 +62,9 @@ importers:
       winston-transport:
         specifier: 4.9.0
         version: 4.9.0
+      zod:
+        specifier: 3.23.8
+        version: 3.23.8
     devDependencies:
       '@eslint/js':
         specifier: 9.10.0
@@ -124,7 +127,7 @@ importers:
         specifier: 29.2.3
         version: 29.2.3(@babel/core@7.25.2)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.25.2))(esbuild@0.23.0)(jest@29.7.0(@types/node@22.5.5)(ts-node@10.9.2(@types/node@22.5.5)(typescript@5.6.2)))(typescript@5.6.2)
       ts-node:
-        specifier: 10.9.2
+        specifier: ^10.9.2
         version: 10.9.2(@types/node@22.5.5)(typescript@5.6.2)
       tslib:
         specifier: 2.7.0
@@ -4822,6 +4825,9 @@ packages:
     peerDependencies:
       zod: ^3.24.1
 
+  zod@3.23.8:
+    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
+
   zod@3.25.67:
     resolution: {integrity: sha512-idA2YXwpCdqUSKRCACDE6ItZD9TZzy3OZMtpfLoh6oPR47lipysRrJfjzMqFxQ3uJuUPyUeWe1r9vLH33xO/Qw==}
 
@@ -5910,8 +5916,8 @@ snapshots:
       express-rate-limit: 7.5.0(express@5.1.0)
       pkce-challenge: 5.0.0
       raw-body: 3.0.0
-      zod: 3.25.67
-      zod-to-json-schema: 3.24.5(zod@3.25.67)
+      zod: 3.23.8
+      zod-to-json-schema: 3.24.5(zod@3.23.8)
     transitivePeerDependencies:
       - supports-color
 
@@ -10540,8 +10546,14 @@ snapshots:
       compress-commons: 6.0.2
       readable-stream: 4.7.0
 
+  zod-to-json-schema@3.24.5(zod@3.23.8):
+    dependencies:
+      zod: 3.23.8
+
   zod-to-json-schema@3.24.5(zod@3.25.67):
     dependencies:
       zod: 3.25.67
+
+  zod@3.23.8: {}
 
   zod@3.25.67: {}
