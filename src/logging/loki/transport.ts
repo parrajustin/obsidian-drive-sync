@@ -41,7 +41,6 @@ export class LokiTransport extends Transport {
      * @memberof LokiTransport
      */
     constructor(options: LokiTransportOptions) {
-        console.log("LokiTransport construct", options);
         super(options);
 
         // Pass all the given options to batcher
@@ -72,7 +71,6 @@ export class LokiTransport extends Transport {
      * @memberof LokiTransport
      */
     public log(info: TransformableInfo, callback?: () => void) {
-        console.log("LOG", info);
         // Immediately tell Winston that this transport has received the log.
         setImmediate(() => {
             this.emit("logged", info);

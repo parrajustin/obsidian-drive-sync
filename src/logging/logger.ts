@@ -1,6 +1,7 @@
 import { LokiTransport } from "./loki/transport";
 import type TransportStream from "winston-transport";
 import {
+    IS_TEST_ENV,
     LOKI_ACCESS_CLIENT_ID,
     LOKI_ACCESS_CLIENT_SECRET,
     LOKI_URL,
@@ -28,7 +29,7 @@ const USER_ID_FORMAT = format((info, _opts) => {
 });
 
 export function CreateLogger(label: string): Logger {
-    const transportStreams: TransportStream[] = [
+    let transportStreams: TransportStream[] = [
         new LokiTransport({
             level: "error",
             host: LOKI_URL,
@@ -69,6 +70,9 @@ export function CreateLogger(label: string): Logger {
                 )
             })
         );
+    }
+    if (IS_TEST_ENV) {
+        transportStreams = [];
     }
 
     return createLogger({
