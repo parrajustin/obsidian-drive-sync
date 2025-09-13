@@ -210,7 +210,7 @@ export class ConvergenceUtil {
     }
 
     @Span()
-    private static updateWithCloudData(
+    public static updateWithCloudData(
         mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
         mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema | LatestNotesSchemaWithoutData>>
     ): MapOfFileNodes<AllExistingFileNodeTypes> {
@@ -285,7 +285,7 @@ export class ConvergenceUtil {
      */
     @Span()
     @PromiseResultSpanError
-    private static async updateWithNewNodes(
+    public static async updateWithNewNodes(
         app: App,
         config: LatestSyncConfigVersion,
         mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,

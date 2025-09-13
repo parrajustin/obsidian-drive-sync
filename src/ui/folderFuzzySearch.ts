@@ -4,6 +4,9 @@ import { SearchString } from "../lib/search_string_parser";
 import { GetQueryString } from "../sync/query_util";
 import { LogError } from "../logging/log";
 import { ConvertToUnknownError } from "../util";
+import { CreateLogger } from "../logging/logger";
+
+const LOGGER = CreateLogger("view.folder_fuzzy_search");
 
 export class FolderFuzzySearch extends FuzzySuggestModal<TFolder> {
     private _searchString: SearchString;
@@ -101,7 +104,7 @@ export class FolderFuzzySearch extends FuzzySuggestModal<TFolder> {
         try {
             this.open();
         } catch (e) {
-            LogError(ConvertToUnknownError("Query Suggest View")(e));
+            LogError(LOGGER, ConvertToUnknownError("Query Suggest View")(e));
         }
     }
 }

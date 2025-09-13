@@ -3,7 +3,8 @@ import { ItemView } from "obsidian";
 import { None, Some, type Option } from "../lib/option";
 import { ErrorCode, type StatusError } from "../lib/status_error";
 // import type { FirebaseHistory } from "../history/firebase_hist";
-import type FirestoreSyncPlugin from "../main";
+// import type FirestoreSyncPlugin from "../main";
+import type { MainAppType } from "../main_app";
 import { CreateIcon, IconName } from "../ui/icon";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { ConvergenceActionType } from "../sync/convergence_util";
@@ -73,7 +74,7 @@ export class SyncProgressView extends ItemView {
     /** The buttons to click to see a syncer history panel. */
     private _syncerHistBtn = new Map<string, HTMLDivElement>();
     /** firestore sync plugin. */
-    private _plugin: FirestoreSyncPlugin;
+    private _plugin: MainAppType;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -91,7 +92,7 @@ export class SyncProgressView extends ItemView {
         this.updateProgressView();
     }
 
-    public setSyncPlugin(plugin: FirestoreSyncPlugin) {
+    public setSyncPlugin(plugin: MainAppType) {
         this._plugin = plugin;
     }
 

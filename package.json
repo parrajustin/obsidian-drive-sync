@@ -54,7 +54,7 @@
         "type-check",
         "lint",
         "test",
-        "buid"
+        "build"
     ],
     "dependencies": {
         "@lit-labs/signals": "0.1.1",
