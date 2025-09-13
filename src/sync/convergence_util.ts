@@ -32,21 +32,21 @@ export enum ConvergenceActionType {
     UPDATE_LOCAL = "UPDATE_LOCAL"
 }
 
-// Action to create a firebase entry for a new file.
+// Action to state we have a new local file, thus need a new cloud entry.
 export interface NewLocalFileAction {
     fullPath: FilePathType;
     action: ConvergenceActionType.NEW_LOCAL_FILE;
     localNode: LocalOnlyFileNode;
 }
 
-// Action to update the firebase data entry for a local file.
+// Action to update the firebase data entry with new local file data.
 export interface UpdateCloudAction {
     fullPath: FilePathType;
     action: ConvergenceActionType.UPDATE_CLOUD;
     localNode: LocalCloudFileNode;
 }
 
-// Action to delete local file based on cloud data.
+// Action to delete local file based on cloud data. Cloud marked is deleted.
 export interface DeleteLocalFileAction {
     fullPath: FilePathType;
     action: ConvergenceActionType.DELETE_LOCAL;
@@ -60,7 +60,7 @@ export interface UpdateLocalFileAction {
     localNode: LocalCloudFileNode | RemoteOnlyNode;
 }
 
-// Action to mark the cloud data as deleted.
+// Action to mark the cloud data as deleted. Local file removed.
 export interface MarkCloudDeletedAction {
     fullPath: FilePathType;
     action: ConvergenceActionType.MARK_CLOUD_DELETED;
@@ -75,11 +75,22 @@ export type ConvergenceAction =
     | MarkCloudDeletedAction;
 
 export interface ConvergenceStateReturnType {
+    // Updated file nodes based on checking local file changes and merging cloud data.
     mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>;
+    // Actions necessary to make both local and cloud states align.
     actions: ConvergenceAction[];
 }
 
 export class ConvergenceUtil {
+    /**
+     * Creates the convergence actions necessary to align the states of the local files and cloud state.
+     * @param app The obsidian app api
+     * @param config The config of the syncer calling this convergence
+     * @param mapOfFileNodes The currently believed state of local files and cloud connections
+     * @param touchedFiles The files believed to have been modified by the user since last execution
+     * @param mapOfCloudData The current up to date cloud connectsion
+     * @returns Update of convergence
+     */
     @Span()
     @PromiseResultSpanError
     public static async createStateConvergenceActions(
