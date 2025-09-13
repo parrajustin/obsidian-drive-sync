@@ -108,7 +108,7 @@ export class SyncerUpdateUtil {
 
     @Span()
     @PromiseResultSpanError
-    public static async handleSingleConvergence(
+    private static async handleSingleConvergence(
         app: App,
         db: Firestore,
         clientId: string,
@@ -146,7 +146,7 @@ export class SyncerUpdateUtil {
 
     @Span()
     @PromiseResultSpanError
-    public static async executeLocalUpdate(
+    private static async executeLocalUpdate(
         app: App,
         db: Firestore,
         syncerConfig: LatestSyncConfigVersion,
@@ -281,7 +281,7 @@ export class SyncerUpdateUtil {
 
     @Span()
     @PromiseResultSpanError
-    public static async executeUpdateCloud(
+    private static async executeUpdateCloud(
         app: App,
         db: Firestore,
         clientId: string,
@@ -380,7 +380,7 @@ export class SyncerUpdateUtil {
      */
     @Span()
     @ResultSpanError
-    public static executeMarkCloudDeleted(
+    private static executeMarkCloudDeleted(
         db: Firestore,
         syncerConfig: LatestSyncConfigVersion,
         action: MarkCloudDeletedAction,
@@ -421,7 +421,7 @@ export class SyncerUpdateUtil {
      */
     @Span()
     @PromiseResultSpanError
-    public static async executeLocalDeletion(
+    private static async executeLocalDeletion(
         app: App,
         syncerConfig: LatestSyncConfigVersion,
         action: DeleteLocalFileAction,

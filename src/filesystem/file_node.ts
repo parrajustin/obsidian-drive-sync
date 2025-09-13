@@ -1,4 +1,4 @@
-import type { LatestNotesSchema } from "../schema/notes/notes.schema";
+import type { LatestNotesSchemaWithoutData } from "../schema/notes/notes.schema";
 import type { SchemaWithId } from "../sync/firebase_cache";
 import type { MsFromEpoch } from "../types";
 
@@ -65,7 +65,7 @@ export interface LocalCloudFileNode {
     type: FileNodeType.LOCAL_CLOUD_FILE;
     fileData: FileData;
     localTime: MsFromEpoch;
-    firebaseData: SchemaWithId<Omit<LatestNotesSchema, "data">>;
+    firebaseData: SchemaWithId<LatestNotesSchemaWithoutData>;
 }
 
 // File exist remotely but missing locally.
@@ -73,7 +73,7 @@ export interface RemoteOnlyNode {
     type: FileNodeType.REMOTE_ONLY;
     fileData: OnlyFilePath;
     localTime: MsFromEpoch;
-    firebaseData: SchemaWithId<Omit<LatestNotesSchema, "data">>;
+    firebaseData: SchemaWithId<LatestNotesSchemaWithoutData>;
 }
 
 // All file node types that are valid.

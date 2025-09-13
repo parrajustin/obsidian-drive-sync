@@ -10,7 +10,7 @@ import {
     LocalCloudFileNode
 } from "../filesystem/file_node";
 import { Span } from "../logging/tracing/span.decorator";
-import { LatestNotesSchema } from "../schema/notes/notes.schema";
+import { LatestNotesSchema, LatestNotesSchemaWithoutData } from "../schema/notes/notes.schema";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import type { Result } from "../lib/result";
 import { Ok } from "../lib/result";
@@ -87,7 +87,7 @@ export class ConvergenceUtil {
         config: LatestSyncConfigVersion,
         mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
         touchedFiles: Map<FilePathType, MsFromEpoch>,
-        mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema>>
+        mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema | LatestNotesSchemaWithoutData>>
     ): Promise<Result<ConvergenceStateReturnType, StatusError>> {
         // First update the file node map with updated local data from `touchedFiles`.
         const mapWithNewNodes = await this.updateWithNewNodes(
@@ -199,9 +199,9 @@ export class ConvergenceUtil {
     }
 
     @Span()
-    public static updateWithCloudData(
+    private static updateWithCloudData(
         mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
-        mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema>>
+        mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema | LatestNotesSchemaWithoutData>>
     ): MapOfFileNodes<AllExistingFileNodeTypes> {
         const outputMap = new Map<FilePathType, AllExistingFileNodeTypes>();
         const visitedPaths = new Set<FilePathType>();
@@ -274,7 +274,7 @@ export class ConvergenceUtil {
      */
     @Span()
     @PromiseResultSpanError
-    public static async updateWithNewNodes(
+    private static async updateWithNewNodes(
         app: App,
         config: LatestSyncConfigVersion,
         mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
