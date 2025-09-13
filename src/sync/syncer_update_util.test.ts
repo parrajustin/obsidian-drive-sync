@@ -24,8 +24,18 @@ import * as progressView from "../sidepanel/progressView";
 import { CompressionUtils } from "./compression_utils";
 import { FakeClock } from "../clock";
 import type { LatestNotesSchema } from "../schema/notes/notes.schema";
+import GetSha256Hash from "../lib/sha";
 
 // Mock dependencies
+jest.mock("../lib/sha", () => ({
+    __esModule: true,
+    default: jest.fn().mockReturnValue(new Uint8Array(32).fill(1))
+}));
+jest.mock("../constants", () => ({
+    FileConst: {
+        FILE_PATH: "local.filepath"
+    }
+}));
 jest.mock("../logging/logger", () => ({
     CreateLogger: () => ({
         debug: jest.fn(),
@@ -97,6 +107,13 @@ const mockApp = {
             }),
             mkdir: jest.fn(async (_path: string) => {
                 // No-op for in-memory fs
+            }),
+            trashSystem: jest.fn(async (path: string) => {
+                mockObsidianFs.delete(path);
+                return true;
+            }),
+            trashLocal: jest.fn(async (path: string) => {
+                mockObsidianFs.delete(path);
             })
         },
         readBinary: jest.fn(async (file: TFile) => {
@@ -104,6 +121,22 @@ const mockApp = {
         }),
         getAbstractFileByPath: jest.fn((path: string) => {
             return (mockApp.vault.fileMap as any)[path] || null;
+        }),
+        trash: jest.fn(async (file: TFile, _system: boolean) => {
+            mockObsidianFs.delete(file.path);
+            delete (mockApp.vault.fileMap as any)[file.path];
+        }),
+        createBinary: jest.fn(async (path: string, data: Uint8Array) => {
+            await (mockApp.vault.adapter.writeBinary as jest.Mock)(path, data);
+            const tFile = new TFile();
+            tFile.path = path;
+            tFile.stat = {
+                ctime: clock.now(),
+                mtime: clock.now(),
+                size: data.length
+            };
+            (mockApp.vault.fileMap as any)[path] = tFile;
+            return tFile;
         })
     },
     workspace: {
@@ -116,13 +149,87 @@ const mockApp = {
 // In-memory Firestore
 const mockFirebaseFs = new Map<string, Partial<LatestNotesSchema>>();
 
+const addFileToObsidian = (
+    path: FilePathType,
+    content: string,
+    opts?: { ctime?: number; mtime?: number }
+) => {
+    const ctime = opts?.ctime ?? clock.now();
+    const mtime = opts?.mtime ?? clock.now();
+    const contentBytes = new TextEncoder().encode(content);
+    mockObsidianFs.set(path, {
+        content: contentBytes,
+        mtime: mtime,
+        ctime: ctime,
+        size: contentBytes.length
+    });
+
+    const tFile = new TFile();
+    tFile.path = path;
+    tFile.stat = { ctime: ctime, mtime: mtime, size: contentBytes.length };
+    const parts = path.split("/");
+    const name = parts.pop()!;
+    const nameParts = name.split(".");
+    tFile.basename = nameParts[0]!;
+    tFile.extension = nameParts[1]!;
+    tFile.vault = mockApp.vault;
+    (mockApp.vault.fileMap as any)[path] = tFile;
+    return tFile;
+};
+
+import { Bytes } from "firebase/firestore";
+const addFileToFirebase = async (
+    path: FilePathType,
+    content: string,
+    opts?: { deleted?: boolean; entryTime?: number; mtime?: number; ctime?: number }
+) => {
+    const entryTime = opts?.entryTime ?? clock.now();
+    const mtime = opts?.mtime ?? entryTime;
+    const ctime = opts?.ctime ?? entryTime;
+    const contentBytes = new TextEncoder().encode(content);
+    const compressedBytesResult = await CompressionUtils.compressData(contentBytes, "test");
+    const compressedBytes = compressedBytesResult.unsafeUnwrap();
+    const fileHash = GetSha256Hash(contentBytes);
+
+    const parts = path.split("/");
+    const name = parts.pop()!;
+    const nameParts = name.split(".");
+    const basename = nameParts[0]!;
+    const extension = nameParts[1]!;
+
+    const doc: LatestNotesSchema = {
+        path,
+        cTime: ctime,
+        mTime: mtime,
+        size: contentBytes.length,
+        baseName: basename,
+        ext: extension,
+        userId: "test-user",
+        deleted: opts?.deleted ?? false,
+        fileHash: Bytes.fromUint8Array(fileHash).toBase64(),
+        vaultName: "test-vault",
+        deviceId: "test-client",
+        syncerConfigId: "test-syncer",
+        entryTime,
+        type: "Raw",
+        data: Bytes.fromUint8Array(new Uint8Array(compressedBytes)),
+        fileStorageRef: null,
+        version: 0
+    };
+
+    mockFirebaseFs.set(path, doc);
+    return doc;
+};
+
 jest.mock("firebase/firestore", () => {
     const originalFirestore = jest.requireActual("firebase/firestore") as any;
     return {
         getFirestore: jest.fn(() => ({}) as Firestore),
-        doc: jest.fn((_firestore, path, ...pathSegments) => ({
-            path: [path, ...pathSegments].join("/")
-        })),
+        doc: jest.fn((_firestore, path, ...pathSegments) => {
+            const fullPath = [path, ...pathSegments].join("/");
+            const id = fullPath.split("/").pop()!;
+            return { path: id };
+        }),
         getDoc: jest.fn(async (docRef: { path: string }) => {
             const data = mockFirebaseFs.get(docRef.path);
             return {
@@ -246,5 +353,169 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         );
 
         expect(new TextDecoder().decode(decompressedData.unsafeUnwrap())).toBe(fileContent);
+    });
+
+    it("should handle a mix of local-only, remote-only, and remote-deleted files", async () => {
+        // Arrange
+        addFileToObsidian("local1.md" as FilePathType, "local 1 content");
+        addFileToObsidian("local2.md" as FilePathType, "local 2 content");
+        await addFileToFirebase("remote1.md" as FilePathType, "remote 1 content");
+        await addFileToFirebase("remote2.md" as FilePathType, "remote 2 content", { deleted: true });
+
+        const touchedFiles = new Map<FilePathType, MsFromEpoch>([
+            ["local1.md" as FilePathType, clock.now()],
+            ["local2.md" as FilePathType, clock.now()]
+        ]);
+        const mapOfCloudData = new Map();
+        for (const [path, data] of mockFirebaseFs.entries()) {
+            mapOfCloudData.set(path, { id: path, data });
+        }
+
+        const convergenceResult = await ConvergenceUtil.createStateConvergenceActions(
+            mockApp,
+            mockSyncerConfig,
+            new Map(),
+            touchedFiles,
+            mapOfCloudData
+        );
+
+        expect(convergenceResult.ok).toBe(true);
+        const actions = convergenceResult.unsafeUnwrap();
+        expect(actions.actions.length).toBe(3);
+
+        // Act
+        const result = await SyncerUpdateUtil.executeLimitedSyncConvergence(
+            mockApp,
+            mockDb,
+            "test-client",
+            mockSyncerConfig,
+            actions,
+            mockCreds
+        );
+
+        // Assert
+        expect(result.ok).toBe(true);
+        const finalFileNodes = result.unsafeUnwrap();
+
+        // Check firebase state
+        expect(mockFirebaseFs.size).toBe(4);
+        const fbDocs = Array.from(mockFirebaseFs.values());
+        expect(fbDocs.find((d) => d?.path === "local1.md")?.deleted).toBe(false);
+        expect(fbDocs.find((d) => d?.path === "local2.md")?.deleted).toBe(false);
+        expect(fbDocs.find((d) => d?.path === "remote1.md")?.deleted).toBe(false);
+        expect(fbDocs.find((d) => d?.path === "remote2.md")?.deleted).toBe(true);
+
+        // Check local fs state
+        expect(mockObsidianFs.has("local1.md")).toBe(true);
+        expect(mockObsidianFs.has("local2.md")).toBe(true);
+        expect(mockObsidianFs.has("remote1.md")).toBe(true);
+        expect(mockObsidianFs.has("remote2.md")).toBe(false);
+
+        // Check final node types
+        expect(finalFileNodes.get("local1.md" as FilePathType)?.type).toBe("LOCAL_CLOUD");
+        expect(finalFileNodes.get("local2.md" as FilePathType)?.type).toBe("LOCAL_CLOUD");
+        expect(finalFileNodes.get("remote1.md" as FilePathType)?.type).toBe("LOCAL_CLOUD");
+        expect(finalFileNodes.get("remote2.md" as FilePathType)?.type).toBe("REMOTE_ONLY");
+    });
+
+    it("should delete a local file when the remote is deleted and newer", async () => {
+        // Arrange
+        const filePath = "file.md" as FilePathType;
+        const olderTime = clock.now() - 2000;
+        const newerTime = clock.now() - 1000;
+
+        addFileToObsidian(filePath, "old content", { mtime: olderTime });
+        await addFileToFirebase(filePath, "remote content", { deleted: true, entryTime: newerTime });
+
+        const mapOfCloudData = new Map();
+        for (const [path, data] of mockFirebaseFs.entries()) {
+            mapOfCloudData.set(path, { id: path, data });
+        }
+
+        const convergenceResult = await ConvergenceUtil.createStateConvergenceActions(
+            mockApp,
+            mockSyncerConfig,
+            new Map(),
+            new Map([[filePath, olderTime]]),
+            mapOfCloudData
+        );
+
+        expect(convergenceResult.ok).toBe(true);
+        const actions = convergenceResult.unsafeUnwrap();
+        expect(actions.actions.length).toBe(1);
+        expect(actions.actions[0]?.action).toBe("DELETE_LOCAL_FILE");
+
+        // Act
+        const result = await SyncerUpdateUtil.executeLimitedSyncConvergence(
+            mockApp,
+            mockDb,
+            "test-client",
+            mockSyncerConfig,
+            actions,
+            mockCreds
+        );
+
+        // Assert
+        expect(result.ok).toBe(true);
+        const finalFileNodes = result.unsafeUnwrap();
+
+        expect(mockObsidianFs.has(filePath)).toBe(false);
+        expect((mockApp.vault.adapter.trashSystem as jest.Mock).mock.calls.length).toBe(1);
+        expect(finalFileNodes.get(filePath)?.type).toBe("REMOTE_ONLY");
+    });
+
+    it("should undelete a remote file when the local file is newer", async () => {
+        // Arrange
+        const filePath = "file.md" as FilePathType;
+        const olderTime = clock.now() - 2000;
+        const newerTime = clock.now() - 1000;
+        const newContent = "this is new content";
+
+        addFileToObsidian(filePath, newContent, { mtime: newerTime });
+        await addFileToFirebase(filePath, "old content", { deleted: true, entryTime: olderTime });
+
+        const mapOfCloudData = new Map();
+        for (const [path, data] of mockFirebaseFs.entries()) {
+            mapOfCloudData.set(path, { id: path, data });
+        }
+
+        const convergenceResult = await ConvergenceUtil.createStateConvergenceActions(
+            mockApp,
+            mockSyncerConfig,
+            new Map(),
+            new Map([[filePath, newerTime]]),
+            mapOfCloudData
+        );
+
+        expect(convergenceResult.ok).toBe(true);
+        const actions = convergenceResult.unsafeUnwrap();
+        expect(actions.actions.length).toBe(1);
+        expect(actions.actions[0]?.action).toBe("UPDATE_CLOUD");
+
+        // Act
+        const result = await SyncerUpdateUtil.executeLimitedSyncConvergence(
+            mockApp,
+            mockDb,
+            "test-client",
+            mockSyncerConfig,
+            actions,
+            mockCreds
+        );
+
+        // Assert
+        expect(result.ok).toBe(true);
+        const finalFileNodes = result.unsafeUnwrap();
+
+        const remoteDoc = mockFirebaseFs.get(filePath);
+        expect(remoteDoc).toBeDefined();
+        expect(remoteDoc?.deleted).toBe(false);
+
+        const decompressedData = await CompressionUtils.decompressData(
+            remoteDoc!.data!.toUint8Array()!,
+            "test"
+        );
+        expect(new TextDecoder().decode(decompressedData.unsafeUnwrap())).toBe(newContent);
+
+        expect(finalFileNodes.get(filePath)?.type).toBe("LOCAL_CLOUD");
     });
 });
