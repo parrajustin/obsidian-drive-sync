@@ -1,5 +1,5 @@
-import type { Firestore, Transaction } from "firebase/firestore";
-import { Bytes, doc } from "firebase/firestore";
+import type { Firestore } from "firebase/firestore";
+import { Bytes, doc, setDoc, updateDoc } from "firebase/firestore";
 import { GetFileCollectionPath } from "../firestore/file_db_util";
 import type { UserCredential } from "firebase/auth";
 import { Ok, type Result, type StatusResult } from "../lib/result";
@@ -23,7 +23,6 @@ export class FirestoreUtil {
         db: Firestore,
         clientId: string,
         syncerConfig: LatestSyncConfigVersion,
-        transaction: Transaction,
         user: UserCredential,
         fileId: string,
         fileNode: LocalOnlyFileNode | LocalCloudFileNode,
@@ -50,7 +49,7 @@ export class FirestoreUtil {
             version: 0
         };
         const updateResult = WrapToResult(
-            () => transaction.set(doc(db, entry), uploadData),
+            () => setDoc(doc(db, entry), uploadData),
             /*textForUnknown=*/ `Failed to execute update transaction`
         );
         if (updateResult.err) {
@@ -68,7 +67,6 @@ export class FirestoreUtil {
         db: Firestore,
         clientId: string,
         syncerConfig: LatestSyncConfigVersion,
-        transaction: Transaction,
         user: UserCredential,
         fileId: string,
         fileNode: LocalOnlyFileNode | LocalCloudFileNode,
@@ -95,7 +93,7 @@ export class FirestoreUtil {
             version: 0
         };
         const updateResult = WrapToResult(
-            () => transaction.set(doc(db, entry), uploadData),
+            () => setDoc(doc(db, entry), uploadData),
             /*textForUnknown=*/ `Failed to execute update transaction`
         );
         if (updateResult.err) {
@@ -111,7 +109,6 @@ export class FirestoreUtil {
     @ResultSpanError
     public static markFirestoreAsDeleted(
         db: Firestore,
-        transaction: Transaction,
         user: UserCredential,
         fileId: string,
         newUpdateTime: number
@@ -123,7 +120,7 @@ export class FirestoreUtil {
             entryTime: newUpdateTime
         };
         const updateResult = WrapToResult(
-            () => transaction.update(doc(db, entry), updateData),
+            () => updateDoc(doc(db, entry), updateData),
             /*textForUnknown=*/ `Failed to execute update transaction`
         );
         if (updateResult.err) {
