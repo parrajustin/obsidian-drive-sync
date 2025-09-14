@@ -487,17 +487,29 @@ describe("FileSyncer", () => {
     });
 
     it("should handle a complex end-to-end sync scenario", async () => {
-        // 1. ARRANGE: Initial State
+        //
+        // BLOCK 1: Initial State Setup
+        //
+        // This block establishes the baseline for the test. We create a set of files
+        // both locally and remotely to simulate a user's vault in a realistic state.
+        // Each file represents a different initial condition for the sync process.
+        //
+        // File states are:
+        // - a.md: Exists only locally. Expected action: NEW_LOCAL_FILE (upload).
+        // - b.md: Exists both locally and remotely, with identical content and timestamps. Expected action: None.
+        // - c.md: Exists only remotely. Expected action: UPDATE_LOCAL (download).
+        // - d.md: Exists only remotely, but is marked as deleted. Expected action: None (ignore).
+        //
         const contentA = "content of a";
         const contentB = "content of b";
         const contentC = "content of c";
         const contentD = "content of d";
 
-        // Local files
+        // Create local files in the mock Obsidian vault.
         addFileToObsidian("a.md" as FilePathType, contentA, { mtime: clock.now() });
         addFileToObsidian("b.md" as FilePathType, contentB, { mtime: clock.now() });
 
-        // Remote files
+        // Create remote files in the mock Firebase backend.
         await addFileToFirebase("b.md" as FilePathType, contentB, { entryTime: clock.now() });
         await addFileToFirebase("c.md" as FilePathType, contentC, { entryTime: clock.now() });
         await addFileToFirebase("d.md" as FilePathType, contentD, {
@@ -505,7 +517,12 @@ describe("FileSyncer", () => {
             entryTime: clock.now()
         });
 
-        // 2. ACT 1: First sync
+        //
+        // BLOCK 2: First Sync Cycle
+        //
+        // We initialize the FileSyncer and run its first sync cycle.
+        // This cycle will process the initial state defined in BLOCK 1.
+        //
         const syncerResult = await FileSyncer.constructFileSyncer(
             mockApp,
             mockPlugin,
@@ -517,16 +534,34 @@ describe("FileSyncer", () => {
         const initResult = await syncer.init();
         expect(initResult.ok).toBe(true);
 
-        // 3. ASSERT 1: Validate state after first sync
-        // Check local file system
-        expect(mockObsidianFs.has("a.md" as FilePathType)).toBe(true);
-        expect(mockObsidianFs.has("b.md" as FilePathType)).toBe(true);
-        expect(mockObsidianFs.has("c.md" as FilePathType)).toBe(true); // c.md should be downloaded
-        expect(new TextDecoder().decode(mockObsidianFs.get("c.md")!.content)).toBe(contentC);
-        expect(mockObsidianFs.has("d.md" as FilePathType)).toBe(false); // d.md is remote-deleted, should not be downloaded
+        //
+        // BLOCK 3: Verification of First Sync
+        //
+        // This block asserts that the first sync cycle performed the correct actions
+        // based on the initial state.
+        //
 
         //
-        // Check remote file system
+        // 3.1: Verify Local File System State
+        //
+        // - a.md: Should still exist (it was uploaded).
+        // - b.md: Should still exist (it was in sync).
+        // - c.md: Should now exist locally (it was downloaded).
+        // - d.md: Should not exist locally (it was remotely deleted).
+        //
+        expect(mockObsidianFs.has("a.md" as FilePathType)).toBe(true);
+        expect(mockObsidianFs.has("b.md" as FilePathType)).toBe(true);
+        expect(mockObsidianFs.has("c.md" as FilePathType)).toBe(true);
+        expect(new TextDecoder().decode(mockObsidianFs.get("c.md")!.content)).toBe(contentC);
+        expect(mockObsidianFs.has("d.md" as FilePathType)).toBe(false);
+
+        //
+        // 3.2: Verify Remote File System State
+        //
+        // - a.md: Should now exist remotely (it was uploaded).
+        // - b.md: Should still exist and not be marked as deleted.
+        // - c.md: Should still exist and not be marked as deleted.
+        // - d.md: Should still be marked as deleted.
         //
         expect(mockFirebaseFs.has("b.md")).toBe(true);
         expect(mockFirebaseFs.get("b.md")?.deleted).toBe(false);
@@ -535,32 +570,44 @@ describe("FileSyncer", () => {
         expect(mockFirebaseFs.has("d.md")).toBe(true);
         expect(mockFirebaseFs.get("d.md")?.deleted).toBe(true);
 
-        // Now look for the a.md file. The default behavior of uploading files is that the id is set by uuidv7 which has a time component.
         const aMdFile = mockFirebaseFs.entries().find((v) => v[1].path === "a.md");
         expect(aMdFile).toBeDefined();
         expect(aMdFile?.[1].deleted).toBe(false);
 
-        // Check internal state (mapOfFileNodes)
+        //
+        // 3.3: Verify Internal Syncer State (mapOfFileNodes)
+        //
+        // This checks the syncer's internal representation of the file states after convergence.
+        // - a.md, b.md, c.md: Should be LOCAL_CLOUD_FILE, meaning they exist in both places.
+        // - d.md: Should be REMOTE_ONLY, as it only exists as a deleted stub on the remote.
+        //
         const nodes1 = syncer.mapOfFileNodes;
         expect(nodes1.get("a.md" as FilePathType)?.type).toBe(FileNodeType.LOCAL_CLOUD_FILE);
         expect(nodes1.get("b.md" as FilePathType)?.type).toBe(FileNodeType.LOCAL_CLOUD_FILE);
         expect(nodes1.get("c.md" as FilePathType)?.type).toBe(FileNodeType.LOCAL_CLOUD_FILE);
         expect(nodes1.get("d.md" as FilePathType)?.type).toBe(FileNodeType.REMOTE_ONLY);
 
-        // 4. ARRANGE 2: Second set of changes
+        //
+        // BLOCK 4: Second Wave of Changes
+        //
+        // This block introduces a new set of changes to test the syncer's ability to handle
+        // ongoing modifications after an initial sync.
+        //
+        // File states:
+        // - a.md: Modified locally. Expected action: UPDATE_CLOUD (upload new content).
+        // - c.md: Marked as deleted on the remote. Expected action: DELETE_LOCAL (delete local copy).
+        //
         clock.addSeconds(2);
 
-        // Modify local file 'a.md'
+        // Modify local file 'a.md' and simulate a file watcher event.
         const newContentA = "new content of a";
         addFileToObsidian("a.md" as FilePathType, newContentA, { mtime: clock.now() });
-        // Manually add to touched files, as the watcher is not running in test
         (syncer as any)._touchedFilepaths.set("a.md" as FilePathType, clock.now());
 
-        // Modify on firebase "c.md" marking it as deleted
+        // Modify remote file 'c.md' to be deleted and simulate a remote snapshot update.
         const remoteC = mockFirebaseFs.get("c.md");
         const updatedRemoteC = { ...remoteC, deleted: true, entryTime: clock.now() };
         mockFirebaseFs.set("c.md", updatedRemoteC as LatestNotesSchema);
-        // Manually trigger onSnapshot to update the syncer's internal state
         expect(onSnapshotCallback).not.toBeNull();
         onSnapshotCallback!({
             docs: [{ id: "c.md", data: () => updatedRemoteC }]
@@ -568,14 +615,31 @@ describe("FileSyncer", () => {
         clock.addSeconds(2);
         await clock.executeTimeoutFuncs();
 
-        // 5. ASSERT 2: Validate final state
-        // Check local file system
+        //
+        // BLOCK 5: Verification of Final State
+        //
+        // This block asserts the final state of the system after the second sync cycle,
+        // ensuring the changes from BLOCK 4 were correctly processed.
+        //
+
+        //
+        // 5.1: Verify Final Local File System State
+        //
+        // - a.md: Should exist with its new content.
+        // - b.md: Should be unchanged.
+        // - c.md: Should now be deleted locally.
+        //
         expect(mockObsidianFs.has("a.md" as FilePathType)).toBe(true);
         expect(new TextDecoder().decode(mockObsidianFs.get("a.md")!.content)).toBe(newContentA);
         expect(mockObsidianFs.has("b.md" as FilePathType)).toBe(true);
-        expect(mockObsidianFs.has("c.md" as FilePathType)).toBe(false); // c.md should be deleted locally
+        expect(mockObsidianFs.has("c.md" as FilePathType)).toBe(false);
 
-        // Check remote file system
+        //
+        // 5.2: Verify Final Remote File System State
+        //
+        // - a.md: Should be updated with the new content.
+        // - c.md: Should remain marked as deleted.
+        //
         const remoteA = mockFirebaseFs.entries().find((v) => v[1].path === "a.md");
         expect(remoteA).toBeDefined();
         expect(remoteA?.[1].deleted).toBe(false);
@@ -583,20 +647,61 @@ describe("FileSyncer", () => {
             remoteA![1].data!.toUint8Array(),
             "test"
         );
-        expect(decompressedA.unsafeUnwrap()).toBe(newContentA); // a.md should be updated
+        expect(decompressedA.unsafeUnwrap()).toBe(newContentA);
 
         expect(mockFirebaseFs.get("c.md")?.deleted).toBe(true);
 
-        // Check internal state
+        //
+        // 5.3: Verify Final Internal Syncer State
+        //
+        // - a.md: Should still be a LOCAL_CLOUD_FILE, but with an updated file hash.
+        // - c.md: Should now be REMOTE_ONLY, reflecting its local deletion.
+        //
         const nodes2 = syncer.mapOfFileNodes;
         expect(nodes2.get("a.md" as FilePathType)?.type).toBe(FileNodeType.LOCAL_CLOUD_FILE);
         expect((nodes2.get("a.md" as FilePathType) as any).fileData.fileHash).not.toBe(
             (nodes1.get("a.md" as FilePathType) as any).fileData.fileHash
         );
-        expect(nodes2.get("c.md" as FilePathType)?.type).toBe(FileNodeType.REMOTE_ONLY); // c.md is now remote only
+        expect(nodes2.get("c.md" as FilePathType)?.type).toBe(FileNodeType.REMOTE_ONLY);
         expect((nodes2.get("c.md" as FilePathType) as any).firebaseData.data.deleted).toBe(true);
 
         syncer.teardown();
         expect(mockUnsubscribe).toHaveBeenCalled();
+
+        //
+        // POTENTIAL MISSING TEST CASES:
+        //
+        // Based on convergence_util.md, the following scenarios should be tested:
+        //
+        // 1.  **Conflict Resolution (Local Newer):**
+        //     - A file (e.g., 'e.md') exists on both local and remote.
+        //     - It's modified in both places, but the local `mtime` is more recent.
+        //     - Expected: The local version should be uploaded, overwriting the remote version (UPDATE_CLOUD).
+        //
+        // 2.  **Conflict Resolution (Remote Newer):**
+        //     - A file (e.g., 'f.md') exists on both local and remote.
+        //     - It's modified in both places, but the remote `entryTime` is more recent.
+        //     - Expected: The remote version should be downloaded, overwriting the local version (UPDATE_LOCAL).
+        //
+        // 3.  **Local Deletion:**
+        //     - A file (e.g., 'g.md') exists on both local and remote.
+        //     - The local file is deleted.
+        //     - Expected: The remote file should be marked as deleted (MARK_CLOUD_DELETED).
+        //
+        // 4.  **Simultaneous Deletion:**
+        //     - A file (e.g., 'h.md') exists on both local and remote.
+        //     - It is deleted locally and marked as deleted on the remote in the same sync cycle.
+        //     - Expected: No action should be taken. The state is consistent.
+        //
+        // 5.  **Conflict: Local Deletion vs. Remote Modification:**
+        //     - A file (e.g., 'i.md') is deleted locally.
+        //     - In the same cycle, the file is modified on the remote, with a newer timestamp than the deletion.
+        //     - Expected: The remote modification "wins". The file should be re-downloaded locally (UPDATE_LOCAL).
+        //
+        // 6.  **Conflict: Remote Deletion vs. Local Modification:**
+        //     - A file (e.g., 'j.md') is marked as deleted on the remote.
+        //     - In the same cycle, the file is modified locally with a newer timestamp.
+        //     - Expected: The local modification "wins". The file should be re-uploaded, and the `deleted` flag cleared on remote (UPDATE_CLOUD).
+        //
     });
 });
