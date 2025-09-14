@@ -60,7 +60,7 @@ export class FileSyncer {
         private _plugin: MainAppType,
         private _firebaseApp: FirebaseApp,
         private _config: LatestSyncConfigVersion,
-        private _mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
+        public _mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
         private _view: SyncProgressView,
         private _clock: Clock = new RealTimeClock()
     ) {}
@@ -333,5 +333,12 @@ export class FileSyncer {
             endTime - startTime
         );
         return Ok(endTime - startTime);
+    }
+
+    public async getRemoteFilesForTesting() {
+        if (this._firebaseSyncer.none) {
+            return new Map();
+        }
+        return this._firebaseSyncer.safeValue().cloudNodes;
     }
 }

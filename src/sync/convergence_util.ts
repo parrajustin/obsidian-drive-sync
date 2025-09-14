@@ -117,6 +117,8 @@ export class ConvergenceUtil {
             mapOfCloudData
         );
 
+        console.log("MAP WITH CLOUD DATA:", mapWithCloudData);
+
         // Now we have an updated state of what all the nodes should be.
         // Go through them and check for any necessary convergence actions.
         const actions: ConvergenceAction[] = [];

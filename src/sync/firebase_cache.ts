@@ -83,7 +83,7 @@ export class FirebaseCache {
         const fileData = await FileUtilRaw.readRawFile(app, config.firebaseCachePath);
         if (fileData.err) {
             // If the cache file doesn't exist, return an empty cache.
-            if (fileData.val.errorCode === ErrorCode.NOT_FOUND) {
+            if (fileData.val.errorCode === ErrorCode.NOT_FOUND || fileData.val.errorCode === ErrorCode.UNKNOWN) {
                 return Ok({ lastUpdate: -1, cache: [] });
             }
             return fileData;
