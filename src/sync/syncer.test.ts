@@ -597,6 +597,8 @@ describe("FileSyncer", () => {
         // - a.md: Modified locally. Expected action: UPDATE_CLOUD (upload new content).
         // - c.md: Marked as deleted on the remote. Expected action: DELETE_LOCAL (delete local copy).
         //
+
+        // Make sure to go forward 2 seconds, just to go far past the possible seconds the timeout function is waiting on.
         clock.addSeconds(2);
 
         // Modify local file 'a.md' and simulate a file watcher event.
@@ -612,6 +614,8 @@ describe("FileSyncer", () => {
         onSnapshotCallback!({
             docs: [{ id: "c.md", data: () => updatedRemoteC }]
         });
+
+        // Should go forward 2 seconds just to be sure.
         clock.addSeconds(2);
         await clock.executeTimeoutFuncs();
 
