@@ -188,7 +188,7 @@ export class FileSyncer {
             this._unsubWatchHandler.safeValue()();
         }
         if (this._timeoutId.some) {
-            clearTimeout(this._timeoutId.safeValue());
+            this._clock.clearTimeout(this._timeoutId.safeValue());
         }
         this._view.setSyncerStatus(
             this._config.syncerId,
@@ -268,7 +268,7 @@ export class FileSyncer {
             return;
         }
         this._timeoutId = Some(
-            window.setTimeout(
+            this._clock.setTimeout(
                 () => {
                     void this.fileSyncerTick();
                 },
@@ -292,7 +292,7 @@ export class FileSyncer {
         });
 
         this._view.newSyncerCycle(this._config.syncerId, cycleId);
-        const startTime = window.performance.now();
+        const startTime = this._clock.performanceNow();
 
         // First converge the file updates.
         const touchedFilePaths = this._touchedFilepaths;
@@ -324,7 +324,7 @@ export class FileSyncer {
         // Finally update the map state of the file nodes.
         this._mapOfFileNodes = executedConvergence.safeUnwrap().mapOfFileNodes;
 
-        const endTime = window.performance.now();
+        const endTime = this._clock.performanceNow();
         this._view.publishSyncerCycleDone(
             this._config.syncerId,
             executedConvergence.safeUnwrap().numberOfActions,
