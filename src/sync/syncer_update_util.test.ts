@@ -31,11 +31,6 @@ jest.mock("../lib/sha", () => ({
     __esModule: true,
     default: jest.fn().mockReturnValue(new Uint8Array(32).fill(1))
 }));
-jest.mock("../constants", () => ({
-    FileConst: {
-        FILE_PATH: "local.filepath"
-    }
-}));
 jest.mock("../logging/logger", () => ({
     CreateLogger: () => ({
         debug: jest.fn(),
@@ -124,6 +119,7 @@ const mockApp = {
         }),
         trash: jest.fn(async (file: TFile, _system: boolean) => {
             mockObsidianFs.delete(file.path);
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
             delete (mockApp.vault.fileMap as any)[file.path];
         }),
         createBinary: jest.fn(async (path: string, data: Uint8Array) => {
@@ -154,7 +150,7 @@ const addFileToObsidian = (
     content: string,
     opts?: { ctime?: number; mtime?: number }
 ) => {
-    const ctime = opts?.ctime ?? clock.now();
+    const ctime = opts?.ctime ?? clock.now() - 1;
     const mtime = opts?.mtime ?? clock.now();
     const contentBytes = new TextEncoder().encode(content);
     mockObsidianFs.set(path, {
@@ -292,29 +288,13 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
 
     it("should handle a new local file by uploading it to firebase", async () => {
         // Arrange
-        const filePath = "valid_file.md" as FilePathType;
         const fileContent = "This is a test file.";
-        const fileContentBytes = new TextEncoder().encode(fileContent);
-        const fileMtime = clock.now();
-        const fileCtime = clock.now() - 100;
+        const filePath = "valid_file.md";
+        addFileToObsidian("valid_file.md" as FilePathType, fileContent);
 
-        mockObsidianFs.set(filePath, {
-            content: fileContentBytes,
-            mtime: fileMtime,
-            ctime: fileCtime,
-            size: fileContentBytes.length
-        });
-
-        const tFile = new TFile();
-        tFile.path = filePath;
-        tFile.stat = { ctime: fileCtime, mtime: fileMtime, size: fileContentBytes.length };
-        tFile.basename = "valid_file";
-        tFile.extension = "md";
-        tFile.vault = mockApp.vault;
-
-        (mockApp.vault.fileMap as any)[filePath] = tFile;
-
-        const touchedFiles = new Map<FilePathType, MsFromEpoch>([[filePath, fileMtime]]);
+        const touchedFiles = new Map<FilePathType, MsFromEpoch>([
+            ["valid_file.md" as FilePathType, clock.now()]
+        ]);
 
         const convergenceResult = await ConvergenceUtil.createStateConvergenceActions(
             mockApp,
@@ -347,20 +327,25 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         expect(uploadedDoc?.path).toBe(filePath);
         expect(uploadedDoc?.data).toBeDefined();
 
-        const decompressedData = await CompressionUtils.decompressData(
+        const decompressedData = await CompressionUtils.decompressStringData(
             uploadedDoc!.data!.toUint8Array()!,
             "test"
         );
-
-        expect(new TextDecoder().decode(decompressedData.unsafeUnwrap())).toBe(fileContent);
+        expect(decompressedData.ok).toBe(true);
+        expect(decompressedData.unsafeUnwrap()).toBe(fileContent);
     });
 
     it("should handle a mix of local-only, remote-only, and remote-deleted files", async () => {
-        // Arrange
+        // local only file.
         addFileToObsidian("local1.md" as FilePathType, "local 1 content");
+        // local only file.
         addFileToObsidian("local2.md" as FilePathType, "local 2 content");
+        // remote only file.
         await addFileToFirebase("remote1.md" as FilePathType, "remote 1 content");
-        await addFileToFirebase("remote2.md" as FilePathType, "remote 2 content", { deleted: true });
+        // deleted remote only file.
+        await addFileToFirebase("remote2.md" as FilePathType, "remote 2 content", {
+            deleted: true
+        });
 
         const touchedFiles = new Map<FilePathType, MsFromEpoch>([
             ["local1.md" as FilePathType, clock.now()],
@@ -400,10 +385,14 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         // Check firebase state
         expect(mockFirebaseFs.size).toBe(4);
         const fbDocs = Array.from(mockFirebaseFs.values());
-        expect(fbDocs.find((d) => d?.path === "local1.md")?.deleted).toBe(false);
-        expect(fbDocs.find((d) => d?.path === "local2.md")?.deleted).toBe(false);
-        expect(fbDocs.find((d) => d?.path === "remote1.md")?.deleted).toBe(false);
-        expect(fbDocs.find((d) => d?.path === "remote2.md")?.deleted).toBe(true);
+        expect(fbDocs.find((d) => d.path === "local1.md")).toBeDefined();
+        expect(fbDocs.find((d) => d.path === "local1.md")?.deleted).toBe(false);
+        expect(fbDocs.find((d) => d.path === "local2.md")).toBeDefined();
+        expect(fbDocs.find((d) => d.path === "local2.md")?.deleted).toBe(false);
+        expect(fbDocs.find((d) => d.path === "remote1.md")).toBeDefined();
+        expect(fbDocs.find((d) => d.path === "remote1.md")?.deleted).toBe(false);
+        expect(fbDocs.find((d) => d.path === "remote2.md")).toBeDefined();
+        expect(fbDocs.find((d) => d.path === "remote2.md")?.deleted).toBe(true);
 
         // Check local fs state
         expect(mockObsidianFs.has("local1.md")).toBe(true);
@@ -425,7 +414,10 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         const newerTime = clock.now() - 1000;
 
         addFileToObsidian(filePath, "old content", { mtime: olderTime });
-        await addFileToFirebase(filePath, "remote content", { deleted: true, entryTime: newerTime });
+        await addFileToFirebase(filePath, "remote content", {
+            deleted: true,
+            entryTime: newerTime
+        });
 
         const mapOfCloudData = new Map();
         for (const [path, data] of mockFirebaseFs.entries()) {
