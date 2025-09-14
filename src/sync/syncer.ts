@@ -37,6 +37,7 @@ import type { Clock } from "../clock";
 import { SyncerUpdateUtil } from "./syncer_update_util";
 import { GetFirestore } from "../firestore/get_firestore";
 import { UserCredential } from "firebase/auth";
+import { InjectMeta } from "../lib/inject_status_msg";
 
 const LOGGER = CreateLogger("drive_syncer");
 
@@ -173,7 +174,13 @@ export class FileSyncer {
         }
         this._view.setSyncerStatus(this._config.syncerId, /*status=*/ "good", /*color=*/ "green");
         // Start the file syncer repeating tick.
-        await this.fileSyncerTick();
+        const firstTickResult = await this.fileSyncerTick();
+        if (firstTickResult.err) {
+            firstTickResult.val.with(
+                (error) => (error.message = `Failed first tick result! ${error.message}`)
+            );
+            return firstTickResult;
+        }
         return Ok();
     }
 
@@ -245,7 +252,7 @@ export class FileSyncer {
 
     /** Execute a filesyncer tick. */
     @Span({ newContext: true })
-    private async fileSyncerTick() {
+    private async fileSyncerTick(): Promise<StatusResult<StatusError>> {
         setAttributeOnActiveSpan(SYNCER_ID_SPAN_ATTR, this._config.syncerId);
         if (this._isDead) {
             this._view.setSyncerStatus(
@@ -256,7 +263,13 @@ export class FileSyncer {
             LOGGER.error(`Syncer is dead!`, {
                 [SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR]: this._config.syncerId
             });
-            return;
+            return Err(
+                InternalError(`Syncer dead.`).with(
+                    InjectMeta({
+                        [SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR]: this._config.syncerId
+                    })
+                )
+            );
         }
         const tickResult = await this.fileSyncerTickLogic();
         if (tickResult.err) {
@@ -264,16 +277,23 @@ export class FileSyncer {
             this._view.publishSyncerError(this._config.syncerId, tickResult.val);
             this._view.setSyncerStatus(this._config.syncerId, "Tick Crash!", "red");
             this._isDead = true;
-            return;
+            LOGGER.error(`Syncer tick has crashed!`, {
+                [SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR]: this._config.syncerId
+            });
+            tickResult.val.with(
+                InjectMeta({
+                    [SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR]: this._config.syncerId
+                })
+            );
+            return tickResult;
         }
         this._timeoutId = Some(
             this._clock.setTimeout(
-                () => {
-                    void this.fileSyncerTick();
-                },
+                () => this.fileSyncerTick(),
                 Math.max(1000 - tickResult.safeUnwrap(), 50)
             )
         );
+        return Ok();
     }
 
     /** The logic that runs for the file syncer very tick. Returns ms it took to do the update. */
@@ -315,7 +335,8 @@ export class FileSyncer {
             this._plugin.settings.clientId,
             this._config,
             convergenceResult.safeUnwrap(),
-            this._creds
+            this._creds,
+            this._view
         );
         if (executedConvergence.err) {
             return executedConvergence;

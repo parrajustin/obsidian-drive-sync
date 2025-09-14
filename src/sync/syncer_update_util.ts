@@ -32,7 +32,7 @@ import type {
 import type { UserCredential } from "firebase/auth";
 import { FirestoreUtil } from "./firestore_util";
 import { Firestore, doc, getDoc } from "firebase/firestore";
-import { GetOrCreateSyncProgressView, SyncProgressView } from "../sidepanel/progressView";
+import { SyncProgressView } from "../sidepanel/progressView";
 import { WrapPromise } from "../lib/wrap_promise";
 import { InjectMeta } from "../lib/inject_status_msg";
 import { FileConst, FIREBASE_NOTE_ID } from "../constants";
@@ -61,7 +61,8 @@ export class SyncerUpdateUtil {
         clientId: string,
         syncerConfig: LatestSyncConfigVersion,
         actions: ConvergenceStateReturnType,
-        creds: UserCredential
+        creds: UserCredential,
+        view: SyncProgressView
     ): Promise<Result<ConvergenceOutput, StatusError>> {
         // Should updated older changes over newer changes first.
         const sortedActions = actions.actions.sort((a, b) => {
@@ -75,7 +76,6 @@ export class SyncerUpdateUtil {
             return Ok({ mapOfFileNodes: actions.mapOfFileNodes, numberOfActions: 0 });
         }
 
-        const view = await GetOrCreateSyncProgressView(app, /*reveal=*/ false);
         const updatedFileNodes = structuredClone(actions.mapOfFileNodes);
         const results = CombineResults(
             await Promise.all(

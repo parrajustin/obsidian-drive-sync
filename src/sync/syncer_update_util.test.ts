@@ -174,6 +174,7 @@ const addFileToObsidian = (
 };
 
 import { Bytes } from "firebase/firestore";
+import { GetOrCreateSyncProgressView } from "../sidepanel/progressView";
 const addFileToFirebase = async (
     path: FilePathType,
     content: string,
@@ -309,13 +310,15 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         expect(actions.actions.length).toBe(1);
 
         // Act
+        const view = await GetOrCreateSyncProgressView(mockApp, /*reveal=*/ false);
         const result = await SyncerUpdateUtil.executeLimitedSyncConvergence(
             mockApp,
             mockDb,
             "test-client",
             mockSyncerConfig,
             actions,
-            mockCreds
+            mockCreds,
+            view
         );
 
         // Assert
@@ -369,13 +372,15 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         expect(actions.actions.length).toBe(3);
 
         // Act
+        const view = await GetOrCreateSyncProgressView(mockApp, /*reveal=*/ false);
         const result = await SyncerUpdateUtil.executeLimitedSyncConvergence(
             mockApp,
             mockDb,
             "test-client",
             mockSyncerConfig,
             actions,
-            mockCreds
+            mockCreds,
+            view
         );
 
         // Assert
@@ -446,13 +451,15 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         expect(actions.actions[0]?.action).toBe("DELETE_LOCAL_FILE");
 
         // Act
+        const view = await GetOrCreateSyncProgressView(mockApp, /*reveal=*/ false);
         const result = await SyncerUpdateUtil.executeLimitedSyncConvergence(
             mockApp,
             mockDb,
             "test-client",
             mockSyncerConfig,
             actions,
-            mockCreds
+            mockCreds,
+            view
         );
 
         // Assert
@@ -493,13 +500,15 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         expect(actions.actions[0]?.action).toBe("UPDATE_CLOUD");
 
         // Act
+        const view = await GetOrCreateSyncProgressView(mockApp, /*reveal=*/ false);
         const result = await SyncerUpdateUtil.executeLimitedSyncConvergence(
             mockApp,
             mockDb,
             "test-client",
             mockSyncerConfig,
             actions,
-            mockCreds
+            mockCreds,
+            view
         );
 
         // Assert
