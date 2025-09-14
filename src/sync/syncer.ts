@@ -37,11 +37,13 @@ import type { Clock } from "../clock";
 import { SyncerUpdateUtil } from "./syncer_update_util";
 import { GetFirestore } from "../firestore/get_firestore";
 import { UserCredential } from "firebase/auth";
+import { InjectMeta } from "../lib/inject_status_msg";
 
 const LOGGER = CreateLogger("drive_syncer");
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
 export class FileSyncer {
+    public mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map();
     /** firebase syncer if one has been created. */
     private _firebaseSyncer: Option<FirebaseSyncer> = None;
     /** firebase syncer if one has been created. */
@@ -55,12 +57,12 @@ export class FileSyncer {
     /** Syncer should die. */
     private _isDead = false;
     private _creds: UserCredential;
+
     private constructor(
         private _app: App,
         private _plugin: MainAppType,
         private _firebaseApp: FirebaseApp,
         private _config: LatestSyncConfigVersion,
-        private _mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
         private _view: SyncProgressView,
         private _clock: Clock = new RealTimeClock()
     ) {}
@@ -92,9 +94,7 @@ export class FileSyncer {
             return error;
         }
         // Build the file syncer
-        return Ok(
-            new FileSyncer(app, plugin, firebaseApp.safeValue(), config, new Map(), view, clock)
-        );
+        return Ok(new FileSyncer(app, plugin, firebaseApp.safeValue(), config, view, clock));
     }
 
     @Span()
@@ -125,7 +125,7 @@ export class FileSyncer {
             SetSpanStatusFromResult(fileNodes);
             return fileNodes;
         }
-        this._mapOfFileNodes = FileMapUtil.convertNodeToMap(fileNodes.safeUnwrap());
+        this.mapOfFileNodes = FileMapUtil.convertNodeToMap(fileNodes.safeUnwrap());
 
         //
         // Load cache of firebase nodes and assign them to filenodes.
@@ -174,7 +174,13 @@ export class FileSyncer {
         }
         this._view.setSyncerStatus(this._config.syncerId, /*status=*/ "good", /*color=*/ "green");
         // Start the file syncer repeating tick.
-        await this.fileSyncerTick();
+        const firstTickResult = await this.fileSyncerTick();
+        if (firstTickResult.err) {
+            firstTickResult.val.with(
+                (error) => (error.message = `Failed first tick result! ${error.message}`)
+            );
+            return firstTickResult;
+        }
         return Ok();
     }
 
@@ -246,7 +252,7 @@ export class FileSyncer {
 
     /** Execute a filesyncer tick. */
     @Span({ newContext: true })
-    private async fileSyncerTick() {
+    private async fileSyncerTick(): Promise<StatusResult<StatusError>> {
         setAttributeOnActiveSpan(SYNCER_ID_SPAN_ATTR, this._config.syncerId);
         if (this._isDead) {
             this._view.setSyncerStatus(
@@ -257,7 +263,13 @@ export class FileSyncer {
             LOGGER.error(`Syncer is dead!`, {
                 [SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR]: this._config.syncerId
             });
-            return;
+            return Err(
+                InternalError(`Syncer dead.`).with(
+                    InjectMeta({
+                        [SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR]: this._config.syncerId
+                    })
+                )
+            );
         }
         const tickResult = await this.fileSyncerTickLogic();
         if (tickResult.err) {
@@ -265,16 +277,23 @@ export class FileSyncer {
             this._view.publishSyncerError(this._config.syncerId, tickResult.val);
             this._view.setSyncerStatus(this._config.syncerId, "Tick Crash!", "red");
             this._isDead = true;
-            return;
+            LOGGER.error(`Syncer tick has crashed!`, {
+                [SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR]: this._config.syncerId
+            });
+            tickResult.val.with(
+                InjectMeta({
+                    [SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR]: this._config.syncerId
+                })
+            );
+            return tickResult;
         }
         this._timeoutId = Some(
             this._clock.setTimeout(
-                () => {
-                    void this.fileSyncerTick();
-                },
+                () => this.fileSyncerTick(),
                 Math.max(1000 - tickResult.safeUnwrap(), 50)
             )
         );
+        return Ok();
     }
 
     /** The logic that runs for the file syncer very tick. Returns ms it took to do the update. */
@@ -300,7 +319,7 @@ export class FileSyncer {
         const convergenceResult = await ConvergenceUtil.createStateConvergenceActions(
             this._app,
             this._config,
-            this._mapOfFileNodes,
+            this.mapOfFileNodes,
             touchedFilePaths,
             cloudNodes
         );
@@ -316,13 +335,14 @@ export class FileSyncer {
             this._plugin.settings.clientId,
             this._config,
             convergenceResult.safeUnwrap(),
-            this._creds
+            this._creds,
+            this._view
         );
         if (executedConvergence.err) {
             return executedConvergence;
         }
         // Finally update the map state of the file nodes.
-        this._mapOfFileNodes = executedConvergence.safeUnwrap().mapOfFileNodes;
+        this.mapOfFileNodes = executedConvergence.safeUnwrap().mapOfFileNodes;
 
         const endTime = this._clock.performanceNow();
         this._view.publishSyncerCycleDone(
@@ -333,5 +353,12 @@ export class FileSyncer {
             endTime - startTime
         );
         return Ok(endTime - startTime);
+    }
+
+    public getRemoteFilesForTesting() {
+        if (this._firebaseSyncer.none) {
+            return new Map();
+        }
+        return this._firebaseSyncer.safeValue().cloudNodes;
     }
 }

@@ -6,14 +6,14 @@ export interface Clock {
     performanceNow(): number;
 
     // Sets a function to run after ms milliseconds have passed.
-    setTimeout(func: () => void, ms: number): number;
+    setTimeout(func: () => Promise<unknown>, ms: number): number;
 
     // Remove a function scheduled timeout.
     clearTimeout(id: number): void;
 }
 
 export class FakeClock implements Clock {
-    private _timeouts = new Map<number, [number, () => void]>();
+    private _timeouts = new Map<number, [number, () => Promise<unknown>]>();
     private _timeId = 0;
     private _now: number;
 
@@ -41,7 +41,7 @@ export class FakeClock implements Clock {
         return this._now;
     }
 
-    public setTimeout(func: () => void, ms: number): number {
+    public setTimeout(func: () => Promise<unknown>, ms: number): number {
         const id = this._timeId++;
         this._timeouts.set(id, [this._now + ms, func]);
         return id;
@@ -51,14 +51,15 @@ export class FakeClock implements Clock {
         this._timeouts.delete(id);
     }
 
-    public executeTimeoutFuncs(): void {
+    public async executeTimeoutFuncs(): Promise<void> {
         const now = this._now;
-        this._timeouts.forEach((value, key) => {
-            if (value[0] <= now) {
-                value[1]();
-                this._timeouts.delete(key);
+        for (const entry of this._timeouts.entries()) {
+            if (entry[1][0] <= now) {
+                const callback = entry[1][1];
+                void (await callback());
+                this._timeouts.delete(entry[0]);
             }
-        });
+        }
     }
 }
 

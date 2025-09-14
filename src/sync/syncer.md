@@ -14,7 +14,7 @@ The initialization of the `FileSyncer` is a multi-step process orchestrated by t
     *   A `SyncProgressView` is created or retrieved to display sync status in the Obsidian side panel.
     *   It waits for the Obsidian workspace layout to be ready to avoid processing a flurry of file events during startup.
     *   It verifies that the Firebase app is initialized and available.
-    *   Finally, it instantiates the `FileSyncer` with the necessary dependencies: the Obsidian `App` instance, the main plugin instance, the Firebase app, the syncer configuration, an empty file map, and the progress view.
+    *   Finally, it instantiates the `FileSyncer` with the necessary dependencies: the Obsidian `App` instance, the main plugin instance, the Firebase app, the syncer configuration, and the progress view.
 
 2.  **Initialization (`init`)**:
     *   Retrieves Firebase credentials.

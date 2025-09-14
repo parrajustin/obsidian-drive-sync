@@ -48,6 +48,11 @@ const notesDataModelSchema = z.union([
         type: z.literal("Ref"),
         data: z.null(),
         fileStorageRef: z.string()
+    }),
+    notesBaseSchema.extend({
+        type: z.literal("Raw-Cache"),
+        data: z.null(),
+        fileStorageRef: z.null()
     })
 ]);
 
