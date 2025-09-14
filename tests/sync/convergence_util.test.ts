@@ -85,6 +85,7 @@ const createLocalCloudFileNode = (
             deviceId: "test-device",
             syncerConfigId: "test-syncer",
             type: "Ref",
+            data: null,
             fileStorageRef: "ref",
             version: 0
         }
@@ -117,6 +118,7 @@ const createRemoteOnlyNode = (
             deviceId: "test-device",
             syncerConfigId: "test-syncer",
             type: "Ref",
+            data: null,
             fileStorageRef: "ref",
             version: 0
         }

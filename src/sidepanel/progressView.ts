@@ -514,7 +514,6 @@ export async function GetOrCreateSyncProgressView(
     }
 
     const leaf = workspace.getRightLeaf(false)!;
-    console.log("LEAF:", leaf);
     await leaf.setViewState({ type: PROGRESS_VIEW_TYPE, active: true });
 
     if (reveal) {

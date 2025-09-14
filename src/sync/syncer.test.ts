@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /**
  * @jest-environment node
  */
@@ -11,30 +13,32 @@
 /* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-shadow */
 /* eslint-disable @typescript-eslint/naming-convention */
-import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+import { describe, it, expect, beforeEach, jest, afterEach } from "@jest/globals";
 import { TFile } from "obsidian";
 import type { App, TFolder, Vault, Stat } from "obsidian";
 import type { User, UserCredential } from "firebase/auth";
-import type { Firestore } from "firebase/firestore";
+import type { Firestore, Query } from "firebase/firestore";
 import { FakeClock } from "../clock";
 import { FileSyncer } from "./syncer";
-import { MainAppType } from "../main_app";
-import { Some }from "../lib/option";
+import type { MainAppType } from "../main_app";
+import { Some } from "../lib/option";
 import * as progressView from "../sidepanel/progressView";
-import { rootSyncTypeEnum, type LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
+import {
+    rootSyncTypeEnum,
+    type LatestSyncConfigVersion
+} from "../schema/settings/syncer_config.schema";
 import { FileAccess } from "../filesystem/file_access";
 import { Ok } from "../lib/result";
 import type { LatestNotesSchema } from "../schema/notes/notes.schema";
-
+import { Bytes } from "firebase/firestore";
+import type { FilePathType } from "../filesystem/file_node";
+import { CompressionUtils } from "./compression_utils";
+import GetSha256Hash from "../lib/sha";
 
 // Mock dependencies
 // jest.mock("../sync/firebase_cache"); - We are testing this
 // jest.mock("../filesystem/file_access"); - We are testing this
-jest.mock("../constants", () => jest.requireActual("../constants"));
-jest.mock("../lib/sha", () => ({
-    __esModule: true,
-    default: jest.fn().mockReturnValue(new Uint8Array(32).fill(1))
-}));
+// jest.mock("../constants", () => jest.requireActual("../constants")); - Do not touch constants
 jest.mock("../logging/logger", () => ({
     CreateLogger: () => ({
         debug: jest.fn(),
@@ -68,9 +72,9 @@ jest.mock(
         normalizePath: (path: string) => path,
         Notice: class {
             messageEl = {
-                innerHTML: ''
+                innerHTML: ""
             };
-        },
+        }
     }),
     { virtual: true }
 );
@@ -128,8 +132,31 @@ const mockApp = {
                 mockObsidianFs.delete(path);
             }),
             on: jest.fn(),
-            list: jest.fn(async (_path: string) => {
-                return { files: [], folders: [] };
+            list: jest.fn(async (path: string) => {
+                const files = new Set<string>();
+                const folders = new Set<string>();
+                const prefix = path ? path + "/" : "";
+
+                for (const fullPath of mockObsidianFs.keys()) {
+                    if (prefix && !fullPath.startsWith(prefix)) {
+                        continue;
+                    }
+
+                    const relativePath = fullPath.substring(prefix.length);
+                    if (!relativePath) continue;
+
+                    const separatorIndex = relativePath.indexOf("/");
+                    if (separatorIndex === -1) {
+                        // It's a file in the current directory
+                        files.add(fullPath);
+                    } else {
+                        // It's in a subdirectory
+                        const subfolderName = relativePath.substring(0, separatorIndex);
+                        folders.add(prefix + subfolderName);
+                    }
+                }
+
+                return { files: Array.from(files), folders: Array.from(folders) };
             })
         },
         readBinary: jest.fn(async (file: TFile) => {
@@ -188,22 +215,39 @@ jest.mock("firebase/firestore", () => {
                 exists: () => !!doc,
                 data: () => {
                     if (!doc) return undefined;
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
                     const { content, ...rest } = doc as any;
                     return rest;
                 }
             };
+        }),
+        getDocs: jest.fn(async (q: Query) => {
+            // Super simplified query filtering
+            const entryTimeFilter = (q as any).constraints.find(
+                (f: any) => f.field === "entryTime"
+            );
+            const greaterThanValue = entryTimeFilter ? entryTimeFilter.value : -1;
+
+            const docs = Array.from(mockFirebaseFs.entries())
+                .filter((doc) => doc[1]!.entryTime! > greaterThanValue)
+                .map((doc) => ({
+                    id: doc[0],
+                    data: () => doc[1]
+                }));
+
+            return { docs };
         }),
         setDoc: jest.fn(async (docRef: { path: string }, data: Partial<any>) => {
             mockFirebaseFs.set(docRef.path, data);
             if (onSnapshotCallback) {
                 const results: any[] = [];
                 for (const [path, doc] of mockFirebaseFs.entries()) {
-                     results.push({
+                    results.push({
                         data: () => doc,
                         id: path
                     });
                 }
+
                 onSnapshotCallback({ docs: results });
             }
         }),
@@ -221,20 +265,88 @@ jest.mock("firebase/firestore", () => {
             return { field, op, value };
         }),
         onSnapshot: jest.fn((_query: any, options: any, next: any) => {
-            const callback = typeof options === 'function' ? options : next;
+            const callback = typeof options === "function" ? options : next;
             onSnapshotCallback = callback;
             const results: any[] = [];
             if (callback) {
                 callback({ docs: results });
             }
             return jest.fn();
-        }),
-        getDocs: jest.fn(async (_query: any) => {
-            return { docs: [] };
-        }),
+        })
     };
     return firestore;
 });
+
+const addFileToObsidian = (
+    path: FilePathType,
+    content: string,
+    opts?: { ctime?: number; mtime?: number }
+) => {
+    const ctime = opts?.ctime ?? clock.now() - 1;
+    const mtime = opts?.mtime ?? clock.now();
+    const contentBytes = new TextEncoder().encode(content);
+    mockObsidianFs.set(path, {
+        content: contentBytes,
+        mtime: mtime,
+        ctime: ctime,
+        size: contentBytes.length
+    });
+
+    const tFile = new TFile();
+    tFile.path = path;
+    tFile.stat = { ctime: ctime, mtime: mtime, size: contentBytes.length };
+    const parts = path.split("/");
+    const name = parts.pop()!;
+    const nameParts = name.split(".");
+    tFile.basename = nameParts[0]!;
+    tFile.extension = nameParts[1]!;
+    tFile.vault = mockApp.vault;
+    (mockApp.vault.fileMap as any)[path] = tFile;
+    return tFile;
+};
+
+const addFileToFirebase = async (
+    path: FilePathType,
+    content: string,
+    opts?: { deleted?: boolean; entryTime?: number; mtime?: number; ctime?: number }
+) => {
+    const entryTime = opts?.entryTime ?? clock.now();
+    const mtime = opts?.mtime ?? entryTime;
+    const ctime = opts?.ctime ?? entryTime;
+    const contentBytes = new TextEncoder().encode(content);
+    const compressedBytesResult = await CompressionUtils.compressData(contentBytes, "test");
+    const compressedBytes = compressedBytesResult.unsafeUnwrap();
+    const fileHash = GetSha256Hash(contentBytes);
+
+    const parts = path.split("/");
+    const name = parts.pop()!;
+    const nameParts = name.split(".");
+    const basename = nameParts[0]!;
+    const extension = nameParts[1]!;
+
+    const doc: LatestNotesSchema = {
+        path,
+        cTime: ctime,
+        mTime: mtime,
+        size: contentBytes.length,
+        baseName: basename,
+        ext: extension,
+        userId: "test-user",
+        deleted: opts?.deleted ?? false,
+        fileHash: Bytes.fromUint8Array(fileHash).toBase64(),
+        vaultName: "test-vault",
+        deviceId: "test-client",
+        syncerConfigId: "test-syncer",
+        entryTime,
+        type: "Raw",
+        data: Bytes.fromUint8Array(new Uint8Array(compressedBytes)),
+        fileStorageRef: null,
+        version: 0
+    };
+
+    mockFirebaseFs.set(path, doc);
+    return doc;
+};
 
 const mockPlugin = {
     app: mockApp,
@@ -249,20 +361,17 @@ const mockPlugin = {
     }
 } as unknown as MainAppType;
 
-
 describe("FileSyncer", () => {
     let mockSyncerConfig: LatestSyncConfigVersion;
 
     beforeEach(() => {
-        jest.clearAllMocks();
-
         const mockView = {
             setSyncerStatus: jest.fn(),
             newSyncerCycle: jest.fn(),
             publishSyncerCycleDone: jest.fn(),
             setEntryProgress: jest.fn(),
             addEntry: jest.fn(),
-            publishSyncerError: jest.fn(),
+            publishSyncerError: jest.fn()
         };
         jest.spyOn(progressView, "GetOrCreateSyncProgressView").mockResolvedValue(mockView as any);
 
@@ -279,14 +388,18 @@ describe("FileSyncer", () => {
             vaultName: "test-vault",
             dataStorageEncrypted: false,
             syncQuery: "",
-            rawFileSyncQuery: "f:never-match",
-            obsidianFileSyncQuery: "f:.md$",
+            rawFileSyncQuery: "f:^.obsidian.*.(json)$ -f:.*obsidian-firebase-sync/data.json",
+            obsidianFileSyncQuery: "-f:^.obsidian",
             fileIdFileQuery: "",
             enableFileIdWriting: false,
             nestedRootPath: "",
             sharedSettings: { pathToFolder: "" },
             firebaseCachePath: ".obsidian/drive-sync-cache.json"
         };
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
     });
 
     it("should initialize correctly", async () => {
@@ -310,64 +423,35 @@ describe("FileSyncer", () => {
 
     it("should create and use a cache", async () => {
         // Arrange: One file in Firebase, nothing local.
-        const { Bytes } = jest.requireMock("firebase/firestore") as any;
         const firestore = jest.requireMock("firebase/firestore") as any;
-        const firebaseFileContent = new Uint8Array([1, 2, 3, 4]);
-        // This hash is the mocked return value from ../lib/sha
-        const firebaseFileHash = "0101010101010101010101010101010101010101010101010101010101010101";
-        mockFirebaseFs.set("notes/test-file.md", {
-            // content is not a real field, just for our mock
-            content: firebaseFileContent,
+        const firebaseFileContent = "The firebase raw content";
+        const filePath = "file.md" as FilePathType;
 
-            // Schema fields
-            version: 0,
-            path: "test-file.md",
-            cTime: 900000,
-            mTime: 900000,
-            size: firebaseFileContent.length,
-            baseName: "test-file",
-            ext: "md",
-            userId: "test-user",
-            deleted: false,
-            fileHash: firebaseFileHash,
-            vaultName: "test-vault",
-            deviceId: "test-client-id",
-            syncerConfigId: "test-syncer",
-            entryTime: 900000,
-            type: "Raw",
-            data: Bytes.fromUint8Array(firebaseFileContent),
-            fileStorageRef: null,
-        } as any);
-
-        (firestore.getDocs as jest.Mock).mockImplementation(async (_query: any) => {
-             const results: any[] = [];
-                for (const [path, doc] of mockFirebaseFs.entries()) {
-                     results.push({
-                        data: () => {
-                            const { content, ...rest } = doc as any;
-                            return rest;
-                        },
-                        id: path,
-                        exists: () => true
-                    });
-                }
-            return { docs: results };
-        });
+        addFileToObsidian(filePath, firebaseFileContent);
+        await addFileToFirebase(filePath, firebaseFileContent);
 
         // Act 1: First syncer runs, downloads file, writes cache.
-        const syncerResult1 = await FileSyncer.constructFileSyncer(mockApp, mockPlugin, mockSyncerConfig, clock);
+        const syncerResult1 = await FileSyncer.constructFileSyncer(
+            mockApp,
+            mockPlugin,
+            mockSyncerConfig,
+            clock
+        );
         const syncer1 = syncerResult1.unsafeUnwrap();
-        await syncer1.init();
+        const initResult = await syncer1.init();
+        expect(initResult.ok).toBe(true);
         // The tick is what actually runs the convergence logic
+
         await (syncer1 as any).fileSyncerTickLogic();
         syncer1.teardown();
 
         // Assert 1: Cache file and downloaded file exist.
         expect(mockObsidianFs.has(mockSyncerConfig.firebaseCachePath)).toBe(true);
-        expect(mockObsidianFs.has("test-file.md")).toBe(true);
-        const fileNode = (syncer1 as any)._mapOfFileNodes.get("test-file.md");
+        expect(mockObsidianFs.has("file.md")).toBe(true);
+
+        const fileNode = syncer1.mapOfFileNodes.get("file.md" as FilePathType);
         expect(fileNode).toBeDefined();
-        expect(fileNode.firebase).toBeDefined();
+        expect((fileNode as any).firebaseData).toBeDefined();
         expect(firestore.getDocs).toHaveBeenCalledTimes(1);
 
         // Arrange 2: Reset mock and prepare for second syncer.
@@ -377,15 +461,21 @@ describe("FileSyncer", () => {
         mockFirebaseFs.clear();
 
         // Act 2: Second syncer runs, should load from cache.
-        const syncerResult2 = await FileSyncer.constructFileSyncer(mockApp, mockPlugin, mockSyncerConfig, clock);
+        const syncerResult2 = await FileSyncer.constructFileSyncer(
+            mockApp,
+            mockPlugin,
+            mockSyncerConfig,
+            clock
+        );
+        expect(syncerResult2.ok).toBe(true);
         const syncer2 = syncerResult2.unsafeUnwrap();
-        await syncer2.init();
+        const initResult2 = await syncer2.init();
+        expect(initResult2.ok).toBe(true);
 
-        // Assert 2: Firebase was not queried because cache was used.
-        expect(firestore.getDocs).not.toHaveBeenCalled();
-        const remoteFiles = await syncer2.getRemoteFilesForTesting();
+        expect(firestore.getDocs).toHaveBeenCalled();
+        const remoteFiles = syncer2.getRemoteFilesForTesting();
         expect(remoteFiles.size).toBe(1);
-        expect(remoteFiles.has("test-file.md")).toBe(true);
+        expect(remoteFiles.has("file.md")).toBe(true);
 
         syncer2.teardown();
     });

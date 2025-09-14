@@ -42,6 +42,7 @@ const LOGGER = CreateLogger("drive_syncer");
 
 /** A root syncer synces everything under it. Multiple root syncers can be nested. */
 export class FileSyncer {
+    public mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map();
     /** firebase syncer if one has been created. */
     private _firebaseSyncer: Option<FirebaseSyncer> = None;
     /** firebase syncer if one has been created. */
@@ -55,12 +56,12 @@ export class FileSyncer {
     /** Syncer should die. */
     private _isDead = false;
     private _creds: UserCredential;
+
     private constructor(
         private _app: App,
         private _plugin: MainAppType,
         private _firebaseApp: FirebaseApp,
         private _config: LatestSyncConfigVersion,
-        public _mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
         private _view: SyncProgressView,
         private _clock: Clock = new RealTimeClock()
     ) {}
@@ -92,9 +93,7 @@ export class FileSyncer {
             return error;
         }
         // Build the file syncer
-        return Ok(
-            new FileSyncer(app, plugin, firebaseApp.safeValue(), config, new Map(), view, clock)
-        );
+        return Ok(new FileSyncer(app, plugin, firebaseApp.safeValue(), config, view, clock));
     }
 
     @Span()
@@ -125,7 +124,7 @@ export class FileSyncer {
             SetSpanStatusFromResult(fileNodes);
             return fileNodes;
         }
-        this._mapOfFileNodes = FileMapUtil.convertNodeToMap(fileNodes.safeUnwrap());
+        this.mapOfFileNodes = FileMapUtil.convertNodeToMap(fileNodes.safeUnwrap());
 
         //
         // Load cache of firebase nodes and assign them to filenodes.
@@ -300,7 +299,7 @@ export class FileSyncer {
         const convergenceResult = await ConvergenceUtil.createStateConvergenceActions(
             this._app,
             this._config,
-            this._mapOfFileNodes,
+            this.mapOfFileNodes,
             touchedFilePaths,
             cloudNodes
         );
@@ -322,7 +321,7 @@ export class FileSyncer {
             return executedConvergence;
         }
         // Finally update the map state of the file nodes.
-        this._mapOfFileNodes = executedConvergence.safeUnwrap().mapOfFileNodes;
+        this.mapOfFileNodes = executedConvergence.safeUnwrap().mapOfFileNodes;
 
         const endTime = this._clock.performanceNow();
         this._view.publishSyncerCycleDone(
@@ -335,7 +334,7 @@ export class FileSyncer {
         return Ok(endTime - startTime);
     }
 
-    public async getRemoteFilesForTesting() {
+    public getRemoteFilesForTesting() {
         if (this._firebaseSyncer.none) {
             return new Map();
         }

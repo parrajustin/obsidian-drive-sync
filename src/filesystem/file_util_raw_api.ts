@@ -5,12 +5,13 @@
 import { normalizePath, type App, type DataWriteOptions } from "obsidian";
 import type { Result, StatusResult } from "../lib/result";
 import { Ok } from "../lib/result";
-import type { StatusError } from "../lib/status_error";
+import { ErrorCode, type StatusError } from "../lib/status_error";
 import { WrapPromise } from "../lib/wrap_promise";
 import { InjectMeta } from "../lib/inject_status_msg";
 import { CreateLogger } from "../logging/logger";
 import { Span } from "../logging/tracing/span.decorator";
 import { PromiseResultSpanError } from "../logging/tracing/result_span.decorator";
+import { FileConst } from "../constants";
 
 const LOGGER = CreateLogger("file_util_raw_api");
 
@@ -27,7 +28,12 @@ export class FileUtilRaw {
             /*textForUnknown=*/ `Failed to fs read from "${filePath}"`
         );
         if (readDataResult.err) {
-            readDataResult.val.with(InjectMeta({ filePath }));
+            readDataResult.val.errorCode = ErrorCode.NOT_FOUND;
+            readDataResult.val.with(
+                InjectMeta({
+                    [FileConst.FILE_PATH]: filePath
+                })
+            );
             return readDataResult;
         }
         LOGGER.debug("Read raw file", { filePath });
@@ -56,7 +62,7 @@ export class FileUtilRaw {
             /*textForUnknown=*/ `Failed to mkdir "${filePath}"`
         );
         if (mkdirs.err) {
-            mkdirs.val.with(InjectMeta({ filePath }));
+            mkdirs.val.with(InjectMeta({ [FileConst.FILE_PATH]: filePath }));
             return mkdirs;
         }
 
@@ -65,7 +71,7 @@ export class FileUtilRaw {
             /*textForUnknown=*/ `Failed to write fs file "${filePath}"`
         );
         if (writeResult.err) {
-            writeResult.val.with(InjectMeta({ filePath }));
+            writeResult.val.with(InjectMeta({ [FileConst.FILE_PATH]: filePath }));
             return writeResult;
         }
         LOGGER.debug("Wrote obsidian file", { filePath });
@@ -84,7 +90,7 @@ export class FileUtilRaw {
             /*textForUnknown=*/ `Failed to trash system "${filePath}"`
         );
         if (trashSystemResult.err) {
-            trashSystemResult.val.with(InjectMeta({ filePath }));
+            trashSystemResult.val.with(InjectMeta({ [FileConst.FILE_PATH]: filePath }));
             return trashSystemResult;
         }
         if (trashSystemResult.safeUnwrap()) {
@@ -95,7 +101,7 @@ export class FileUtilRaw {
             /*textForUnknown=*/ `Failed to trash local "${filePath}"`
         );
         if (trashLocalResult.err) {
-            trashLocalResult.val.with(InjectMeta({ filePath }));
+            trashLocalResult.val.with(InjectMeta({ [FileConst.FILE_PATH]: filePath }));
             return trashLocalResult;
         }
         LOGGER.debug("Removed obsidian file", { filePath });

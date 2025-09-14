@@ -1,7 +1,6 @@
 import { Ok, StatusResult, type Result } from "../lib/result";
 import type { StatusError } from "../lib/status_error";
 import {
-    LatestNotesSchemaWithoutData,
     NOTES_SCHEMA_MANAGER,
     type AnyVersionNotesSchema,
     type LatestNotesSchema
@@ -32,9 +31,9 @@ export class FirebaseCache {
     public static async writeToFirebaseCache(
         app: App,
         config: LatestSyncConfigVersion,
-        cloudData: SchemaWithId<LatestNotesSchema | LatestNotesSchemaWithoutData>[]
+        cloudData: SchemaWithId<LatestNotesSchema>[]
     ): Promise<StatusResult<StatusError>> {
-        const cachedData: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>> = {
+        const cachedData: FirebaseStoredData<SchemaWithId<LatestNotesSchema>> = {
             lastUpdate: -1,
             cache: []
         };
@@ -47,16 +46,21 @@ export class FirebaseCache {
                 }
             }
             cachedData.lastUpdate = lastUpdate;
-            cachedData.cache = cloudData.map((n): SchemaWithId<LatestNotesSchemaWithoutData> => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                if ((n.data as any).data === undefined) {
-                    return n as SchemaWithId<LatestNotesSchemaWithoutData>;
+            cachedData.cache = cloudData.map((n): SchemaWithId<LatestNotesSchema> => {
+                switch (n.data.type) {
+                    case "Ref":
+                    case "Raw-Cache":
+                        return n;
+                    case "Raw": {
+                        const newNode: LatestNotesSchema = {
+                            ...n.data,
+                            type: "Raw-Cache",
+                            fileStorageRef: null,
+                            data: null
+                        };
+                        return { id: n.id, data: newNode };
+                    }
                 }
-
-                const newNode: SchemaWithId<LatestNotesSchemaWithoutData> = structuredClone(n);
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                delete (newNode.data as any).data;
-                return newNode;
             });
         }
 
@@ -77,13 +81,11 @@ export class FirebaseCache {
     public static async readFirebaseCache(
         app: App,
         config: LatestSyncConfigVersion
-    ): Promise<
-        Result<FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>>, StatusError>
-    > {
+    ): Promise<Result<FirebaseStoredData<SchemaWithId<LatestNotesSchema>>, StatusError>> {
         const fileData = await FileUtilRaw.readRawFile(app, config.firebaseCachePath);
         if (fileData.err) {
             // If the cache file doesn't exist, return an empty cache.
-            if (fileData.val.errorCode === ErrorCode.NOT_FOUND || fileData.val.errorCode === ErrorCode.UNKNOWN) {
+            if (fileData.val.errorCode === ErrorCode.NOT_FOUND) {
                 return Ok({ lastUpdate: -1, cache: [] });
             }
             return fileData;
@@ -99,17 +101,12 @@ export class FirebaseCache {
             // Convert to a string.
             .map((n) => new window.TextDecoder("utf-8").decode(n))
             // Parse the string as json.
-            .map(
-                (n) =>
-                    JSON.parse(n) as FirebaseStoredData<
-                        SchemaWithId<Omit<AnyVersionNotesSchema, "data">>
-                    >
-            );
+            .map((n) => JSON.parse(n) as FirebaseStoredData<SchemaWithId<AnyVersionNotesSchema>>);
         if (parsedJson.err) {
             return parsedJson;
         }
 
-        const updatedCache: SchemaWithId<Omit<LatestNotesSchema, "data">>[] = [];
+        const updatedCache: SchemaWithId<LatestNotesSchema>[] = [];
         for (const entry of parsedJson.safeUnwrap().cache) {
             const updatedEntry = NOTES_SCHEMA_MANAGER.updateSchema(entry.data);
             if (updatedEntry.err) {

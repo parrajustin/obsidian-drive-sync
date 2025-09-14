@@ -168,7 +168,7 @@ export class SyncerUpdateUtil {
         let compressedDataResult: Result<ArrayBufferLike, StatusError>;
 
         const firebaseData = action.localNode.firebaseData.data;
-        if (firebaseData.type === "Raw") {
+        if (firebaseData.type === "Raw" || firebaseData.type === "Raw-Cache") {
             // Data is in firestore, we need to fetch the full document.
             const docRef = doc(db, action.localNode.firebaseData.id);
             const docSnap = await WrapPromise(

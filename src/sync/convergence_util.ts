@@ -10,7 +10,7 @@ import {
     LocalCloudFileNode
 } from "../filesystem/file_node";
 import { Span } from "../logging/tracing/span.decorator";
-import { LatestNotesSchema, LatestNotesSchemaWithoutData } from "../schema/notes/notes.schema";
+import { LatestNotesSchema } from "../schema/notes/notes.schema";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import type { Result } from "../lib/result";
 import { Ok } from "../lib/result";
@@ -98,7 +98,7 @@ export class ConvergenceUtil {
         config: LatestSyncConfigVersion,
         mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
         touchedFiles: Map<FilePathType, MsFromEpoch>,
-        mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema | LatestNotesSchemaWithoutData>>
+        mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema>>
     ): Promise<Result<ConvergenceStateReturnType, StatusError>> {
         // First update the file node map with updated local data from `touchedFiles`.
         const mapWithNewNodes = await this.updateWithNewNodes(
@@ -116,8 +116,6 @@ export class ConvergenceUtil {
             mapWithNewNodes.safeUnwrap(),
             mapOfCloudData
         );
-
-        console.log("MAP WITH CLOUD DATA:", mapWithCloudData);
 
         // Now we have an updated state of what all the nodes should be.
         // Go through them and check for any necessary convergence actions.
@@ -214,7 +212,7 @@ export class ConvergenceUtil {
     @Span()
     public static updateWithCloudData(
         mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>,
-        mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema | LatestNotesSchemaWithoutData>>
+        mapOfCloudData: Map<string, SchemaWithId<LatestNotesSchema>>
     ): MapOfFileNodes<AllExistingFileNodeTypes> {
         const outputMap = new Map<FilePathType, AllExistingFileNodeTypes>();
         const visitedPaths = new Set<FilePathType>();

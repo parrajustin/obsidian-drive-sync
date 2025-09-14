@@ -1,3 +1,10 @@
+/* eslint-disable @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/no-confusing-void-expression */
+/* eslint-disable @typescript-eslint/await-thenable */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-empty-function */
+/* eslint-disable @typescript-eslint/member-ordering */
+/* eslint-disable @typescript-eslint/no-useless-constructor */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
@@ -6,27 +13,18 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-shadow */
+
 /* eslint-disable @typescript-eslint/naming-convention */
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import type { App, Vault, Stat, TFolder } from "obsidian";
-import { TFile } from "obsidian";
+import type { TFile } from "obsidian";
 import type { User, UserCredential } from "firebase/auth";
 import type { Firestore, Query, Unsubscribe } from "firebase/firestore";
-import {
-    query,
-    getDocs,
-    onSnapshot,
-    Bytes
-} from "firebase/firestore";
+import { query, getDocs, onSnapshot, Bytes } from "firebase/firestore";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { rootSyncTypeEnum } from "../schema/settings/syncer_config.schema";
 import { FakeClock } from "../clock";
-import type {
-    AnyVersionNotesSchema,
-    LatestNotesSchema,
-    LatestNotesSchemaWithoutData
-} from "../schema/notes/notes.schema";
+import type { AnyVersionNotesSchema, LatestNotesSchema } from "../schema/notes/notes.schema";
 import { FirebaseSyncer } from "./firebase_syncer";
 import type { FirebaseStoredData, SchemaWithId } from "./firebase_cache";
 import { FirebaseCache } from "./firebase_cache";
@@ -36,7 +34,7 @@ import { Ok } from "../lib/result";
 
 // Mock dependencies
 jest.mock("../firestore/get_firestore", () => ({
-    GetFirestore: jest.fn(() => ({} as Firestore))
+    GetFirestore: jest.fn(() => ({}) as Firestore)
 }));
 jest.mock("./compression_utils", () => ({
     CompressionUtils: {
@@ -195,9 +193,7 @@ jest.mock("firebase/firestore", () => {
         where: jest.fn((field, op, value) => ({ type: "where", field, op, value })),
         getDocs: jest.fn(async (q: Query) => {
             // Super simplified query filtering
-            const filters = (q as any)._query.constraints.filter(
-                (c: any) => c.type === "where"
-            );
+            const filters = (q as any)._query.constraints.filter((c: any) => c.type === "where");
             const entryTimeFilter = filters.find((f: any) => f.field === "entryTime");
             const greaterThanValue = entryTimeFilter ? entryTimeFilter.value : -1;
 
@@ -265,7 +261,7 @@ describe("FirebaseSyncer", () => {
             // Arrange
             await addFileToFirebase("file1.md", "content1", { entryTime: 1100 });
             await addFileToFirebase("file2.md", "content2", { entryTime: 1200 });
-            const emptyCache: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>> = {
+            const emptyCache: FirebaseStoredData<SchemaWithId<LatestNotesSchema>> = {
                 lastUpdate: 0,
                 cache: []
             };
@@ -293,9 +289,9 @@ describe("FirebaseSyncer", () => {
             // Arrange
             const cachedDoc = await addFileToFirebase("file1.md", "content1", { entryTime: 1100 });
             await addFileToFirebase("file2.md", "content2", { entryTime: 1200 }); // Newer
-            const cache: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>> = {
+            const cache: FirebaseStoredData<SchemaWithId<LatestNotesSchema>> = {
                 lastUpdate: 1150,
-                cache: [{ id: cachedDoc.id, data: cachedDoc.data as LatestNotesSchemaWithoutData }]
+                cache: [{ id: cachedDoc.id, data: cachedDoc.data as LatestNotesSchema }]
             };
 
             // Act
@@ -327,9 +323,9 @@ describe("FirebaseSyncer", () => {
         it("should not fetch documents if the cache is up-to-date", async () => {
             // Arrange
             const cachedDoc = await addFileToFirebase("file1.md", "content1", { entryTime: 1100 });
-            const cache: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>> = {
+            const cache: FirebaseStoredData<SchemaWithId<LatestNotesSchema>> = {
                 lastUpdate: 1200, // Newer than all docs
-                cache: [{ id: cachedDoc.id, data: cachedDoc.data as LatestNotesSchemaWithoutData }]
+                cache: [{ id: cachedDoc.id, data: cachedDoc.data as LatestNotesSchema }]
             };
 
             // Act
@@ -356,11 +352,13 @@ describe("FirebaseSyncer", () => {
         it("should update the cache if new documents are fetched", async () => {
             // Arrange
             await addFileToFirebase("file1.md", "content1", { entryTime: 1200 });
-            const emptyCache: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>> = {
+            const emptyCache: FirebaseStoredData<SchemaWithId<LatestNotesSchema>> = {
                 lastUpdate: 0,
                 cache: []
             };
-            const writeSpy = jest.spyOn(FirebaseCache, "writeToFirebaseCache").mockResolvedValue(Ok());
+            const writeSpy = jest
+                .spyOn(FirebaseCache, "writeToFirebaseCache")
+                .mockResolvedValue(Ok());
 
             // Act
             await FirebaseSyncer.buildFirebaseSyncer(
@@ -389,7 +387,7 @@ describe("FirebaseSyncer", () => {
                 entryTime: 1100,
                 version: 0
             });
-            const emptyCache: FirebaseStoredData<SchemaWithId<LatestNotesSchemaWithoutData>> = {
+            const emptyCache: FirebaseStoredData<SchemaWithId<LatestNotesSchema>> = {
                 lastUpdate: 0,
                 cache: []
             };
@@ -412,7 +410,8 @@ describe("FirebaseSyncer", () => {
             expect(migratedDoc).toBeDefined();
             expect(migratedDoc?.data.version).toBe(NOTES_SCHEMA_MANAGER.getLatestVersion());
             // Check that data is now Bytes, not a raw array
-            expect((migratedDoc?.data as LatestNotesSchema).data).toBeInstanceOf(Bytes);
+            // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
+            expect((migratedDoc?.data)!.data).toBeInstanceOf(Bytes);
         });
     });
 
@@ -513,7 +512,9 @@ describe("FirebaseSyncer", () => {
             const newDoc = await addFileToFirebase("another_new_file.md", "more content", {
                 entryTime: 1500
             });
-            const writeSpy = jest.spyOn(FirebaseCache, "writeToFirebaseCache").mockResolvedValue(Ok());
+            const writeSpy = jest
+                .spyOn(FirebaseCache, "writeToFirebaseCache")
+                .mockResolvedValue(Ok());
 
             // Act
             expect(onSnapshotCallback).not.toBeNull();
