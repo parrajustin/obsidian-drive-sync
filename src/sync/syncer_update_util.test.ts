@@ -401,10 +401,18 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         expect(mockObsidianFs.has("remote2.md")).toBe(false);
 
         // Check final node types
-        expect(finalFileNodes.get("local1.md" as FilePathType)?.type).toBe("LOCAL_CLOUD");
-        expect(finalFileNodes.get("local2.md" as FilePathType)?.type).toBe("LOCAL_CLOUD");
-        expect(finalFileNodes.get("remote1.md" as FilePathType)?.type).toBe("LOCAL_CLOUD");
-        expect(finalFileNodes.get("remote2.md" as FilePathType)?.type).toBe("REMOTE_ONLY");
+        expect(finalFileNodes.mapOfFileNodes.get("local1.md" as FilePathType)?.type).toBe(
+            "LOCAL_CLOUD"
+        );
+        expect(finalFileNodes.mapOfFileNodes.get("local2.md" as FilePathType)?.type).toBe(
+            "LOCAL_CLOUD"
+        );
+        expect(finalFileNodes.mapOfFileNodes.get("remote1.md" as FilePathType)?.type).toBe(
+            "LOCAL_CLOUD"
+        );
+        expect(finalFileNodes.mapOfFileNodes.get("remote2.md" as FilePathType)?.type).toBe(
+            "REMOTE_ONLY"
+        );
     });
 
     it("should delete a local file when the remote is deleted and newer", async () => {
@@ -453,7 +461,7 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
 
         expect(mockObsidianFs.has(filePath)).toBe(false);
         expect((mockApp.vault.adapter.trashSystem as jest.Mock).mock.calls.length).toBe(1);
-        expect(finalFileNodes.get(filePath)?.type).toBe("REMOTE_ONLY");
+        expect(finalFileNodes.mapOfFileNodes.get(filePath)?.type).toBe("REMOTE_ONLY");
     });
 
     it("should undelete a remote file when the local file is newer", async () => {
@@ -508,6 +516,6 @@ describe("SyncerUpdateUtil.executeLimitedSyncConvergence", () => {
         );
         expect(new TextDecoder().decode(decompressedData.unsafeUnwrap())).toBe(newContent);
 
-        expect(finalFileNodes.get(filePath)?.type).toBe("LOCAL_CLOUD");
+        expect(finalFileNodes.mapOfFileNodes.get(filePath)?.type).toBe("LOCAL_CLOUD");
     });
 });

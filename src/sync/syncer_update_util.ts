@@ -44,6 +44,11 @@ import { CompressionUtils } from "./compression_utils";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
+interface ConvergenceOutput {
+    mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes>;
+    numberOfActions: number;
+}
+
 export class SyncerUpdateUtil {
     /**
      * Executes a limited number of sync convergence actions based on the syncer config.
@@ -57,7 +62,8 @@ export class SyncerUpdateUtil {
         syncerConfig: LatestSyncConfigVersion,
         actions: ConvergenceStateReturnType,
         creds: UserCredential
-    ): Promise<Result<MapOfFileNodes<AllExistingFileNodeTypes>, StatusError>> {
+    ): Promise<Result<ConvergenceOutput, StatusError>> {
+        // Should updated older changes over newer changes first.
         const sortedActions = actions.actions.sort((a, b) => {
             return a.localNode.localTime - b.localNode.localTime;
         });
@@ -66,7 +72,7 @@ export class SyncerUpdateUtil {
             Math.min(sortedActions.length, syncerConfig.maxUpdatePerSyncer)
         );
         if (actionsToTakeThisCycle.length === 0) {
-            return Ok(actions.mapOfFileNodes);
+            return Ok({ mapOfFileNodes: actions.mapOfFileNodes, numberOfActions: 0 });
         }
 
         const view = await GetOrCreateSyncProgressView(app, /*reveal=*/ false);
@@ -103,7 +109,10 @@ export class SyncerUpdateUtil {
             return results;
         }
 
-        return Ok(updatedFileNodes);
+        return Ok({
+            mapOfFileNodes: updatedFileNodes,
+            numberOfActions: actionsToTakeThisCycle.length
+        });
     }
 
     @Span()
