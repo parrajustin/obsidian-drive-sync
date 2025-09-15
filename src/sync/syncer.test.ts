@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-dynamic-delete */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 
 /**
@@ -15,7 +16,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { describe, it, expect, beforeEach, jest, afterEach } from "@jest/globals";
 import { TFile } from "obsidian";
-import type { App, TFolder, Vault, Stat } from "obsidian";
+import type { App, TFolder, Vault, Stat, TAbstractFile } from "obsidian";
 import type { User, UserCredential } from "firebase/auth";
 import type { Firestore, Query } from "firebase/firestore";
 import { FakeClock } from "../clock";
@@ -247,7 +248,7 @@ jest.mock("firebase/firestore", () => {
         setDoc: jest.fn(
             async (docRef: { path: string }, data: Partial<any>, options?: { merge: boolean }) => {
                 if (options?.merge) {
-                    const existingData = mockFirebaseFs.get(docRef.path) || {};
+                    const existingData = mockFirebaseFs.get(docRef.path) ?? {};
                     mockFirebaseFs.set(docRef.path, { ...existingData, ...data });
                 } else {
                     mockFirebaseFs.set(docRef.path, data);
@@ -289,6 +290,13 @@ jest.mock("firebase/firestore", () => {
             }));
             onNext({ docs });
             return mockUnsubscribe;
+        }),
+        updateDoc: jest.fn((docRef: { path: string }, data: Partial<any>) => {
+            const doc = mockFirebaseFs.get(docRef.path);
+            if (doc) {
+                mockFirebaseFs.set(docRef.path, { ...doc, ...data });
+            }
+            return Promise.resolve();
         })
     };
     return firestore;
@@ -762,13 +770,18 @@ describe("FileSyncer", () => {
         await clock.executeTimeoutFuncs(); // Initial sync to establish LOCAL_CLOUD_FILE state
 
         // Delete the file locally.
-        mockObsidianFs.delete(fileG);
-        delete (mockApp.vault.fileMap as any)[fileG];
+        clock.addSeconds(2);
+        await mockApp.vault.trash({ path: fileG } as unknown as TAbstractFile, false);
+        // mockObsidianFs.delete(fileG);
+        // // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        // delete (mockApp.vault.fileMap as any)[fileG];
         (syncer as any)._touchedFilepaths.set(fileG, clock.now());
 
         await clock.executeTimeoutFuncs();
 
         // Verification: Remote file should be marked as deleted.
+        const fileGNode = mockFirebaseFs.get(fileG);
+        expect(fileGNode).toBeDefined();
         expect(mockFirebaseFs.get(fileG)?.deleted).toBe(true);
         expect(syncer.mapOfFileNodes.get(fileG)?.type).toBe(FileNodeType.REMOTE_ONLY);
 
@@ -843,11 +856,14 @@ describe("FileSyncer", () => {
         // undeleting the remote file and uploading the new content.
         //
         clock.addSeconds(2);
+
         const fileJ = "j.md" as FilePathType;
         const localUpdatedContent = "local update wins";
         addFileToObsidian(fileJ, "initial", { mtime: clock.now() });
         await addFileToFirebase(fileJ, "initial", { entryTime: clock.now() });
+
         await clock.executeTimeoutFuncs(); // Initial sync
+        clock.addSeconds(2);
 
         // Mark as deleted remotely.
         const remoteJ = mockFirebaseFs.get(fileJ);
@@ -857,6 +873,7 @@ describe("FileSyncer", () => {
         addFileToObsidian(fileJ, localUpdatedContent, { mtime: clock.now() });
         (syncer as any)._touchedFilepaths.set(fileJ, clock.now());
 
+        clock.addSeconds(1);
         await clock.executeTimeoutFuncs();
 
         // Verification: The local file should be uploaded, and the remote file "undeleted".

@@ -8,7 +8,7 @@ import { Span } from "../logging/tracing/span.decorator";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { IsAcceptablePath, IsObsidianFile, IsLocalFileRaw } from "../sync/query_util";
 import { AsyncForEach, CombineResults } from "../util";
-import { None, Optional, Some, WrapOptional } from "../lib/option";
+import { None, Optional, Some } from "../lib/option";
 import GetSha256Hash from "../lib/sha";
 import { FileUtilObsidian } from "./file_util_obsidian_api";
 import { FileUtilRaw } from "./file_util_raw_api";
@@ -360,19 +360,6 @@ export class FileAccess {
             path: string,
             time: MsFromEpoch
         ): Promise<StatusResult<StatusError>> => {
-            const fileStatResult = await WrapPromise(
-                app.vault.adapter.stat(normalizePath(path)),
-                /*textForUnknown=*/ `Failed to stat "${path}"`
-            );
-            if (fileStatResult.err) {
-                return fileStatResult;
-            }
-
-            const stat = WrapOptional(fileStatResult.safeUnwrap());
-            if (stat.none) {
-                return Ok(None);
-            }
-
             const fileNodeResult = await this.getFileNode(
                 app,
                 path as FilePathType,
@@ -381,6 +368,7 @@ export class FileAccess {
                 /*ignoreInvalidPath=*/ true
             );
             if (fileNodeResult.err) {
+                fileNodeResult.val.with(InjectMeta({ [FileConst.FILE_PATH]: path }));
                 return fileNodeResult;
             }
             const fileNode = fileNodeResult.safeUnwrap();
