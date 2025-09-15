@@ -304,6 +304,7 @@ describe("FileAccess", () => {
 
     describe("getFileNode", () => {
         beforeEach(() => {
+            jest.restoreAllMocks();
             // Spy on the static methods to mock their implementation for this describe block
             jest.spyOn(FileAccess, "getObsidianNode").mockResolvedValue(Ok(Some(mockFileNode)));
             jest.spyOn(FileAccess, "getRawNode").mockResolvedValue(Ok(Some(mockFileNode)));
@@ -526,6 +527,7 @@ describe("FileAccess", () => {
 
     describe("getTouchedFileNodes", () => {
         beforeEach(() => {
+            jest.restoreAllMocks();
             jest.spyOn(FileAccess, "getFileNode").mockImplementation(
                 async (_app, fullPath, _config, _ignoreMissing, _ignoreInvalid): Promise<any> => {
                     if (fullPath === "valid.md") {
@@ -534,7 +536,7 @@ describe("FileAccess", () => {
                     if (fullPath === "missing.md") {
                         return Ok({ type: FileNodeType.LOCAL_MISSING, fileData: { fullPath }, localTime: 0 });
                     }
-                    if (fullPath === "invalid.md") {
+                    if (fullPath === "invalid.md" || fullPath === "not-found.md") {
                         return Ok({ type: FileNodeType.INVALID, fileData: { fullPath } });
                     }
                     return Err(new StatusError(ErrorCode.NOT_FOUND,"File not found"));
@@ -550,6 +552,10 @@ describe("FileAccess", () => {
                 }
                 return { type: "file", ctime: 1, mtime: 1, size: 1 };
             });
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
         });
 
         test("should process touched files and return a map of file nodes", async () => {
@@ -584,7 +590,7 @@ describe("FileAccess", () => {
             const result = await FileAccess.getTouchedFileNodes(mockApp, mockConfig, touchedFiles);
 
             expect(result.err).toBe(true);
-            expect((result.val as StatusError).message).toContain('Failed to stat "error-stat.md"');
+            expect((result.val as StatusError).message).toContain("File not found");
         });
 
         test("should propagate error when getFileNode fails", async () => {

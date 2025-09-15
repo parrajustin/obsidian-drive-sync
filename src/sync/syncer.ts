@@ -323,6 +323,7 @@ export class FileSyncer {
             touchedFilePaths,
             cloudNodes
         );
+        this._touchedFilepaths.clear();
         if (convergenceResult.err) {
             return convergenceResult;
         }
