@@ -166,6 +166,9 @@ const mockApp = {
         getAbstractFileByPath: jest.fn((path: string) => {
             return (mockApp.vault.fileMap as any)[path] || null;
         }),
+        getFiles: jest.fn(() => {
+            return Object.values(mockApp.vault.fileMap as any);
+        }),
         trash: jest.fn(async (file: TFile, _system: boolean) => {
             mockObsidianFs.delete(file.path);
             // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
@@ -182,6 +185,12 @@ const mockApp = {
             };
             (mockApp.vault.fileMap as any)[path] = tFile;
             return tFile;
+        }),
+        modifyBinary: jest.fn(async (file: TFile, data: Uint8Array) => {
+            await (mockApp.vault.adapter.writeBinary as jest.Mock)(file.path, data);
+            file.stat.mtime = clock.now();
+            file.stat.size = data.length;
+            (mockApp.vault.fileMap as any)[file.path] = file;
         }),
         on: jest.fn()
     },
@@ -235,21 +244,30 @@ jest.mock("firebase/firestore", () => {
 
             return { docs };
         }),
-        setDoc: jest.fn(async (docRef: { path: string }, data: Partial<any>) => {
-            mockFirebaseFs.set(docRef.path, data);
-            if (onSnapshotCallback) {
-                const results: any[] = [];
-                for (const [path, doc] of mockFirebaseFs.entries()) {
-                    results.push({
-                        data: () => doc,
-                        id: path
-                    });
+        setDoc: jest.fn(
+            async (docRef: { path: string }, data: Partial<any>, options?: { merge: boolean }) => {
+                if (options?.merge) {
+                    const existingData = mockFirebaseFs.get(docRef.path) || {};
+                    mockFirebaseFs.set(docRef.path, { ...existingData, ...data });
+                } else {
+                    mockFirebaseFs.set(docRef.path, data);
                 }
 
-                onSnapshotCallback({ docs: results });
+                if (onSnapshotCallback) {
+                    const results: any[] = [];
+                    for (const [path, doc] of mockFirebaseFs.entries()) {
+                        results.push({
+                            data: () => doc,
+                            id: path
+                        });
+                    }
+
+                    onSnapshotCallback({ docs: results });
+                }
             }
-        }),
+        ),
         Bytes: originalFirestore.Bytes,
+        serverTimestamp: jest.fn(() => clock.now()),
         persistentMultipleTabManager: jest.fn(),
         persistentLocalCache: jest.fn(),
         initializeFirestore: jest.fn(() => ({})),
@@ -368,6 +386,7 @@ const mockPlugin = {
 } as unknown as MainAppType;
 
 describe("FileSyncer", () => {
+    jest.setTimeout(30000);
     let mockSyncerConfig: LatestSyncConfigVersion;
 
     beforeEach(() => {
@@ -669,43 +688,188 @@ describe("FileSyncer", () => {
         expect(nodes2.get("c.md" as FilePathType)?.type).toBe(FileNodeType.REMOTE_ONLY);
         expect((nodes2.get("c.md" as FilePathType) as any).firebaseData.data.deleted).toBe(true);
 
-        syncer.teardown();
-        expect(mockUnsubscribe).toHaveBeenCalled();
+        //
+        // BLOCK 6: Conflict Resolution (Local Newer)
+        //
+        // Scenario: A file is modified both locally and remotely, but the local
+        // modification is newer. The syncer should prioritize the local change and
+        // upload it, overwriting the stale remote version.
+        //
+        clock.addSeconds(2);
+        const localNewerContent = "local is newer";
+        const remoteStaleContent = "remote is stale";
+        const fileE = "e.md" as FilePathType;
+
+        // Remote modification happens first.
+        await addFileToFirebase(fileE, remoteStaleContent, { entryTime: clock.now() });
+        // Local modification happens second, making it newer.
+        clock.addSeconds(1);
+        addFileToObsidian(fileE, localNewerContent, { mtime: clock.now() });
+        (syncer as any)._touchedFilepaths.set(fileE, clock.now());
+
+        await clock.executeTimeoutFuncs();
+
+        // Verification: Local content should be on the remote.
+        const remoteE = mockFirebaseFs.entries().find((v) => v[1].path === fileE);
+        expect(remoteE).toBeDefined();
+        const decompressedE = await CompressionUtils.decompressStringData(
+            remoteE![1].data!.toUint8Array(),
+            "test"
+        );
+        expect(decompressedE.unsafeUnwrap()).toBe(localNewerContent);
+        expect(mockFirebaseFs.get(fileE)?.deleted).toBe(false);
+        expect(syncer.mapOfFileNodes.get(fileE)?.type).toBe(FileNodeType.LOCAL_CLOUD_FILE);
 
         //
-        // POTENTIAL MISSING TEST CASES:
+        // BLOCK 7: Conflict Resolution (Remote Newer)
         //
-        // Based on convergence_util.md, the following scenarios should be tested:
+        // Scenario: A file is modified both locally and remotely, but the remote
+        // modification is newer. The syncer should prioritize the remote change and
+        // download it, overwriting the stale local version.
         //
-        // 1.  **Conflict Resolution (Local Newer):**
-        //     - A file (e.g., 'e.md') exists on both local and remote.
-        //     - It's modified in both places, but the local `mtime` is more recent.
-        //     - Expected: The local version should be uploaded, overwriting the remote version (UPDATE_CLOUD).
+        clock.addSeconds(2);
+        const localStaleContent = "local is stale";
+        const remoteNewerContent = "remote is newer";
+        const fileF = "f.md" as FilePathType;
+
+        // Local modification happens first.
+        addFileToObsidian(fileF, localStaleContent, { mtime: clock.now() });
+        (syncer as any)._touchedFilepaths.set(fileF, clock.now());
+        // Remote modification happens second, making it newer.
+        clock.addSeconds(1);
+        await addFileToFirebase(fileF, remoteNewerContent, { entryTime: clock.now() });
+
+        await clock.executeTimeoutFuncs();
+
+        // Verification: Remote content should be on the local filesystem.
+        expect(mockObsidianFs.has(fileF)).toBe(true);
+        expect(new TextDecoder().decode(mockObsidianFs.get(fileF)!.content)).toBe(
+            remoteNewerContent
+        );
+        expect(syncer.mapOfFileNodes.get(fileF)?.type).toBe(FileNodeType.LOCAL_CLOUD_FILE);
+
         //
-        // 2.  **Conflict Resolution (Remote Newer):**
-        //     - A file (e.g., 'f.md') exists on both local and remote.
-        //     - It's modified in both places, but the remote `entryTime` is more recent.
-        //     - Expected: The remote version should be downloaded, overwriting the local version (UPDATE_LOCAL).
+        // BLOCK 8: Local Deletion
         //
-        // 3.  **Local Deletion:**
-        //     - A file (e.g., 'g.md') exists on both local and remote.
-        //     - The local file is deleted.
-        //     - Expected: The remote file should be marked as deleted (MARK_CLOUD_DELETED).
+        // Scenario: A file that exists in both locations is deleted locally.
+        // The syncer should propagate this change to the remote by marking the
+        // remote file as deleted.
         //
-        // 4.  **Simultaneous Deletion:**
-        //     - A file (e.g., 'h.md') exists on both local and remote.
-        //     - It is deleted locally and marked as deleted on the remote in the same sync cycle.
-        //     - Expected: No action should be taken. The state is consistent.
+        clock.addSeconds(2);
+        const fileG = "g.md" as FilePathType;
+        addFileToObsidian(fileG, "content", { mtime: clock.now() });
+        await addFileToFirebase(fileG, "content", { entryTime: clock.now() });
+        await clock.executeTimeoutFuncs(); // Initial sync to establish LOCAL_CLOUD_FILE state
+
+        // Delete the file locally.
+        mockObsidianFs.delete(fileG);
+        delete (mockApp.vault.fileMap as any)[fileG];
+        (syncer as any)._touchedFilepaths.set(fileG, clock.now());
+
+        await clock.executeTimeoutFuncs();
+
+        // Verification: Remote file should be marked as deleted.
+        expect(mockFirebaseFs.get(fileG)?.deleted).toBe(true);
+        expect(syncer.mapOfFileNodes.get(fileG)?.type).toBe(FileNodeType.REMOTE_ONLY);
+
         //
-        // 5.  **Conflict: Local Deletion vs. Remote Modification:**
-        //     - A file (e.g., 'i.md') is deleted locally.
-        //     - In the same cycle, the file is modified on the remote, with a newer timestamp than the deletion.
-        //     - Expected: The remote modification "wins". The file should be re-downloaded locally (UPDATE_LOCAL).
+        // BLOCK 9: Simultaneous Deletion
         //
-        // 6.  **Conflict: Remote Deletion vs. Local Modification:**
-        //     - A file (e.g., 'j.md') is marked as deleted on the remote.
-        //     - In the same cycle, the file is modified locally with a newer timestamp.
-        //     - Expected: The local modification "wins". The file should be re-uploaded, and the `deleted` flag cleared on remote (UPDATE_CLOUD).
+        // Scenario: A file is deleted locally, and in the same sync cycle, it's
+        // also marked as deleted on the remote. The syncer should recognize that
+        // both sides are already consistent and take no further action.
         //
+        clock.addSeconds(2);
+        const fileH = "h.md" as FilePathType;
+        addFileToObsidian(fileH, "content", { mtime: clock.now() });
+        await addFileToFirebase(fileH, "content", { entryTime: clock.now() });
+        await clock.executeTimeoutFuncs(); // Initial sync
+
+        // Delete locally.
+        mockObsidianFs.delete(fileH);
+        delete (mockApp.vault.fileMap as any)[fileH];
+        (syncer as any)._touchedFilepaths.set(fileH, clock.now());
+        // Mark as deleted remotely.
+        const remoteH = mockFirebaseFs.get(fileH);
+        mockFirebaseFs.set(fileH, { ...remoteH, deleted: true, entryTime: clock.now() });
+
+        const preActionNodes = syncer.mapOfFileNodes;
+        await clock.executeTimeoutFuncs();
+        const postActionNodes = syncer.mapOfFileNodes;
+
+        // Verification: The node state should remain REMOTE_ONLY and no files written.
+        expect(mockFirebaseFs.get(fileH)?.deleted).toBe(true);
+        expect(mockObsidianFs.has(fileH)).toBe(false);
+        // Compare the before and after internal states to ensure no changes were made.
+        expect(postActionNodes.get(fileH)).toEqual(preActionNodes.get(fileH));
+
+        //
+        // BLOCK 10: Conflict - Local Deletion vs. Remote Modification
+        //
+        // Scenario: A user deletes a file locally, but before the sync happens,
+        // another client modifies the same file remotely. The remote modification
+        // should "win" because it's a more significant action than a deletion.
+        // The file should be re-downloaded.
+        //
+        clock.addSeconds(2);
+        const fileI = "i.md" as FilePathType;
+        const remoteUpdatedContent = "remote update wins";
+        addFileToObsidian(fileI, "initial", { mtime: clock.now() });
+        await addFileToFirebase(fileI, "initial", { entryTime: clock.now() });
+        await clock.executeTimeoutFuncs(); // Initial sync
+
+        // Delete locally.
+        mockObsidianFs.delete(fileI);
+        delete (mockApp.vault.fileMap as any)[fileI];
+        (syncer as any)._touchedFilepaths.set(fileI, clock.now());
+        // Modify remotely with a newer timestamp.
+        clock.addSeconds(1);
+        await addFileToFirebase(fileI, remoteUpdatedContent, { entryTime: clock.now() });
+
+        await clock.executeTimeoutFuncs();
+
+        // Verification: The remote file should be re-downloaded.
+        expect(mockObsidianFs.has(fileI)).toBe(true);
+        expect(new TextDecoder().decode(mockObsidianFs.get(fileI)!.content)).toBe(
+            remoteUpdatedContent
+        );
+        expect(syncer.mapOfFileNodes.get(fileI)?.type).toBe(FileNodeType.LOCAL_CLOUD_FILE);
+
+        //
+        // BLOCK 11: Conflict - Remote Deletion vs. Local Modification
+        //
+        // Scenario: A file is marked as deleted on the remote, but a user modifies
+        // it locally before the sync happens. The local modification should "win",
+        // undeleting the remote file and uploading the new content.
+        //
+        clock.addSeconds(2);
+        const fileJ = "j.md" as FilePathType;
+        const localUpdatedContent = "local update wins";
+        addFileToObsidian(fileJ, "initial", { mtime: clock.now() });
+        await addFileToFirebase(fileJ, "initial", { entryTime: clock.now() });
+        await clock.executeTimeoutFuncs(); // Initial sync
+
+        // Mark as deleted remotely.
+        const remoteJ = mockFirebaseFs.get(fileJ);
+        mockFirebaseFs.set(fileJ, { ...remoteJ, deleted: true, entryTime: clock.now() });
+        // Modify locally with a newer timestamp.
+        clock.addSeconds(1);
+        addFileToObsidian(fileJ, localUpdatedContent, { mtime: clock.now() });
+        (syncer as any)._touchedFilepaths.set(fileJ, clock.now());
+
+        await clock.executeTimeoutFuncs();
+
+        // Verification: The local file should be uploaded, and the remote file "undeleted".
+        expect(mockFirebaseFs.get(fileJ)?.deleted).toBe(false);
+        const remoteJFinal = mockFirebaseFs.entries().find((v) => v[1].path === fileJ);
+        const decompressedJ = await CompressionUtils.decompressStringData(
+            remoteJFinal![1].data!.toUint8Array(),
+            "test"
+        );
+        expect(decompressedJ.unsafeUnwrap()).toBe(localUpdatedContent);
+        expect(syncer.mapOfFileNodes.get(fileJ)?.type).toBe(FileNodeType.LOCAL_CLOUD_FILE);
+
+        syncer.teardown();
+        expect(mockUnsubscribe).toHaveBeenCalled();
     });
 });
