@@ -12,6 +12,7 @@ import { FileUtilRaw } from "../filesystem/file_util_raw_api";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { CompressionUtils } from "./compression_utils";
 import { ErrorCode } from "../lib/status_error";
+import { None, Optional, Some } from "../lib/option";
 
 export interface SchemaWithId<T> {
     id: string;
@@ -26,6 +27,13 @@ export interface FirebaseStoredData<T> {
 }
 
 export class FirebaseCache {
+    private static _lastCacheEntry: Optional<FirebaseStoredData<SchemaWithId<LatestNotesSchema>>> =
+        None;
+
+    public static clearCache(): void {
+        this._lastCacheEntry = None;
+    }
+
     @Span()
     @PromiseResultSpanError
     public static async writeToFirebaseCache(
@@ -64,6 +72,7 @@ export class FirebaseCache {
             });
         }
 
+        this._lastCacheEntry = Some(cachedData);
         const compressedCache = await CompressionUtils.compressStringData(
             JSON.stringify(cachedData),
             /*reason=*/ "Firebase Cache"
@@ -82,6 +91,10 @@ export class FirebaseCache {
         app: App,
         config: LatestSyncConfigVersion
     ): Promise<Result<FirebaseStoredData<SchemaWithId<LatestNotesSchema>>, StatusError>> {
+        if (this._lastCacheEntry.some) {
+            return Ok(this._lastCacheEntry.safeValue());
+        }
+
         const fileData = await FileUtilRaw.readRawFile(app, config.firebaseCachePath);
         if (fileData.err) {
             // If the cache file doesn't exist, return an empty cache.
@@ -114,9 +127,11 @@ export class FirebaseCache {
             }
             updatedCache.push({ id: entry.id, data: updatedEntry.safeUnwrap() });
         }
-        return Ok({
+        const cache = {
             lastUpdate: parsedJson.safeUnwrap().lastUpdate,
             cache: updatedCache
-        });
+        };
+        this._lastCacheEntry = Some(cache);
+        return Ok(cache);
     }
 }

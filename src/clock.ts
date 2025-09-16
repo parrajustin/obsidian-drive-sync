@@ -1,3 +1,11 @@
+import { THIS_APP } from "./main_app";
+import { CreateLogger } from "./logging/logger";
+import { LogError } from "./logging/log";
+import { NotFoundError } from "./lib/status_error";
+import { Err } from "./lib/result";
+
+const LOGGER = CreateLogger("clock");
+
 export interface Clock {
     // Gets the milliseconds elapsed since midnight, January 1, 1970 Universal Coordinated Time (UTC).
     now(): number;
@@ -64,6 +72,15 @@ export class FakeClock implements Clock {
 }
 
 export class RealTimeClock implements Clock {
+    private get _app() {
+        if (THIS_APP.none) {
+            const err = NotFoundError("found no app in realtime clock!");
+            LogError(LOGGER, err);
+            throw Err(err);
+        }
+        return THIS_APP.safeValue();
+    }
+
     public now(): number {
         return Date.now();
     }
@@ -73,7 +90,11 @@ export class RealTimeClock implements Clock {
     }
 
     public setTimeout(func: () => void, ms: number): number {
-        return window.setTimeout(func, ms);
+        const timeoutId = window.setTimeout(func, ms);
+        this._app.register(() => {
+            window.clearTimeout(timeoutId);
+        });
+        return timeoutId;
     }
 
     public clearTimeout(id: number): void {

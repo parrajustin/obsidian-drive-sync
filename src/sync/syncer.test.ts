@@ -36,6 +36,7 @@ import type { FilePathType } from "../filesystem/file_node";
 import { FileNodeType } from "../filesystem/file_node";
 import { CompressionUtils } from "./compression_utils";
 import GetSha256Hash from "../lib/sha";
+import { FirebaseCache } from "./firebase_cache";
 
 // Mock dependencies
 // jest.mock("../sync/firebase_cache"); - We are testing this
@@ -398,6 +399,7 @@ describe("FileSyncer", () => {
     let mockSyncerConfig: LatestSyncConfigVersion;
 
     beforeEach(() => {
+        FirebaseCache.clearCache();
         const mockView = {
             setSyncerStatus: jest.fn(),
             newSyncerCycle: jest.fn(),
