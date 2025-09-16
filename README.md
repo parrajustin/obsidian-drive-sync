@@ -1,4 +1,4 @@
-# A cloud file syncer for Obsidian.
+# A firebase file syncer for Obsidian.
 
 ## How to commit
 
