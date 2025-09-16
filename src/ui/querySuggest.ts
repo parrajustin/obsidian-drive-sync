@@ -5,10 +5,13 @@ import { GetQueryString } from "../sync/query_util";
 import { LogError } from "../logging/log";
 import { ConvertToUnknownError } from "../util";
 import type { LocalCloudFileNode, LocalOnlyFileNode } from "../filesystem/file_node";
+import { CreateLogger } from "../logging/logger";
 
-export class SearchStringFuzzySearch
-    extends FuzzySuggestModal<LocalOnlyFileNode | LocalCloudFileNode>
-{
+const LOGGER = CreateLogger("search_string_fuzzy_search");
+
+export class SearchStringFuzzySearch extends FuzzySuggestModal<
+    LocalOnlyFileNode | LocalCloudFileNode
+> {
     private _searchString: SearchString;
     private _originalQuery: string;
     constructor(
@@ -166,7 +169,7 @@ export class SearchStringFuzzySearch
         try {
             this.open();
         } catch (e) {
-            LogError(ConvertToUnknownError("Query Suggest View")(e));
+            LogError(LOGGER, ConvertToUnknownError("Query Suggest View")(e));
         }
     }
 }
