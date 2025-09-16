@@ -1,5 +1,90 @@
 # Changelog
 
+## [3.0.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.3.1...v3.0.0) (2025-09-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* Bump version
+
+### Features
+
+* Add a map util ([e8bdd9e](https://github.com/parrajustin/obsidian-drive-sync/commit/e8bdd9e2a8b4bad6a0cb3410bc1d639354588969))
+* Add a missing logging decorator ([faa40ad](https://github.com/parrajustin/obsidian-drive-sync/commit/faa40ad9730efd99c6df472143fdd9420ae52a0a))
+* add access information to  the build step ([1c93774](https://github.com/parrajustin/obsidian-drive-sync/commit/1c937746909d0b4160b2cabb8f2074e4509d2aeb))
+* Add comprehensive e2e tests for FileSyncer ([6963b95](https://github.com/parrajustin/obsidian-drive-sync/commit/6963b95d431026968d89b48b6fcbb7e29e7ca742))
+* add comprehensive tests for convergence_util ([2b74d07](https://github.com/parrajustin/obsidian-drive-sync/commit/2b74d075485b51cc1b08b64f7d6929dc449b22d2))
+* Add comprehensive tests for FileAccess module ([88bc911](https://github.com/parrajustin/obsidian-drive-sync/commit/88bc9119228e7810863c73d7bd44447b663d40d1))
+* Add decompressStringData function ([7fa497f](https://github.com/parrajustin/obsidian-drive-sync/commit/7fa497fa82be487048240ae39a5c3e0a748900c7))
+* add deleted file nodes ([c9b1902](https://github.com/parrajustin/obsidian-drive-sync/commit/c9b19029f0bba816742034a39df92b7627ab1cc6))
+* Add firebase cache unit tests ([0502bef](https://github.com/parrajustin/obsidian-drive-sync/commit/0502bef332cc25f94c71802b0899d769b7c1c246))
+* Add grafana loki logging ([e0c8af9](https://github.com/parrajustin/obsidian-drive-sync/commit/e0c8af9618e5b9362408810f6d72401221896f40))
+* add inital tracing ([579ecd7](https://github.com/parrajustin/obsidian-drive-sync/commit/579ecd7b63ecd1d1788effae23b5a707464d8ddb))
+* Add more identifiers to the build ([e862202](https://github.com/parrajustin/obsidian-drive-sync/commit/e862202ef3d39cee92a74f1f65d5bf12d4041435))
+* Add more inital logging ([a8497c8](https://github.com/parrajustin/obsidian-drive-sync/commit/a8497c81862658fa175fd1718878bd771dd151e1))
+* Add more tests for executeLimitedSyncConvergence ([b34f200](https://github.com/parrajustin/obsidian-drive-sync/commit/b34f200706666d1bfa301b8ce2ee5448ef2cc84f))
+* add schema utils ([cc01228](https://github.com/parrajustin/obsidian-drive-sync/commit/cc01228daa6458ef02c4b132e33a67c393794478))
+* Add test for executeLimitedSyncConvergence ([53f3770](https://github.com/parrajustin/obsidian-drive-sync/commit/53f37703414215acaa355d4e4c277a1c8663a314))
+* Add test for executeLimitedSyncConvergence ([bbf4187](https://github.com/parrajustin/obsidian-drive-sync/commit/bbf418788917a2eee6c6145a67152854bbcece5c))
+* Add tests for file_util_obsidian_api ([af1be75](https://github.com/parrajustin/obsidian-drive-sync/commit/af1be75568ca8f0726592d836e66b907ef01557a))
+* Add tests for FileUtilRaw ([0a904f2](https://github.com/parrajustin/obsidian-drive-sync/commit/0a904f249f8b06037bee64b88ce27757603448e8))
+* Add tracing OTLP to the plugin ([1ac4ec5](https://github.com/parrajustin/obsidian-drive-sync/commit/1ac4ec5e0589567d285c2f766e66824b05459c49))
+* Add unit tests for FirebaseSyncer ([5cf8e68](https://github.com/parrajustin/obsidian-drive-sync/commit/5cf8e688525c2cf532e700448a2b0b2641ad7c4b))
+* Add unit tests for FirebaseSyncer ([8265a60](https://github.com/parrajustin/obsidian-drive-sync/commit/8265a60664bbf1dc4c61c8d79091832748145849))
+* Bump version ([2b2c606](https://github.com/parrajustin/obsidian-drive-sync/commit/2b2c606252538888eab29431e8302d57adad7905))
+* Change filenode implementation ([a3bc59b](https://github.com/parrajustin/obsidian-drive-sync/commit/a3bc59b3d1c7987f8e77bb96c82a572853b2052d))
+* Fix convergence to make it simple ([600083c](https://github.com/parrajustin/obsidian-drive-sync/commit/600083c8c2da4a7aa625fb971c796c31fa94e471))
+* fix remaining files to make plugin buildable ([8e7fb64](https://github.com/parrajustin/obsidian-drive-sync/commit/8e7fb64559556a5729856c850e5bd130cc0918ec))
+* Implement UPDATE_LOCAL convergence logic ([00969eb](https://github.com/parrajustin/obsidian-drive-sync/commit/00969ebd9a4ac723047f423663ae0670716c1f88))
+* Make syncer test work ([614b165](https://github.com/parrajustin/obsidian-drive-sync/commit/614b16568dbf22c7b768aae2ca81d616eddb6888))
+* move firebase cache from settings to syncer config ([a7b9664](https://github.com/parrajustin/obsidian-drive-sync/commit/a7b96640d46fd916cd8bf1ca26ea98603f84a0fb))
+* **tests:** Add comprehensive tests for file_access.ts ([e7ff554](https://github.com/parrajustin/obsidian-drive-sync/commit/e7ff554c652bb89dbf1d7bb59b01b91e2702456f))
+* **tests:** Add comprehensive tests for file_access.ts ([db9f4b1](https://github.com/parrajustin/obsidian-drive-sync/commit/db9f4b17800cce80ea3909a0731a32591e1930cb))
+* update fake clock implementation for testing ([90c0b02](https://github.com/parrajustin/obsidian-drive-sync/commit/90c0b027b3b380e819629b4ab452e6fbfb7836f4))
+* update firebase cache ergonomics ([aab6783](https://github.com/parrajustin/obsidian-drive-sync/commit/aab678321f2ef83b16c4f694b5e155058aed3064))
+* update firebase syncer logic ([8339d35](https://github.com/parrajustin/obsidian-drive-sync/commit/8339d356243f29f4144366659b616901df085734))
+* update type of file nodes ([ef6411a](https://github.com/parrajustin/obsidian-drive-sync/commit/ef6411ae790a6c1e26f7569552187eee12feadf4))
+
+
+### Bug Fixes
+
+* Add api to delete a file node ([c59fb6b](https://github.com/parrajustin/obsidian-drive-sync/commit/c59fb6bb2cf4394a51c5e83df6f1b7ab097b2ebd))
+* Add missing convergence action and view ([01681de](https://github.com/parrajustin/obsidian-drive-sync/commit/01681dee812aafcd2ab4ccc4c5700cdae9b49a0e))
+* add missing lib changes ([0cd221a](https://github.com/parrajustin/obsidian-drive-sync/commit/0cd221a43d94638ad581ec1df3e728ce4f0980c8))
+* add missing number type ([f3e9f04](https://github.com/parrajustin/obsidian-drive-sync/commit/f3e9f045d2f97d1b84515c4db7792656819de891))
+* add missing schema fields ([7c8c4ba](https://github.com/parrajustin/obsidian-drive-sync/commit/7c8c4ba732e5dbdfcb748e965d2d8c25e55d5adf))
+* add small comments to ensure ai knows ([068dc82](https://github.com/parrajustin/obsidian-drive-sync/commit/068dc82b1200a5c01c64636397271b0d7f288a26))
+* Comment out all history related stuff ([ec9f3fd](https://github.com/parrajustin/obsidian-drive-sync/commit/ec9f3fde83a0f686574209208431e9c84edcea77))
+* comment out broken test for now ([e4d71b6](https://github.com/parrajustin/obsidian-drive-sync/commit/e4d71b6b0592ca6939a8eb1164a96848136b6fa1))
+* Current iteration adding cloud storage ([882fe83](https://github.com/parrajustin/obsidian-drive-sync/commit/882fe83a555de784b6d8b52ee5089dfbe0fb359b))
+* feature errors ([8da34f7](https://github.com/parrajustin/obsidian-drive-sync/commit/8da34f7ac87473b48e7b1d87df72e285a9c8566e))
+* fix an error with main being included ([af2d54c](https://github.com/parrajustin/obsidian-drive-sync/commit/af2d54cc23a692a7e726559491940334b19479b8))
+* fix broken tests ([d2f7f84](https://github.com/parrajustin/obsidian-drive-sync/commit/d2f7f84979e079da125153b0e4def773b9d8ea7c))
+* fix issues with syncer update util ([d332a19](https://github.com/parrajustin/obsidian-drive-sync/commit/d332a1930d8fe2e90094a9360e045c31ec9b3ef8))
+* fix schema for Bytes ([673a872](https://github.com/parrajustin/obsidian-drive-sync/commit/673a8722c3da225e664a0cf64c53f0c7cda66b1e))
+* Fix similarites between new file and cloud node ([f1cd372](https://github.com/parrajustin/obsidian-drive-sync/commit/f1cd372662cec75b129a9d60df454c56e52b47f4))
+* Fix some issues with the query suggest changes ([0d824f3](https://github.com/parrajustin/obsidian-drive-sync/commit/0d824f3f9d84fc72f9a8e92e2009010eeeb29075))
+* Fix some linting and add to the test of compression utils ([bf94140](https://github.com/parrajustin/obsidian-drive-sync/commit/bf94140f07361cd6cca1a4396f1e9df40270a53f))
+* fix some logging stuff ([8ed9b27](https://github.com/parrajustin/obsidian-drive-sync/commit/8ed9b27ce03fe4372b7b49ad91776d5d35762a09))
+* fix some static function visbility ([657c67b](https://github.com/parrajustin/obsidian-drive-sync/commit/657c67b83aa91477575ce56f94fe82082131f28d))
+* fix some testing for syncer update util ([bfee4ad](https://github.com/parrajustin/obsidian-drive-sync/commit/bfee4adcd764dcd417f0cfb650dea778e1f9f12b))
+* fix syncer and tests needed ([8902263](https://github.com/parrajustin/obsidian-drive-sync/commit/89022639ba50b46f6c5234ecfa97ec9e7bfa7199))
+* fix syncer tests ([e500353](https://github.com/parrajustin/obsidian-drive-sync/commit/e5003531e173eb7f92c77d5c5cb9e387f64a7f6e))
+* fix syncer update util test ([cee986a](https://github.com/parrajustin/obsidian-drive-sync/commit/cee986ac75d0964be4a3aab784e1092815f7e596))
+* fix type error in file access ([8c23dc9](https://github.com/parrajustin/obsidian-drive-sync/commit/8c23dc9dd3437fde32f85da344cbed81192a749b))
+* fix typing and clean up ([f3fbc58](https://github.com/parrajustin/obsidian-drive-sync/commit/f3fbc58f54df6f29575da5f762e0937317a6435e))
+* issue with convergence test and logging ([58bb39a](https://github.com/parrajustin/obsidian-drive-sync/commit/58bb39a8eec13a00c31087c42c63d33b5eb50d24))
+* make the pre commit checks work ([0f3cc6f](https://github.com/parrajustin/obsidian-drive-sync/commit/0f3cc6facf0656dbfadfa094ef48e8c8dae646e7))
+* Seperate out local only and cloud with local files ([696d6e2](https://github.com/parrajustin/obsidian-drive-sync/commit/696d6e2191e290d8767a46f3cc1ce87ef120ed76))
+* **test:** Add more comprehensive syncer test ([76602a5](https://github.com/parrajustin/obsidian-drive-sync/commit/76602a5f37cff12427ed3944505c1ea5376862f6))
+* typing and issues in schema files ([f227353](https://github.com/parrajustin/obsidian-drive-sync/commit/f22735319f58e3e5870c061cd81602898c325198))
+* Uncomment and update types in querySuggest.ts ([5239041](https://github.com/parrajustin/obsidian-drive-sync/commit/523904137597eb769b8f68c46749a0cbe953faf1))
+* Uncomment and update types in querySuggest.ts ([66a03e5](https://github.com/parrajustin/obsidian-drive-sync/commit/66a03e5d29b046742dc10df92aa554ba5292433a))
+* Update file node semantics and convergence ([9460c9b](https://github.com/parrajustin/obsidian-drive-sync/commit/9460c9b4e22f838515137f93ef2f60795cf84d45))
+* update firebase syncer with changes from cache ([8907383](https://github.com/parrajustin/obsidian-drive-sync/commit/890738336d31acec0e69fb2939f270e59c9cf649))
+* update some documentation ([a34802e](https://github.com/parrajustin/obsidian-drive-sync/commit/a34802e673983bfaecf10135846a5f54d53735b4))
+* Update some typeing issues with the file access tests ([53b853b](https://github.com/parrajustin/obsidian-drive-sync/commit/53b853bc7dd4a19cb2e62296655a9a0781439c0e))
+
 ## [2.3.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.3.0...v2.3.1) (2025-06-19)
 
 
