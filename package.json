@@ -5,7 +5,7 @@
     "main": "main.js",
     "type": "module",
     "scripts": {
-        "dev": "node esbuild.config.mjs",
+        "dev": "node esbuild.config.mjs development false",
         "deploy": "firebase deploy",
         "prebuild": "eslint . --ignore-pattern \"**/*.js\"",
         "build": "node esbuild.config.mjs production",
@@ -14,7 +14,8 @@
         "test": "jest",
         "test-dev": "jest --silent=false --verbose=true",
         "lint": "eslint . --ignore-pattern \"**/*.js\"",
-        "type-check": "tsc --noEmit"
+        "type-check": "tsc --noEmit",
+        "devObsidianDeploy": "./dev_update -o \"/mnt/PersonalVault/.obsidian/plugins/obsidian-firebase-sync/\""
     },
     "keywords": [
         "obsidian",

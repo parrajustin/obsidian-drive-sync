@@ -11,8 +11,23 @@
 	},
 	"mounts": [
 		"type=bind,source=${localWorkspaceFolder},target=/work",
-		"type=bind,source=/var/home/${localEnv:USER}/.ssh,target=/home/node/.ssh,readonly"
-	]
+		"type=bind,source=/var/home/${localEnv:USER}/.ssh,target=/home/node/.ssh,readonly",
+		"type=bind,source=/var/mnt/Additional/JustinObsidianVaults/Personal,target=/mnt/PersonalVault,readonly",
+		"type=bind,source=/var/mnt/Additional/JustinObsidianVaults/Personal/.obsidian/plugins/obsidian-firebase-sync,target=/mnt/PersonalVault/.obsidian/plugins/obsidian-firebase-sync"
+	],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"google.gemini-cli-vscode-ide-companion",
+				"google.geminicodeassist",
+				"esbenp.prettier-vscode",  // Prettier formatter
+				"dbaeumer.vscode-eslint"   // ESLint linter
+			],
+			"settings": {
+				"editor.wordWrap": "on"
+			}
+		}
+	}
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},

@@ -1,0 +1,13 @@
+#! /bin/sh
+. ./shflags
+
+DEFINE_string obisidan_plugin_path '' "Path of the plugin folder which to install obsidian dev plugin in" o
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# First build dev binary.
+npm run dev
+
+# Now copy the built binary to the job.
+cp ./dist/main.js ${FLAGS_obisidan_plugin_path}/main.js
+cp ./dist/meta.json ${FLAGS_obisidan_plugin_path}/meta.json
