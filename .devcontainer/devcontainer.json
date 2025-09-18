@@ -3,10 +3,16 @@
 {
 	"name": "Node.js & TypeScript",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+	"image": "mcr.microsoft.com/devcontainers/typescript-node:24-bookworm",
 	"features": {
-		"ghcr.io/devcontainers/features/node:1": {}
-	}
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "v24.8.0"
+		}
+	},
+	"mounts": [
+		"type=bind,source=${localWorkspaceFolder},target=/work",
+		"type=bind,source=/var/home/${localEnv:USER}/.ssh,target=/home/node/.ssh,readonly"
+	]
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
