@@ -27,8 +27,7 @@ service cloud.firestore {
     match /notes/{file} {
         allow delete: if false;
         allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-        allow create, update: if request.auth != null && request.resource.data.keys().hasOnly(
-        ["baseName", "cTime", "data", "deleted", "deviceId", "ext", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "userId", "vaultName", "fileHash", "version", "entryTime", "type"]) && request.auth.uid == request.resource.data.userId;
+        allow create, update: if request.auth != null && request.resource.data.keys().hasOnly(["baseName", "cTime", "data", "deleted", "deviceId", "entryTime", "ext", "fileHash", "fileStorageRef", "mTime", "path", "size", "syncerConfigId", "type", "userId", "vaultName", "version"]) && request.auth.uid == request.resource.data.userId;
     }
     match /history/{file} {
         allow update: if false;
