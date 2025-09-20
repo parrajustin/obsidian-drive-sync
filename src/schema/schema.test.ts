@@ -43,11 +43,20 @@ const MANAGER = new SchemaManager<[Version0, Version1, Version2], 2>(
         }
     ],
     () => {
-        return { name: "default", otherData: "lol", temp: 0, version: 0 };
+        return { klep: false, otherData: "lol", version: 2 };
     }
 );
 
 describe("SchemaManager", () => {
+    test("getDefault", () => {
+        const defaultData = MANAGER.getDefault();
+        expect(defaultData.unsafeUnwrap()).toEqual({
+            klep: false,
+            otherData: "lol",
+            version: 2
+        });
+    });
+
     test("null", () => {
         const finalData = MANAGER.updateSchema(null);
         expect((finalData.val as StatusError).toString()).toContain(
