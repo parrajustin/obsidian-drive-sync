@@ -62,7 +62,7 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
         private _name: string,
         private _zodSchemas: readonly z.ZodTypeAny[],
         private _converters: GetConverters<Schemas>,
-        private _default?: () => Schemas[0]
+        private _default?: () => Schemas[MaxVersion]
     ) {}
 
     /**
@@ -102,7 +102,30 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
         if (defaultFunc.none) {
             return Err(NotFoundError(`No default schema found for ${this._name}.`));
         }
-        return this.loadDataInternal(defaultFunc.safeValue()(), 0);
+
+        const defaultData = defaultFunc.safeValue()();
+        const latestVersion = this.getLatestVersion();
+        const zodSchema = this._zodSchemas[latestVersion];
+        if (!zodSchema) {
+            return Err(
+                new StatusError(
+                    ErrorCode.INTERNAL,
+                    `No zod schema found for version ${latestVersion}`
+                )
+            );
+        }
+
+        const parseResult = zodSchema.safeParse(defaultData);
+        if (parseResult.error) {
+            return Err(
+                new StatusError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    `Schema validation failed for ${this._name} version ${latestVersion}: ${parseResult.error.toString()}`
+                )
+            );
+        }
+
+        return Ok(parseResult.data);
     }
 
     @Span()
