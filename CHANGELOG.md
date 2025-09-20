@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.1.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v3.0.0...v3.1.0) (2025-09-20)
+
+
+### Features
+
+* Add capability to build the plugin by script ([36272ff](https://github.com/parrajustin/obsidian-drive-sync/commit/36272ff9bad2923aa5ac7a3e356774458f22249d))
+* Add util to update firestore rules ([f07d174](https://github.com/parrajustin/obsidian-drive-sync/commit/f07d17444373b89d49c155d3b794242e0ff72aa2))
+* Create robust script to update firestore.rules from schema ([a51bb75](https://github.com/parrajustin/obsidian-drive-sync/commit/a51bb75cad3d04cc2c20622c0c08801cf89f4ce2))
+* Create robust script to update firestore.rules from schema ([975f512](https://github.com/parrajustin/obsidian-drive-sync/commit/975f512f39bf7b5fed822aaae0c27fec97bebafb))
+* **schema:** Update schema default mechanism ([660e446](https://github.com/parrajustin/obsidian-drive-sync/commit/660e4462cf50dcd1880d8cc8a9efddfa5c1dbaf8))
+* **schema:** Update schema default mechanism ([9cfa843](https://github.com/parrajustin/obsidian-drive-sync/commit/9cfa8431285d4a2c04e8257079e7362d9d0f8849))
+
+
+### Bug Fixes
+
+* add firestore debug log as ignored ([de2b7fb](https://github.com/parrajustin/obsidian-drive-sync/commit/de2b7fb88131cc1ccfd4e6c4f4ef9bae8b17b3c1))
+* fix bugs with sync ([93cc608](https://github.com/parrajustin/obsidian-drive-sync/commit/93cc608fdcef7590ede2c5e52a681a665b5d2ff6))
+* if settins fail to validate a default is used. ([2eb5bdc](https://github.com/parrajustin/obsidian-drive-sync/commit/2eb5bdc9a5854d66b957f451a0a43fc328ec2aaf))
+* remove npm package lock ([2921102](https://github.com/parrajustin/obsidian-drive-sync/commit/29211021f118c023b5f1b179a81a0bb8849da1c6))
+* remove old firestore rules ([0caa4de](https://github.com/parrajustin/obsidian-drive-sync/commit/0caa4dea5aa1deaf6d864653d76d0ec04c091a63))
+* Update dev container ([1ee1b20](https://github.com/parrajustin/obsidian-drive-sync/commit/1ee1b206056bcb02903364252dcd668f2b9df6ff))
+
 ## [3.0.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v2.3.1...v3.0.0) (2025-09-16)
 
 
