@@ -82,6 +82,7 @@ export class SyncerUpdateUtil {
                 AsyncForEach(
                     actionsToTakeThisCycle,
                     async (action): Promise<StatusResult<StatusError>> => {
+                        view.addEntry(syncerConfig.syncerId, action.fullPath, action.action);
                         const resultantNode = await SyncerUpdateUtil.handleSingleConvergence(
                             app,
                             db,
@@ -92,9 +93,11 @@ export class SyncerUpdateUtil {
                             view
                         );
                         if (resultantNode.err) {
+                            view.setEntryProgress(syncerConfig.syncerId, action.fullPath, -1.0);
                             return resultantNode;
                         }
 
+                        view.setEntryProgress(syncerConfig.syncerId, action.fullPath, 1.0);
                         updatedFileNodes.set(
                             action.localNode.fileData.fullPath,
                             resultantNode.safeUnwrap()
@@ -162,8 +165,6 @@ export class SyncerUpdateUtil {
         action: UpdateLocalFileAction,
         view: SyncProgressView
     ): Promise<Result<LocalCloudFileNode, StatusError>> {
-        view.addEntry(syncerConfig.syncerId, action.fullPath, action.action);
-
         // 1. Download data
         let compressedDataResult: Result<ArrayBufferLike, StatusError>;
 
@@ -436,7 +437,6 @@ export class SyncerUpdateUtil {
         action: DeleteLocalFileAction,
         view: SyncProgressView
     ): Promise<Result<RemoteOnlyNode, StatusError>> {
-        view.addEntry(syncerConfig.syncerId, action.localNode.fileData.fullPath, action.action);
         const deleteFile = await FileAccess.deleteFileNode(app, action.localNode, syncerConfig);
         view.setEntryProgress(syncerConfig.syncerId, action.localNode.fileData.fullPath, 0.7);
         if (deleteFile.err) {

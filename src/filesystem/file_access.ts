@@ -416,9 +416,19 @@ export class FileAccess {
                     if (!IsAcceptablePath(fullpath, config)) {
                         return Ok();
                     }
-                    const fileNode = await this.getFileNode(app, fullpath, config);
-                    if (fileNode.ok) {
-                        files.push(fileNode.safeUnwrap());
+                    const fileNode = await this.getFileNode(
+                        app,
+                        fullpath,
+                        config,
+                        /*ignoreMissingFile=*/ false,
+                        /*ignoreInvalidPath=*/ true
+                    );
+                    if (fileNode.ok && fileNode.safeUnwrap().type !== FileNodeType.INVALID) {
+                        const node = fileNode.safeUnwrap();
+                        if (node.type === FileNodeType.INVALID) {
+                            return fileNode;
+                        }
+                        files.push(node);
                     }
                     return fileNode;
                 }
