@@ -28,5 +28,5 @@
         "noUnusedLocals": true, // Report errors on unused local variables.
         "noUnusedParameters": true // Report errors on unused parameters in functions
     },
-    "include": ["src/**/*.ts", "tests/**/*.ts", "docs/**/*", "jest.config.ts"]
+    "include": ["src/**/*.ts", "tests/**/*.ts", "docs/**/*", "jest.config.ts", "util/update_firestore_rules.ts"]
 }

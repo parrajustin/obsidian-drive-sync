@@ -15,6 +15,7 @@
         "test-dev": "jest --silent=false --verbose=true",
         "lint": "eslint . --ignore-pattern \"**/*.js\"",
         "type-check": "tsc --noEmit",
+        "update-firestore-rules": "./util/update_firestore_rules",
         "devObsidianDeploy": "./dev_update -o \"/mnt/PersonalVault/.obsidian/plugins/obsidian-firebase-sync/\""
     },
     "keywords": [

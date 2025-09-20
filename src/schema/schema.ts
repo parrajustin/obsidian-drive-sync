@@ -163,6 +163,10 @@ export class SchemaManager<Schemas extends VersionedSchema<any, any>[], MaxVersi
         return this.loadDataInternal(newData.safeUnwrap(), version + 1);
     }
 
+    public getSchemas(): readonly z.ZodTypeAny[] {
+        return this._zodSchemas;
+    }
+
     public getLatestVersion(): number {
         return this._converters.length;
     }

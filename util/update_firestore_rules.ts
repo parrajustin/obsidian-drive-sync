@@ -1,38 +1,48 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { promises as fs } from "fs";
-import { NOTES_SCHEMA_MANAGER } from "./src/schema/notes/notes.schema.ts";
+import { NOTES_SCHEMA_MANAGER } from "../src/schema/notes/notes.schema";
 import { ZodObject, ZodUnion } from "zod";
+import { WrapOptional } from "../src/lib/option";
 
-async function updateFirestoreRules() {
+async function UpdateFirestoreRules() {
     try {
         // HACK: Accessing private properties. This is for a build script, so it's acceptable.
-        const manager = NOTES_SCHEMA_MANAGER as any;
+        const manager = NOTES_SCHEMA_MANAGER;
         const latestVersion = manager.getLatestVersion();
-        const latestSchema = manager._zodSchemas[latestVersion];
+        const allSchemas = manager.getSchemas();
+        const getLatestVersion = WrapOptional(allSchemas).andThen((val) =>
+            WrapOptional(val[val.length - 1])
+        );
 
-        if (!latestSchema) {
+        if (getLatestVersion.none) {
             throw new Error(`Could not find schema for version ${latestVersion}`);
         }
+        const latestSchema = getLatestVersion.safeValue();
 
         const keySet = new Set<string>();
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const unionSchema = latestSchema._def.left;
         if (unionSchema instanceof ZodUnion) {
-            unionSchema.options.forEach(option => {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            unionSchema.options.forEach((option: { shape: unknown }) => {
                 if (option instanceof ZodObject) {
-                    Object.keys(option.shape).forEach(key => keySet.add(key));
+                    Object.keys(option.shape).forEach((key) => keySet.add(key));
                 }
             });
         }
 
         const intersectionSchema = latestSchema._def.right;
         if (intersectionSchema instanceof ZodObject) {
-            Object.keys(intersectionSchema.shape).forEach(key => keySet.add(key));
+            Object.keys(intersectionSchema.shape).forEach((key) => keySet.add(key));
         }
 
         const allKeys = Array.from(keySet).sort();
 
         const firestoreRulesPath = "./firestore.rules";
-        let rulesContent = await fs.readFile(firestoreRulesPath, "utf-8");
+        const rulesContent = await fs.readFile(firestoreRulesPath, "utf-8");
 
         const keysString = `["${allKeys.join('", "')}"]`;
 
@@ -40,15 +50,10 @@ async function updateFirestoreRules() {
             /(match \/notes\/{file} {[\s\S]*?allow create, update: if request\.auth != null && request\.resource\.data\.keys\(\)\.hasOnly\()([\s\S]*?)(\) && request\.auth\.uid == request\.resource\.data\.userId;[\s\S]*?})/;
 
         if (!regex.test(rulesContent)) {
-            throw new Error(
-                "Could not find the notes rule to update in firestore.rules"
-            );
+            throw new Error("Could not find the notes rule to update in firestore.rules");
         }
 
-        const newRulesContent = rulesContent.replace(
-            regex,
-            `$1${keysString}$3`
-        );
+        const newRulesContent = rulesContent.replace(regex, `$1${keysString}$3`);
 
         await fs.writeFile(firestoreRulesPath, newRulesContent, "utf-8");
 
@@ -59,4 +64,6 @@ async function updateFirestoreRules() {
     }
 }
 
-updateFirestoreRules();
+UpdateFirestoreRules().catch((err: unknown) => {
+    console.error(err);
+});

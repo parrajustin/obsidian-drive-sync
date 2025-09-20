@@ -1,0 +1,11 @@
+#! /bin/sh
+. ./shflags
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# First build the binary.
+npx esbuild ./util/update_firestore_rules.ts --bundle --platform=node --format=esm --external:firebase/firestore --external:@opentelemetry/* --outfile=./util/update_firestore_rules.js
+
+# Run the updater
+node ./util/update_firestore_rules.js
