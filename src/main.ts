@@ -117,18 +117,17 @@ export default class FirestoreSyncPlugin extends Plugin {
     @Span()
     public async loadSettings(): Promise<void> {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const dataFromObsidian = Object.assign(
-            {},
-            SETTINGS_CONFIG_SCHEMA_MANAGER.getDefault().unsafeUnwrap(),
-            await this.loadData()
-        );
+        const dataFromObsidian = Object.assign({}, await this.loadData());
         const settingUpdated = SETTINGS_CONFIG_SCHEMA_MANAGER.updateSchema(dataFromObsidian);
         if (settingUpdated.err) {
-            this.onunload();
-            LogError(LOGGER, settingUpdated.val);
-            return;
+            LOGGER.crit(`Setting loaded was invalid!`, {
+                error: settingUpdated.val.toString(),
+                original: JSON.stringify(dataFromObsidian)
+            });
+            this.settings = SETTINGS_CONFIG_SCHEMA_MANAGER.getDefault().unsafeUnwrap();
+        } else {
+            this.settings = settingUpdated.safeUnwrap();
         }
-        this.settings = settingUpdated.safeUnwrap();
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         LOGGER.debug("loaded settings", { dataFromObsidian, parsedSettings: this.settings });
         this.startupSyncers();
