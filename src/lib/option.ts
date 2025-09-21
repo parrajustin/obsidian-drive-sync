@@ -23,6 +23,9 @@ interface BaseOption<T> {
      */
     map<U>(mapper: (val: T) => U): Option<U>;
 
+    // Merges this option with another.
+    merge<U, O>(other: Option<U>, func: (val: T, otherVal: U) => O | Option<O>): Option<O>;
+
     /** Checks if both options are the same. */
     equals<U>(other: Option<U>): boolean;
 
@@ -52,6 +55,13 @@ export class NoneImpl implements BaseOption<never> {
      * This function can be used to compose the Options of two functions.
      */
     public map(_mapper: unknown): None {
+        return this;
+    }
+
+    public merge<U, O>(
+        _other: Option<U>,
+        _func: (val: never, otherVal: U) => Option<O> | O
+    ): Option<O> {
         return this;
     }
 
@@ -128,6 +138,17 @@ export class SomeImpl<T> implements BaseOption<T> {
             return result;
         }
         return Some(result);
+    }
+
+    public merge<U, O>(other: Option<U>, func: (val: T, otherVal: U) => Option<O> | O): Option<O> {
+        if (other.none) {
+            return other;
+        }
+        const returnee = func(this.val, other.safeValue());
+        if (IsOption(returnee)) {
+            return returnee;
+        }
+        return Some(returnee);
     }
 
     /**
