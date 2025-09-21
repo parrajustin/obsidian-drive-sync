@@ -1,15 +1,10 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable no-prototype-builtins */
-/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/naming-convention */
-import type * as winston from "winston";
-import type { WritableStreamOptions } from "./winston/transport";
+import type { ExtendedTransformableinfo, WritableStreamOptions } from "./winston/transport";
 import { TransportStream } from "./winston/transport";
 import { WrapOptional } from "../lib/option";
+import { LEVEL, MESSAGE } from "triple-beam";
 
 export interface BrowserConsoleOptions extends WritableStreamOptions {
     outputInterface?: {
@@ -57,30 +52,14 @@ export default class BrowserConsole extends TransportStream {
         }
     }
 
-    public log = (logEntry: winston.LogEntry) => {
-        // (window as any).l = logEntry;
-        setImmediate(() => {
-            (this as any).emit("logged", logEntry);
-        });
-
-        const { message, level } = logEntry;
+    public log = (logEntry: ExtendedTransformableinfo) => {
+        const message = logEntry[MESSAGE];
+        const level = logEntry[LEVEL];
         const mappedMethod = WrapOptional(
             this.methods[level as "debug" | "error" | "info" | "warn"]
         );
         const method = mappedMethod.valueOr("debug") as "debug" | "error" | "info" | "warn";
-
-        if (Object.getOwnPropertySymbols(logEntry).length === 2) {
-            this.outputInterface[method](message);
-        } else {
-            // @ts-ignore
-            let args = logEntry[Object.getOwnPropertySymbols(logEntry)[1]];
-            args = args.length >= 1 ? args[0] : args;
-            if (args) {
-                this.outputInterface[method](message, args);
-            } else {
-                this.outputInterface[method](message);
-            }
-        }
+        this.outputInterface[method](message);
     };
 }
 
