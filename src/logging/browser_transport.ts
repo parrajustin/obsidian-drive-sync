@@ -59,9 +59,7 @@ export default class BrowserConsole extends TransportStream {
 
     public log = (logEntry: winston.LogEntry) => {
         // (window as any).l = logEntry;
-        setImmediate(() => {
-            (this as any).emit("logged", logEntry);
-        });
+        (this as any).emit("logged", logEntry);
 
         const { message, level } = logEntry;
         const mappedMethod = WrapOptional(
