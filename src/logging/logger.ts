@@ -14,6 +14,7 @@ import { THIS_APP } from "../main_app";
 import BrowserConsole from "./browser_transport";
 import type { TransportStream } from "./winston/transport";
 import { Logger } from "./winston/logger";
+import { CreateErrorNotice } from "./log";
 
 const USER_ID_FORMAT = format((info, _opts) => {
     if (THIS_APP.none) {
@@ -54,7 +55,9 @@ export function CreateLogger(label: string): Logger {
             },
             clearOnError: false,
             onConnectionError: (err: unknown) => {
-                console.log("ERROR!", err);
+                // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+                CreateErrorNotice(`<b>LokiTransport Error</b>:<br/>${err}`);
+                console.error("ERROR!", err);
             }
         })
     ];

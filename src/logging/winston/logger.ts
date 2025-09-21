@@ -8,6 +8,7 @@ import {
 import { WrapOptional } from "../../lib/option";
 import { WrapToResult } from "../../lib/wrap_to_result";
 import { CreateErrorNotice } from "../log";
+import { LEVEL, MESSAGE } from "triple-beam";
 
 export interface LoggerOptions {
     silent?: boolean;
@@ -86,7 +87,14 @@ export class Logger {
             return;
         }
 
-        const info = { level, message, ...this.defaultMeta, ...meta };
+        const info = {
+            level,
+            message,
+            ...this.defaultMeta,
+            ...meta,
+            [LEVEL]: level,
+            [MESSAGE]: message
+        };
         let formattedInfo = info as ExtendedTransformableinfo;
         const format = WrapOptional(this.format);
         if (format.some) {

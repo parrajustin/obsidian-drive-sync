@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, expect } from "@jest/globals";
-import { format } from "logform";
+// import { format } from "logform";
 import BrowserConsole from "../browser_transport";
 import { Logger } from "./logger";
+import { format } from "logform";
 
 class MockOutput {
     public messages: { level: string; message: string; args: unknown[] }[] = [];

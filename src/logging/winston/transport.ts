@@ -7,6 +7,7 @@ import type { Logger } from "./logger";
 import { WrapOptional } from "../../lib/option";
 import { WrapToResult } from "../../lib/wrap_to_result";
 import { Span } from "../tracing/span.decorator";
+import { CreateErrorNotice } from "../log";
 
 export type Levels = "critical" | "error" | "warn" | "info" | "verbose" | "debug" | "silly";
 
@@ -121,16 +122,21 @@ export class TransportStream {
         // prefer any explicit level set on the Transport itself falling back to
         // any level set on the parent.
         const level = this.level ?? this.parent?.level;
-        const levelOpt = WrapOptional(level);
-        const logLevel = WrapOptional(info[LEVEL]);
-        const localLevelNum = levelOpt.andThen((levelRaw) => WrapOptional(LevelNumber[levelRaw]));
-        const logLevelNum = logLevel.andThen((levelRaw) => WrapOptional(LevelNumber[levelRaw]));
-        const levelPassesThreshold = localLevelNum.merge(
-            logLevelNum,
-            (localLevelNumUnwrap, logLevelNumUnwrap) => localLevelNumUnwrap >= logLevelNumUnwrap
+        const levelThreshold = WrapOptional(level);
+        const messageLevel = WrapOptional(info[LEVEL]);
+        const levelThresholdNumber = levelThreshold.andThen((levelRaw) =>
+            WrapOptional(LevelNumber[levelRaw])
+        );
+        const messageLevelNumber = messageLevel.andThen((levelRaw) =>
+            WrapOptional(LevelNumber[levelRaw])
+        );
+        const levelPassesThreshold = messageLevelNumber.merge(
+            levelThresholdNumber,
+            (msgNumber, thresholdNumber) => msgNumber >= thresholdNumber
         );
         const log = WrapOptional(this.log);
-        if (log.some && (levelOpt.none || levelPassesThreshold.valueOr(false))) {
+
+        if (log.some && (levelThreshold.none || levelPassesThreshold.valueOr(false))) {
             const format = WrapOptional(this.format);
             if (format.none) {
                 log.safeValue()(info);
@@ -150,10 +156,14 @@ export class TransportStream {
             );
 
             if (transform.err) {
+                CreateErrorNotice(`<b>Log Transform Error</b>:<br/>${transform.val.toString()}`);
+                // eslint-disable-next-line no-console
                 console.error(transform.val.toString(), { message: info });
                 return;
             }
             if (transform.safeUnwrap() === false) {
+                CreateErrorNotice(`<b>Log Transform Error</b>:<br/>Transformer invalid`);
+                // eslint-disable-next-line no-console
                 console.error(`Failed to transform log entry`, { message: info });
                 return;
             }
@@ -162,12 +172,3 @@ export class TransportStream {
         }
     }
 }
-
-// /**
-//  * _nop is short for "No operation"
-//  * @returns {Boolean} Intentionally false.
-//  */
-// TransportStream.prototype._nop = function _nop() {
-//   // eslint-disable-next-line no-undefined
-//   return void undefined;
-// };
