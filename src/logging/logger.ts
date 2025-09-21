@@ -12,8 +12,9 @@ import {
 } from "../constants";
 import { format } from "logform";
 import type { Logger } from "winston";
-import winston, { createLogger, transports } from "winston";
+import winston, { createLogger } from "winston";
 import { THIS_APP } from "../main_app";
+import BrowserConsole from "./browser_transport";
 
 const USER_ID_FORMAT = format((info, _opts) => {
     if (THIS_APP.none) {
@@ -60,7 +61,7 @@ export function CreateLogger(label: string): Logger {
     ];
     if (PLUGIN_ENVIRONMENT !== "production") {
         transportStreams.unshift(
-            new transports.Console({
+            new BrowserConsole({
                 level: "debug",
                 format: format.combine(
                     USER_ID_FORMAT(),
