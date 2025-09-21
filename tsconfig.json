@@ -6,7 +6,7 @@
         "module": "ESNext",
         "target": "ES2018",
         "allowJs": true,
-        "moduleResolution": "node",
+        "moduleResolution": "node10",
         "importHelpers": true,
         "isolatedModules": true,
         "esModuleInterop": true,

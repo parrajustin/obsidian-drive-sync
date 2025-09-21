@@ -57,7 +57,7 @@ export default class BrowserConsole extends TransportStream {
         }
     }
 
-    public log(logEntry: winston.LogEntry, next: () => void) {
+    public log = (logEntry: winston.LogEntry) => {
         // (window as any).l = logEntry;
         setImmediate(() => {
             (this as any).emit("logged", logEntry);
@@ -81,9 +81,7 @@ export default class BrowserConsole extends TransportStream {
                 this.outputInterface[method](message);
             }
         }
-
-        next();
-    }
+    };
 }
 
 enum Level {

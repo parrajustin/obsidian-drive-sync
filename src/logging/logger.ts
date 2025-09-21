@@ -1,5 +1,4 @@
 import { LokiTransport } from "./loki/transport";
-import type TransportStream from "winston-transport";
 import {
     IS_TEST_ENV,
     LOKI_ACCESS_CLIENT_ID,
@@ -11,10 +10,10 @@ import {
     SERVICE_NAME
 } from "../constants";
 import { format } from "logform";
-import type { Logger } from "winston";
-import winston, { createLogger } from "winston";
 import { THIS_APP } from "../main_app";
 import BrowserConsole from "./browser_transport";
+import type { TransportStream } from "./winston/transport";
+import { Logger } from "./winston/logger";
 
 const USER_ID_FORMAT = format((info, _opts) => {
     if (THIS_APP.none) {
@@ -76,8 +75,7 @@ export function CreateLogger(label: string): Logger {
         transportStreams = [];
     }
 
-    return createLogger({
-        levels: winston.config.syslog.levels,
+    return new Logger({
         format: format.combine(
             USER_ID_FORMAT(),
             format.label({ label }),

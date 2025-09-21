@@ -2,14 +2,14 @@
 // const Transport = require('winston-transport')
 // const Batcher = require('./src/batcher')
 // const { MESSAGE } = require('triple-beam')
-import Transport from "winston-transport";
+import type { WritableStreamOptions } from "../winston/transport";
+import { TransportStream } from "../winston/transport";
 import type { LogEntry } from "./batcher";
 import { Batcher } from "./batcher";
 import { MESSAGE } from "triple-beam";
-import type TransportStream from "winston-transport";
 import type { TransformableInfo } from "logform";
 
-interface LokiTransportOptions extends TransportStream.TransportStreamOptions {
+interface LokiTransportOptions extends WritableStreamOptions {
     host: string;
     headers?: object;
     // Interval between batches in seconds.
@@ -29,7 +29,7 @@ interface LokiTransportOptions extends TransportStream.TransportStreamOptions {
  * @class LokiTransport
  * @extends {Transport}
  */
-export class LokiTransport extends Transport {
+export class LokiTransport extends TransportStream {
     public batcher: Batcher;
     public labels?: Record<string, unknown>;
     public useCustomFormat: boolean;
@@ -70,11 +70,11 @@ export class LokiTransport extends Transport {
      * @param {*} callback
      * @memberof LokiTransport
      */
-    public log(info: TransformableInfo, callback?: () => void) {
+    public log = (info: TransformableInfo) => {
         // Immediately tell Winston that this transport has received the log.
-        setImmediate(() => {
-            this.emit("logged", info);
-        });
+        // setImmediate(() => {
+        //     this.emit("logged", info);
+        // });
 
         // Deconstruct the log
         const { label, labels, timestamp, message, metadataContext, ...rest } = info;
@@ -137,12 +137,7 @@ export class LokiTransport extends Transport {
             // eslint-disable-next-line no-console
             console.error(err);
         });
-
-        // Trigger the optional callback
-        if (callback !== undefined) {
-            callback();
-        }
-    }
+    };
 
     /**
      * Flush unsent batched logs to Winston transport and return
@@ -162,7 +157,7 @@ export class LokiTransport extends Transport {
     /**
      * Send batch to loki when clean up
      */
-    public close() {
+    public close = () => {
         this.batcher.close();
-    }
+    };
 }
