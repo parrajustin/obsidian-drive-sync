@@ -41,6 +41,7 @@ import { CloudStorageUtil } from "../firestore/cloud_storage_util";
 import { NOTES_SCHEMA_MANAGER, type LatestNotesSchema } from "../schema/notes/notes.schema";
 import { WrapOptional } from "../lib/option";
 import { CompressionUtils } from "./compression_utils";
+import { GetFileCollectionPath } from "../firestore/file_db_util";
 
 const ONE_HUNDRED_KB_IN_BYTES = 1000 * 100;
 
@@ -144,7 +145,14 @@ export class SyncerUpdateUtil {
             case ConvergenceActionType.DELETE_LOCAL:
                 return SyncerUpdateUtil.executeLocalDeletion(app, syncerConfig, action, view);
             case ConvergenceActionType.UPDATE_LOCAL:
-                return SyncerUpdateUtil.executeLocalUpdate(app, db, syncerConfig, action, view);
+                return SyncerUpdateUtil.executeLocalUpdate(
+                    app,
+                    db,
+                    syncerConfig,
+                    action,
+                    creds,
+                    view
+                );
             case ConvergenceActionType.MARK_CLOUD_DELETED:
                 return SyncerUpdateUtil.executeMarkCloudDeleted(
                     db,
@@ -163,6 +171,7 @@ export class SyncerUpdateUtil {
         db: Firestore,
         syncerConfig: LatestSyncConfigVersion,
         action: UpdateLocalFileAction,
+        creds: UserCredential,
         view: SyncProgressView
     ): Promise<Result<LocalCloudFileNode, StatusError>> {
         // 1. Download data
@@ -171,9 +180,9 @@ export class SyncerUpdateUtil {
         const firebaseData = action.localNode.firebaseData.data;
         if (firebaseData.type === "Raw" || firebaseData.type === "Raw-Cache") {
             // Data is in firestore, we need to fetch the full document.
-            const docRef = doc(db, action.localNode.firebaseData.id);
+            const entry = `${GetFileCollectionPath(creds)}/${action.localNode.firebaseData.id}`;
             const docSnap = await WrapPromise(
-                getDoc(docRef),
+                getDoc(doc(db, entry)),
                 "Failed to get document for local update."
             );
             if (docSnap.err) {

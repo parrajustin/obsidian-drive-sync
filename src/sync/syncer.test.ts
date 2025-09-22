@@ -37,6 +37,11 @@ import { FileNodeType } from "../filesystem/file_node";
 import { CompressionUtils } from "./compression_utils";
 import GetSha256Hash from "../lib/sha";
 import { FirebaseCache } from "./firebase_cache";
+import path from "path";
+
+const { NOTES_MARKDOWN_FIREBASE_DB_NAME } = jest.requireActual("../constants") as {
+    NOTES_MARKDOWN_FIREBASE_DB_NAME: "DB_NAME";
+};
 
 // Mock dependencies
 // jest.mock("../sync/firebase_cache"); - We are testing this
@@ -173,7 +178,7 @@ const mockApp = {
         }),
         trash: jest.fn(async (file: TFile, _system: boolean) => {
             mockObsidianFs.delete(file.path);
-            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+
             delete (mockApp.vault.fileMap as any)[file.path];
         }),
         createBinary: jest.fn(async (path: string, data: Uint8Array) => {
@@ -210,7 +215,9 @@ const mockApp = {
 } as unknown as App;
 
 // In-memory Firestore
-const mockFirebaseFs = new Map<string, Partial<LatestNotesSchema>>();
+const inMemoryFirestoreFS = {
+    [NOTES_MARKDOWN_FIREBASE_DB_NAME]: new Map<string, Partial<LatestNotesSchema>>()
+};
 let onSnapshotCallback: ((snapshot: { docs: any[] }) => void) | null = null;
 const mockUnsubscribe = jest.fn();
 
@@ -220,14 +227,20 @@ jest.mock("firebase/firestore", () => {
         getFirestore: jest.fn(() => ({}) as Firestore),
         doc: jest.fn((_firestore, path, ...pathSegments) => {
             const fullPath = [path, ...pathSegments].join("/");
-            const id = fullPath.split("/").pop()!;
-            return { path: id };
+            return { path: fullPath };
         }),
         getDoc: jest.fn(async (docRef: { path: string }) => {
-            const doc = mockFirebaseFs.get(docRef.path);
+            const parsedPath = path.parse(docRef.path);
+            if (parsedPath.dir !== NOTES_MARKDOWN_FIREBASE_DB_NAME) {
+                return {
+                    exists: () => false,
+                    data: () => undefined
+                };
+            }
+            const data = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get(parsedPath.base);
             return {
-                exists: () => !!doc,
-                data: () => doc
+                exists: () => !!data,
+                data: () => data
             };
         }),
         getDocs: jest.fn(async (q: Query) => {
@@ -237,7 +250,7 @@ jest.mock("firebase/firestore", () => {
             );
             const greaterThanValue = entryTimeFilter ? entryTimeFilter.value : -1;
 
-            const docs = Array.from(mockFirebaseFs.entries())
+            const docs = Array.from(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].entries())
                 .filter((doc) => doc[1]!.entryTime! > greaterThanValue)
                 .map((doc) => ({
                     id: doc[0],
@@ -246,28 +259,27 @@ jest.mock("firebase/firestore", () => {
 
             return { docs };
         }),
-        setDoc: jest.fn(
-            async (docRef: { path: string }, data: Partial<any>, options?: { merge: boolean }) => {
-                if (options?.merge) {
-                    const existingData = mockFirebaseFs.get(docRef.path) ?? {};
-                    mockFirebaseFs.set(docRef.path, { ...existingData, ...data });
-                } else {
-                    mockFirebaseFs.set(docRef.path, data);
-                }
-
-                if (onSnapshotCallback) {
-                    const results: any[] = [];
-                    for (const [path, doc] of mockFirebaseFs.entries()) {
-                        results.push({
-                            data: () => doc,
-                            id: path
-                        });
-                    }
-
-                    onSnapshotCallback({ docs: results });
-                }
+        setDoc: jest.fn(async (docRef: { path: string }, data: Partial<any>) => {
+            const parsedPath = path.parse(docRef.path);
+            if (parsedPath.dir !== NOTES_MARKDOWN_FIREBASE_DB_NAME) {
+                return;
             }
-        ),
+            inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].set(parsedPath.base, data);
+
+            if (onSnapshotCallback) {
+                const results: any[] = [];
+                for (const [path, doc] of inMemoryFirestoreFS[
+                    NOTES_MARKDOWN_FIREBASE_DB_NAME
+                ].entries()) {
+                    results.push({
+                        data: () => doc,
+                        id: path
+                    });
+                }
+
+                onSnapshotCallback({ docs: results });
+            }
+        }),
         Bytes: originalFirestore.Bytes,
         serverTimestamp: jest.fn(() => clock.now()),
         persistentMultipleTabManager: jest.fn(),
@@ -285,7 +297,9 @@ jest.mock("firebase/firestore", () => {
         onSnapshot: jest.fn((_query: any, _options: any, onNext: any) => {
             onSnapshotCallback = onNext;
             // Immediately call with current state to simulate initial data load
-            const docs = Array.from(mockFirebaseFs.entries()).map(([id, data]) => ({
+            const docs = Array.from(
+                inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].entries()
+            ).map(([id, data]) => ({
                 id,
                 data: () => data
             }));
@@ -293,9 +307,19 @@ jest.mock("firebase/firestore", () => {
             return mockUnsubscribe;
         }),
         updateDoc: jest.fn((docRef: { path: string }, data: Partial<any>) => {
-            const doc = mockFirebaseFs.get(docRef.path);
+            const parsedPath = path.parse(docRef.path);
+            if (parsedPath.dir !== NOTES_MARKDOWN_FIREBASE_DB_NAME) {
+                return {
+                    exists: () => false,
+                    data: () => undefined
+                };
+            }
+            const doc = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get(parsedPath.base);
             if (doc) {
-                mockFirebaseFs.set(docRef.path, { ...doc, ...data });
+                inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].set(parsedPath.base, {
+                    ...doc,
+                    ...data
+                });
             }
             return Promise.resolve();
         })
@@ -370,12 +394,14 @@ const addFileToFirebase = async (
         version: 0
     };
 
-    mockFirebaseFs.set(path, doc);
+    inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].set(path, doc);
     if (onSnapshotCallback) {
-        const docs = Array.from(mockFirebaseFs.entries()).map(([id, data]) => ({
-            id,
-            data: () => data
-        }));
+        const docs = Array.from(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].entries()).map(
+            ([id, data]) => ({
+                id,
+                data: () => data
+            })
+        );
         onSnapshotCallback({ docs });
     }
     return doc;
@@ -411,7 +437,7 @@ describe("FileSyncer", () => {
         jest.spyOn(progressView, "GetOrCreateSyncProgressView").mockResolvedValue(mockView as any);
 
         mockObsidianFs.clear();
-        mockFirebaseFs.clear();
+        inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].clear();
         (mockApp.vault.fileMap as any) = {};
         onSnapshotCallback = null;
 
@@ -493,7 +519,7 @@ describe("FileSyncer", () => {
         (firestore.getDocs as jest.Mock).mockClear();
         // Clear the file from the mock FS to ensure it's not re-downloaded
         // but loaded from cache
-        mockFirebaseFs.clear();
+        inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].clear();
 
         // Act 2: Second syncer runs, should load from cache.
         const syncerResult2 = await FileSyncer.constructFileSyncer(
@@ -592,14 +618,22 @@ describe("FileSyncer", () => {
         // - c.md: Should still exist and not be marked as deleted.
         // - d.md: Should still be marked as deleted.
         //
-        expect(mockFirebaseFs.has("b.md")).toBe(true);
-        expect(mockFirebaseFs.get("b.md")?.deleted).toBe(false);
-        expect(mockFirebaseFs.has("c.md")).toBe(true);
-        expect(mockFirebaseFs.get("c.md")?.deleted).toBe(false);
-        expect(mockFirebaseFs.has("d.md")).toBe(true);
-        expect(mockFirebaseFs.get("d.md")?.deleted).toBe(true);
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].has("b.md")).toBe(true);
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get("b.md")?.deleted).toBe(
+            false
+        );
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].has("c.md")).toBe(true);
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get("c.md")?.deleted).toBe(
+            false
+        );
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].has("d.md")).toBe(true);
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get("d.md")?.deleted).toBe(
+            true
+        );
 
-        const aMdFile = mockFirebaseFs.entries().find((v) => v[1].path === "a.md");
+        const aMdFile = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].entries().find(
+            (v) => v[1].path === "a.md"
+        );
         expect(aMdFile).toBeDefined();
         expect(aMdFile?.[1].deleted).toBe(false);
 
@@ -636,9 +670,12 @@ describe("FileSyncer", () => {
         (syncer as any)._touchedFilepaths.set("a.md" as FilePathType, clock.now());
 
         // Modify remote file 'c.md' to be deleted and simulate a remote snapshot update.
-        const remoteC = mockFirebaseFs.get("c.md");
+        const remoteC = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get("c.md");
         const updatedRemoteC = { ...remoteC, deleted: true, entryTime: clock.now() };
-        mockFirebaseFs.set("c.md", updatedRemoteC as LatestNotesSchema);
+        inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].set(
+            "c.md",
+            updatedRemoteC as LatestNotesSchema
+        );
         expect(onSnapshotCallback).not.toBeNull();
         onSnapshotCallback!({
             docs: [{ id: "c.md", data: () => updatedRemoteC }]
@@ -673,7 +710,9 @@ describe("FileSyncer", () => {
         // - a.md: Should be updated with the new content.
         // - c.md: Should remain marked as deleted.
         //
-        const remoteA = mockFirebaseFs.entries().find((v) => v[1].path === "a.md");
+        const remoteA = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].entries().find(
+            (v) => v[1].path === "a.md"
+        );
         expect(remoteA).toBeDefined();
         expect(remoteA?.[1].deleted).toBe(false);
         const decompressedA = await CompressionUtils.decompressStringData(
@@ -682,7 +721,9 @@ describe("FileSyncer", () => {
         );
         expect(decompressedA.unsafeUnwrap()).toBe(newContentA);
 
-        expect(mockFirebaseFs.get("c.md")?.deleted).toBe(true);
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get("c.md")?.deleted).toBe(
+            true
+        );
 
         //
         // 5.3: Verify Final Internal Syncer State
@@ -720,14 +761,18 @@ describe("FileSyncer", () => {
         await clock.executeTimeoutFuncs();
 
         // Verification: Local content should be on the remote.
-        const remoteE = mockFirebaseFs.entries().find((v) => v[1].path === fileE);
+        const remoteE = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].entries().find(
+            (v) => v[1].path === fileE
+        );
         expect(remoteE).toBeDefined();
         const decompressedE = await CompressionUtils.decompressStringData(
             remoteE![1].data!.toUint8Array(),
             "test"
         );
         expect(decompressedE.unsafeUnwrap()).toBe(localNewerContent);
-        expect(mockFirebaseFs.get(fileE)?.deleted).toBe(false);
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get(fileE)?.deleted).toBe(
+            false
+        );
         expect(syncer.mapOfFileNodes.get(fileE)?.type).toBe(FileNodeType.LOCAL_CLOUD_FILE);
 
         //
@@ -782,9 +827,9 @@ describe("FileSyncer", () => {
         await clock.executeTimeoutFuncs();
 
         // Verification: Remote file should be marked as deleted.
-        const fileGNode = mockFirebaseFs.get(fileG);
+        const fileGNode = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get(fileG);
         expect(fileGNode).toBeDefined();
-        expect(mockFirebaseFs.get(fileG)?.deleted).toBe(true);
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get(fileG)?.deleted).toBe(true);
         expect(syncer.mapOfFileNodes.get(fileG)?.type).toBe(FileNodeType.REMOTE_ONLY);
 
         //
@@ -805,15 +850,19 @@ describe("FileSyncer", () => {
         delete (mockApp.vault.fileMap as any)[fileH];
         (syncer as any)._touchedFilepaths.set(fileH, clock.now());
         // Mark as deleted remotely.
-        const remoteH = mockFirebaseFs.get(fileH);
-        mockFirebaseFs.set(fileH, { ...remoteH, deleted: true, entryTime: clock.now() });
+        const remoteH = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get(fileH);
+        inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].set(fileH, {
+            ...remoteH,
+            deleted: true,
+            entryTime: clock.now()
+        });
 
         const preActionNodes = syncer.mapOfFileNodes;
         await clock.executeTimeoutFuncs();
         const postActionNodes = syncer.mapOfFileNodes;
 
         // Verification: The node state should remain REMOTE_ONLY and no files written.
-        expect(mockFirebaseFs.get(fileH)?.deleted).toBe(true);
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get(fileH)?.deleted).toBe(true);
         expect(mockObsidianFs.has(fileH)).toBe(false);
         // Compare the before and after internal states to ensure no changes were made.
         expect(postActionNodes.get(fileH)).toEqual(preActionNodes.get(fileH));
@@ -868,8 +917,12 @@ describe("FileSyncer", () => {
         clock.addSeconds(2);
 
         // Mark as deleted remotely.
-        const remoteJ = mockFirebaseFs.get(fileJ);
-        mockFirebaseFs.set(fileJ, { ...remoteJ, deleted: true, entryTime: clock.now() });
+        const remoteJ = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get(fileJ);
+        inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].set(fileJ, {
+            ...remoteJ,
+            deleted: true,
+            entryTime: clock.now()
+        });
         // Modify locally with a newer timestamp.
         clock.addSeconds(1);
         addFileToObsidian(fileJ, localUpdatedContent, { mtime: clock.now() });
@@ -879,8 +932,12 @@ describe("FileSyncer", () => {
         await clock.executeTimeoutFuncs();
 
         // Verification: The local file should be uploaded, and the remote file "undeleted".
-        expect(mockFirebaseFs.get(fileJ)?.deleted).toBe(false);
-        const remoteJFinal = mockFirebaseFs.entries().find((v) => v[1].path === fileJ);
+        expect(inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].get(fileJ)?.deleted).toBe(
+            false
+        );
+        const remoteJFinal = inMemoryFirestoreFS[NOTES_MARKDOWN_FIREBASE_DB_NAME].entries().find(
+            (v) => v[1].path === fileJ
+        );
         const decompressedJ = await CompressionUtils.decompressStringData(
             remoteJFinal![1].data!.toUint8Array(),
             "test"
