@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.2.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v3.1.0...v3.2.0) (2025-09-22)
+
+
+### Features
+
+* Add option method to merge options ([a8125ac](https://github.com/parrajustin/obsidian-drive-sync/commit/a8125ac91dcf5196e2af5dcf7a23f76a4b05932f))
+* add tests for winston logger ([aa47241](https://github.com/parrajustin/obsidian-drive-sync/commit/aa47241e92a5d0011875d30185a39adfa7b873c3))
+* add tests for winston logger ([f221240](https://github.com/parrajustin/obsidian-drive-sync/commit/f22124044ba2af998b20a0a818fc59737d23c9fa))
+* Create new transport for browser compat ([4d4e66f](https://github.com/parrajustin/obsidian-drive-sync/commit/4d4e66f0c75d4df53d534ab41120e7c5043f6c04))
+* Fix nodejs imports from Logform ([981af76](https://github.com/parrajustin/obsidian-drive-sync/commit/981af769bca720fc4bbc70bf53635aec05c557a7))
+* Make logger mobile compatible ([069e14d](https://github.com/parrajustin/obsidian-drive-sync/commit/069e14d25798a31f61afca5a192d46d0fa0c6ab1))
+* Replace logger with simpler one ([8ad580d](https://github.com/parrajustin/obsidian-drive-sync/commit/8ad580dc407dd84893fab75961f59e52f502a2b1))
+
 ## [3.1.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v3.0.0...v3.1.0) (2025-09-20)
 
 
