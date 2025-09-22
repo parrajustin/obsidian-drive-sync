@@ -42,7 +42,7 @@ export class Logger {
         this.log("critical", message, meta);
     }
     public crit(message: string, meta?: Record<string, unknown>): void {
-        this.crit(message, meta);
+        this.critical(message, meta);
     }
 
     public error(message: string, meta?: Record<string, unknown>): void {
