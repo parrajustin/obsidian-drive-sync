@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v3.2.0...v3.2.1) (2025-09-22)
+
+
+### Bug Fixes
+
+* Fix an issue with doc paths ([af6ed1a](https://github.com/parrajustin/obsidian-drive-sync/commit/af6ed1a463d5b89e508c41791cda3e354582058a))
+
 ## [3.2.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v3.1.0...v3.2.0) (2025-09-22)
 
 
