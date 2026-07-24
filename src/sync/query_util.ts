@@ -1,5 +1,5 @@
 import type { FilePathType } from "../filesystem/file_node";
-import { SearchString } from "../lib/search_string_parser";
+import { SearchString } from "standard-ts-lib/src/search_string/search_string_parser";
 import {
     rootSyncTypeEnum,
     type LatestSyncConfigVersion

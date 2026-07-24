@@ -1,7 +1,7 @@
 // import type { App, WorkspaceLeaf } from "obsidian";
 // import { ItemView } from "obsidian";
-// import { None, Some } from "../lib/option";
-// import type { Option } from "../lib/option";
+// import { None, Some } from "standard-ts-lib/src/optional";
+// import type { Optional } from "standard-ts-lib/src/optional";
 // import type { FirebaseHistory } from "./firebase_hist";
 // import type { RootPart } from "lit";
 // import { html, render } from "lit";
@@ -17,11 +17,11 @@
 // import "./components/history_entry";
 // import "./components/history_change_entry";
 
-// let CURRENT_HISTORY_VIEW: Option<WorkspaceLeaf> = None;
+// let CURRENT_HISTORY_VIEW: Optional<WorkspaceLeaf> = None;
 // export const HISTORY_VIEW_TYPE = "drive-sync-history-view";
 
 // export const DIFF_SIGNAL = signal<
-//     [Option<LocalNode | HistoricFileNode>, Option<LocalNode | HistoricFileNode>]
+//     [Optional<LocalNode | HistoricFileNode>, Optional<LocalNode | HistoricFileNode>]
 // >([None, None]);
 
 // export interface AppContext {
@@ -37,9 +37,9 @@
 // /** The right leaf history view. */
 // export class HistoryProgressView extends ItemView {
 //     private _container: HTMLElement;
-//     private _history: Option<FirebaseHistory> = None;
-//     private _rootPart: Option<RootPart> = None;
-//     private _entries: Option<HistoryEntryData[]> = None;
+//     private _history: Optional<FirebaseHistory> = None;
+//     private _rootPart: Optional<RootPart> = None;
+//     private _entries: Optional<HistoryEntryData[]> = None;
 //     private _watcher = new Signal.subtle.Watcher(() => {
 //         void (async () => {
 //             // Wait to let the signals notification phase pass.
@@ -57,7 +57,7 @@
 //                     })
 //                     .filter((n) => n !== "");
 //                 let countFound = 0;
-//                 let baseNode: Option<HistoricFileNode> = None;
+//                 let baseNode: Optional<HistoricFileNode> = None;
 //                 const thisHistoryDocNodes = this._entries
 //                     .safeValue()
 //                     .find((v) => v.filePath === filePath);

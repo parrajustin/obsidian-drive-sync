@@ -12,13 +12,14 @@ import {
     LocalCloudFileNode,
     RemoteOnlyNode
 } from "../filesystem/file_node";
-import { Err, Ok, StatusResult } from "../lib/result";
-import type { Result } from "../lib/result";
-import { InternalError, NotFoundError, StatusError } from "../lib/status_error";
-import { PromiseResultSpanError, ResultSpanError } from "../logging/tracing/result_span.decorator";
+import { Err, Ok, StatusResult } from "standard-ts-lib/src/result";
+import type { Result } from "standard-ts-lib/src/result";
+import { InternalError, NotFoundError, StatusError } from "standard-ts-lib/src/status_error";
+import { PromiseResultSpanError } from "standard-obsidian-lib/src/decorators/result_span.decorator";
 import { Span } from "../logging/tracing/span.decorator";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
-import { AsyncForEach, CombineResults } from "../util";
+import { AsyncForEach } from "standard-ts-lib/src/async";
+import { CombineResults } from "standard-ts-lib/src/utils";
 import { ConvergenceActionType } from "./convergence_util";
 import type {
     ConvergenceAction,
@@ -33,13 +34,13 @@ import type { UserCredential } from "firebase/auth";
 import { FirestoreUtil } from "./firestore_util";
 import { Firestore, doc, getDoc } from "firebase/firestore";
 import { SyncProgressView } from "../sidepanel/progressView";
-import { WrapPromise } from "../lib/wrap_promise";
-import { InjectMeta } from "../lib/inject_status_msg";
+import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
+import { InjectMeta } from "standard-ts-lib/src/status_util/inject_status_msg";
 import { FileConst, FIREBASE_NOTE_ID } from "../constants";
 import { uuidv7 } from "../lib/uuid";
 import { CloudStorageUtil } from "../firestore/cloud_storage_util";
 import { NOTES_SCHEMA_MANAGER, type LatestNotesSchema } from "../schema/notes/notes.schema";
-import { WrapOptional } from "../lib/option";
+import { WrapOptional } from "standard-ts-lib/src/optional";
 import { CompressionUtils } from "./compression_utils";
 import { GetFileCollectionPath } from "../firestore/file_db_util";
 
@@ -333,7 +334,7 @@ export class SyncerUpdateUtil {
         if (!tooBigForFirestore) {
             // When the data is small enough compress it and upload to firebase.
 
-            const uploadToFirestore = FirestoreUtil.uploadDataToFirestore(
+            const uploadToFirestore = await FirestoreUtil.uploadDataToFirestore(
                 db,
                 clientId,
                 syncerConfig,
@@ -370,7 +371,7 @@ export class SyncerUpdateUtil {
         }
         view.setEntryProgress(syncerConfig.syncerId, action.localNode.fileData.fullPath, 0.7);
 
-        const uploadToFirestore = FirestoreUtil.uploadCloudNodeToFirestore(
+        const uploadToFirestore = await FirestoreUtil.uploadCloudNodeToFirestore(
             db,
             clientId,
             syncerConfig,
@@ -398,15 +399,15 @@ export class SyncerUpdateUtil {
      * @returns A remote only file node which is marked as deleted.
      */
     @Span()
-    @ResultSpanError
-    private static executeMarkCloudDeleted(
+    @PromiseResultSpanError
+    private static async executeMarkCloudDeleted(
         db: Firestore,
         syncerConfig: LatestSyncConfigVersion,
         action: MarkCloudDeletedAction,
         creds: UserCredential,
         view: SyncProgressView
-    ): Result<RemoteOnlyNode, StatusError> {
-        const updateCloud = FirestoreUtil.markFirestoreAsDeleted(
+    ): Promise<Result<RemoteOnlyNode, StatusError>> {
+        const updateCloud = await FirestoreUtil.markFirestoreAsDeleted(
             db,
             creds,
             action.localNode.firebaseData.id,

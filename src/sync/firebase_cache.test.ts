@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/unbound-method */
 import { describe, expect, test, beforeEach, jest } from "@jest/globals";
 import type { App } from "obsidian";
 import { FirebaseCache, type FirebaseStoredData, type SchemaWithId } from "./firebase_cache";
@@ -7,8 +5,8 @@ import { FileUtilRaw } from "../filesystem/file_util_raw_api";
 import { CompressionUtils } from "./compression_utils";
 import { type LatestNotesSchema } from "../schema/notes/notes.schema";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
-import { Err, Ok } from "../lib/result";
-import { UnknownError } from "../lib/status_error";
+import { Err, Ok } from "standard-ts-lib/src/result";
+import { NotFoundError, UnknownError } from "standard-ts-lib/src/status_error";
 import { Bytes } from "firebase/firestore";
 
 // Mock dependencies
@@ -146,6 +144,67 @@ describe("FirebaseCache", () => {
 
             expect(result.err).toBe(true);
             expect(result.val).toBe(error);
+        });
+    });
+
+    describe("per config cache isolation", () => {
+        const makeConfig = (path: string): LatestSyncConfigVersion =>
+            ({ firebaseCachePath: path }) as LatestSyncConfigVersion;
+        const makeEntry = (path: string, entryTime: number): SchemaWithId<LatestNotesSchema> => ({
+            id: `id-${path}`,
+            data: {
+                type: "Ref",
+                fileStorageRef: "ref",
+                data: null,
+                deleted: false,
+                path,
+                entryTime,
+                version: 0
+            } as unknown as LatestNotesSchema
+        });
+
+        beforeEach(() => {
+            FirebaseCache.clearCache();
+        });
+
+        test("one syncer config's in-memory cache never leaks into another's", async () => {
+            mockedFileUtilRaw.writeToRawFile.mockResolvedValue(Ok());
+            // Config B's on-disk cache is empty (file missing).
+            mockedFileUtilRaw.readRawFile.mockResolvedValue(Err(NotFoundError("missing")));
+
+            const configA = makeConfig("vaultA-cache.json.gz");
+            const configB = makeConfig("vaultB-cache.json.gz");
+
+            const writeA = await FirebaseCache.writeToFirebaseCache(mockApp, configA, [
+                makeEntry("a.md", 100)
+            ]);
+            expect(writeA.ok).toBe(true);
+
+            // Reading config A back hits the in-memory entry.
+            const readA = await FirebaseCache.readFirebaseCache(mockApp, configA);
+            expect(readA.ok).toBe(true);
+            expect(readA.unsafeUnwrap().cache.map((e) => e.data.path)).toEqual(["a.md"]);
+
+            // Reading config B must NOT observe config A's data.
+            const readB = await FirebaseCache.readFirebaseCache(mockApp, configB);
+            expect(readB.ok).toBe(true);
+            expect(readB.unsafeUnwrap()).toEqual({ lastUpdate: -1, cache: [] });
+        });
+
+        test("clearCache drops all in-memory entries", async () => {
+            mockedFileUtilRaw.writeToRawFile.mockResolvedValue(Ok());
+            const config = makeConfig("vault-cache.json.gz");
+            const write = await FirebaseCache.writeToFirebaseCache(mockApp, config, [
+                makeEntry("a.md", 100)
+            ]);
+            expect(write.ok).toBe(true);
+
+            FirebaseCache.clearCache();
+            mockedFileUtilRaw.readRawFile.mockResolvedValue(Err(NotFoundError("missing")));
+
+            const read = await FirebaseCache.readFirebaseCache(mockApp, config);
+            expect(read.ok).toBe(true);
+            expect(read.unsafeUnwrap()).toEqual({ lastUpdate: -1, cache: [] });
         });
     });
 });

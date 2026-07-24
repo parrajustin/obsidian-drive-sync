@@ -1,4 +1,4 @@
-import type { StatusError } from "./status_error";
+import type { StatusError } from "standard-ts-lib/src/status_error";
 
 /**
  * Creates a promise that can be resolved externally.

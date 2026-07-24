@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention */
-/* eslint-disable @typescript-eslint/no-empty-function */
 import { describe, expect, jest, test, beforeEach } from "@jest/globals";
 import type { App, DataWriteOptions, FileStats, TAbstractFile, TFolder, Vault } from "obsidian";
 import { TFile } from "obsidian";
@@ -87,7 +85,7 @@ describe("FileUtilObsidian", () => {
         test("should handle non-file type", async () => {
             const filePath = "test.md";
             const mockFile = { path: filePath }; // Not a TFile
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+
             mockVault.getAbstractFileByPath.mockReturnValue(mockFile as any);
             const result = await FileUtilObsidian.readObsidianFile(mockApp, filePath);
             expect(result.ok).toBe(false);
@@ -144,11 +142,82 @@ describe("FileUtilObsidian", () => {
             );
         });
 
+        test("should create a root level file with an empty mkdir path", async () => {
+            const filePath = "test.md";
+            const fileData = new Uint8Array([1, 2, 3]);
+            mockVault.getAbstractFileByPath.mockReturnValue(null);
+            mockVault.adapter.mkdir.mockResolvedValue(undefined);
+            mockVault.createBinary.mockResolvedValue(new TFile());
+
+            const result = await FileUtilObsidian.writeToObsidianFile(mockApp, filePath, fileData);
+
+            expect(result.ok).toBe(true);
+            expect(mockVault.adapter.mkdir).toHaveBeenCalledWith("");
+            expect(mockVault.createBinary).toHaveBeenCalledWith(
+                filePath,
+                fileData.buffer,
+                undefined
+            );
+        });
+
+        test("should pass write options through to createBinary", async () => {
+            const filePath = "folder/test.md";
+            const fileData = new Uint8Array([1, 2, 3]);
+            const opts: DataWriteOptions = { ctime: 111, mtime: 222 };
+            mockVault.getAbstractFileByPath.mockReturnValue(null);
+            mockVault.adapter.mkdir.mockResolvedValue(undefined);
+            mockVault.createBinary.mockResolvedValue(new TFile());
+
+            const result = await FileUtilObsidian.writeToObsidianFile(
+                mockApp,
+                filePath,
+                fileData,
+                opts
+            );
+
+            expect(result.ok).toBe(true);
+            expect(mockVault.createBinary).toHaveBeenCalledWith(filePath, fileData.buffer, opts);
+        });
+
+        test("should pass write options through to modifyBinary", async () => {
+            const filePath = "test.md";
+            const fileData = new Uint8Array([1, 2, 3]);
+            const opts: DataWriteOptions = { ctime: 111, mtime: 222 };
+            const mockFile = new TFile();
+            mockVault.getAbstractFileByPath.mockReturnValue(mockFile);
+            mockVault.modifyBinary.mockResolvedValue(undefined);
+
+            const result = await FileUtilObsidian.writeToObsidianFile(
+                mockApp,
+                filePath,
+                fileData,
+                opts
+            );
+
+            expect(result.ok).toBe(true);
+            expect(mockVault.modifyBinary).toHaveBeenCalledWith(mockFile, fileData.buffer, opts);
+        });
+
+        test("should only write the viewed bytes of an offset Uint8Array", async () => {
+            const filePath = "test.md";
+            // A view into the middle of a larger buffer: only [2, 3, 4] is visible.
+            const fileData = new Uint8Array([1, 2, 3, 4, 5]).subarray(1, 4);
+            const mockFile = new TFile();
+            mockVault.getAbstractFileByPath.mockReturnValue(mockFile);
+            mockVault.modifyBinary.mockResolvedValue(undefined);
+
+            const result = await FileUtilObsidian.writeToObsidianFile(mockApp, filePath, fileData);
+
+            expect(result.ok).toBe(true);
+            const writtenBuffer = mockVault.modifyBinary.mock.calls[0]![1];
+            expect(new Uint8Array(writtenBuffer)).toEqual(new Uint8Array([2, 3, 4]));
+        });
+
         test("should handle path being a folder", async () => {
             const filePath = "folder";
             const fileData = new Uint8Array([1, 2, 3]);
             const mockFolder = { path: filePath, children: [] }; // Not a TFile
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+
             mockVault.getAbstractFileByPath.mockReturnValue(mockFolder as any);
 
             const result = await FileUtilObsidian.writeToObsidianFile(mockApp, filePath, fileData);
@@ -235,7 +304,7 @@ describe("FileUtilObsidian", () => {
         test("should handle non-file type", async () => {
             const filePath = "folder";
             const mockFolder = { path: filePath, children: [] }; // Not a TFile
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+
             mockVault.getAbstractFileByPath.mockReturnValue(mockFolder as any);
 
             const result = await FileUtilObsidian.deleteObsidianFile(mockApp, filePath);

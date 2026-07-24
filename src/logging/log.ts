@@ -1,5 +1,5 @@
 import { Notice } from "obsidian";
-import { StatusError } from "../lib/status_error";
+import { StatusError } from "standard-ts-lib/src/status_error";
 import type { Logger } from "./winston/logger";
 
 export function LogUpdate(msg: string): void {

@@ -6,12 +6,12 @@ import type { FirebaseApp } from "firebase/app";
 import type { Query, QuerySnapshot, Unsubscribe } from "firebase/firestore";
 import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore";
 import type { UserCredential } from "firebase/auth";
-import type { Result } from "../lib/result";
-import { Ok, type StatusResult } from "../lib/result";
-import { ErrorCode, StatusError } from "../lib/status_error";
-import type { Option } from "../lib/option";
-import { None, Some } from "../lib/option";
-import { WrapPromise } from "../lib/wrap_promise";
+import type { Result } from "standard-ts-lib/src/result";
+import { Ok, type StatusResult } from "standard-ts-lib/src/result";
+import { ErrorCode, StatusError } from "standard-ts-lib/src/status_error";
+import type { Optional } from "standard-ts-lib/src/optional";
+import { None, Some } from "standard-ts-lib/src/optional";
+import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
 import type { App } from "obsidian";
 import { LogError } from "../logging/log";
 import { GetFileCollectionPath } from "../firestore/file_db_util";
@@ -23,9 +23,12 @@ import {
     LatestNotesSchema,
     NOTES_SCHEMA_MANAGER
 } from "../schema/notes/notes.schema";
-import { PromiseResultSpanError, ResultSpanError } from "../logging/tracing/result_span.decorator";
+import {
+    PromiseResultSpanError,
+    ResultSpanError
+} from "standard-obsidian-lib/src/decorators/result_span.decorator";
 import { Span } from "../logging/tracing/span.decorator";
-import { WrapToResult } from "../lib/wrap_to_result";
+import { WrapToResult } from "standard-ts-lib/src/wrap_to_result";
 import { FirebaseCache, SchemaWithId, type FirebaseStoredData } from "./firebase_cache";
 import { CreateLogger } from "../logging/logger";
 
@@ -36,7 +39,7 @@ const LOGGER = CreateLogger("firebase_syncer");
  */
 export class FirebaseSyncer {
     /** Unsub function to stop real time updates. */
-    private _unsubscribe: Option<Unsubscribe> = None;
+    private _unsubscribe: Optional<Unsubscribe> = None;
     /** If this firebase syncer is ready to get updates. */
     private _isValid = false;
     /** If there is a save setting microtask already running. */
@@ -49,6 +52,24 @@ export class FirebaseSyncer {
         public cloudNodes: Map<string, SchemaWithId<LatestNotesSchema>>,
         private _query: Query
     ) {}
+
+    /**
+     * Sets a cloud node into the path keyed map, removing any stale entry that
+     * refers to the same firestore doc under a different path. Without this a
+     * remote rename (same doc id, new path) leaves a ghost entry at the old
+     * path which convergence would treat as a live remote file.
+     */
+    private static setCloudNode(
+        map: Map<string, SchemaWithId<LatestNotesSchema>>,
+        entry: SchemaWithId<LatestNotesSchema>
+    ): void {
+        for (const [path, existing] of map) {
+            if (existing.id === entry.id && path !== entry.data.path) {
+                map.delete(path);
+            }
+        }
+        map.set(entry.data.path, entry);
+    }
 
     /** Build the firebase syncer. */
     @Span()
@@ -96,7 +117,7 @@ export class FirebaseSyncer {
             if (updatedCloudNote.err) {
                 return updatedCloudNote;
             }
-            cloudMapFilePathToFirebaseEntry.set(updatedCloudNote.safeUnwrap().path, {
+            FirebaseSyncer.setCloudNode(cloudMapFilePathToFirebaseEntry, {
                 id: change.id,
                 data: updatedCloudNote.safeUnwrap()
             });
@@ -197,7 +218,7 @@ export class FirebaseSyncer {
             if (updatedCloudNote.err) {
                 return updatedCloudNote;
             }
-            this.cloudNodes.set(updatedCloudNote.safeUnwrap().path, {
+            FirebaseSyncer.setCloudNode(this.cloudNodes, {
                 id: entry.id,
                 data: updatedCloudNote.safeUnwrap()
             });

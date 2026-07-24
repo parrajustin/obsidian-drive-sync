@@ -1,10 +1,23 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { describe, it, expect } from "@jest/globals";
+import { describe, it, expect, jest } from "@jest/globals";
 // import { format } from "logform";
 import BrowserConsole from "../browser_transport";
 import { Logger } from "./logger";
+import type { Format } from "logform";
 import { format } from "logform";
+
+jest.mock(
+    "obsidian",
+    () => ({
+        Notice: class {
+            public messageEl = { innerHTML: "" };
+            constructor(
+                public message: string,
+                public duration?: number
+            ) {}
+        }
+    }),
+    { virtual: true }
+);
 
 class MockOutput {
     public messages: { level: string; message: string; args: unknown[] }[] = [];
@@ -146,5 +159,62 @@ describe("Logger", () => {
             transports: [transport]
         });
         expect(transport.parent).toBe(logger);
+    });
+
+    it("should expose all level helper methods", () => {
+        const mockOutput = new MockOutput();
+        const transport = new BrowserConsole({ outputInterface: mockOutput });
+        const logger = new Logger({ transports: [transport] });
+
+        logger.crit("crit message");
+        logger.critical("critical message");
+        logger.error("error message");
+        logger.warn("warn message");
+        logger.info("info message");
+        logger.debug("debug message");
+        logger.verbose("verbose message");
+        logger.silly("silly message");
+
+        expect(mockOutput.messages.length).toBe(8);
+        // Levels without a console mapping fall back to debug.
+        expect(mockOutput.messages[0]!.level).toBe("debug");
+        expect(mockOutput.messages[2]!.level).toBe("error");
+    });
+
+    it("should contain errors thrown by the format instead of propagating", () => {
+        const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+        const mockOutput = new MockOutput();
+        const transport = new BrowserConsole({ outputInterface: mockOutput });
+        const throwingFormat = {
+            options: {},
+            transform: () => {
+                throw new Error("bad format");
+            }
+        } as unknown as Format;
+        const logger = new Logger({ transports: [transport], format: throwingFormat });
+
+        expect(() => {
+            logger.info("test message");
+        }).not.toThrow();
+        expect(mockOutput.messages.length).toBe(0);
+        expect(consoleError).toHaveBeenCalled();
+        consoleError.mockRestore();
+    });
+
+    it("should drop the log when the format filters it out by returning false", () => {
+        const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+        const mockOutput = new MockOutput();
+        const transport = new BrowserConsole({ outputInterface: mockOutput });
+        const filteringFormat = {
+            options: {},
+            transform: () => false
+        } as unknown as Format;
+        const logger = new Logger({ transports: [transport], format: filteringFormat });
+
+        logger.info("test message");
+
+        expect(mockOutput.messages.length).toBe(0);
+        expect(consoleError).toHaveBeenCalled();
+        consoleError.mockRestore();
     });
 });

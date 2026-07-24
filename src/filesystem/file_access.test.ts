@@ -1,9 +1,7 @@
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /** @jest-environment node */
 /* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/naming-convention */
+ 
+ 
 import { describe, expect, jest, test, beforeEach, afterEach } from "@jest/globals";
 import type { App, Stat, Vault, DataAdapter , TFolder, FileStats, TAbstractFile } from "obsidian";
 import { TFile } from "obsidian";
@@ -11,8 +9,8 @@ import { FileAccess } from "./file_access";
 import { FileUtilObsidian } from "./file_util_obsidian_api";
 import { FileUtilRaw } from "./file_util_raw_api";
 import * as queryUtil from "../sync/query_util";
-import { Ok, Err } from "../lib/result";
-import { StatusError, ErrorCode } from "../lib/status_error";
+import { Ok, Err } from "standard-ts-lib/src/result";
+import { StatusError, ErrorCode } from "standard-ts-lib/src/status_error";
 import { Bytes } from "firebase/firestore";
 import GetSha256Hash from "../lib/sha";
 import { FileNodeType } from "./file_node";
@@ -25,7 +23,7 @@ import type {
 } from "./file_node";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { rootSyncTypeEnum } from "../schema/settings/syncer_config.schema";
-import { Some, None } from "../lib/option";
+import { Some, None } from "standard-ts-lib/src/optional";
 
 // Mock the 'obsidian' module
 jest.mock(
@@ -71,7 +69,7 @@ jest.mock("../constants", () => ({
 jest.mock('../logging/tracing/span.decorator', () => ({
     Span: () => (_target: any, _propertyKey: string, descriptor: PropertyDescriptor) => descriptor,
 }));
-jest.mock('../logging/tracing/result_span.decorator', () => ({
+jest.mock('standard-obsidian-lib/src/decorators/result_span.decorator', () => ({
     PromiseResultSpanError: () => (_target: any, _propertyKey: string, descriptor: PropertyDescriptor) => descriptor,
 }));
 jest.mock("../logging/logger", () => ({

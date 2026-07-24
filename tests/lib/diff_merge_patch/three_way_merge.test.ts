@@ -3,8 +3,8 @@ import {
     ChangeType,
     GetThreeWayDifferences,
     ThreeWayDiff
-} from "../../../src/lib/diff_merge_patch/three_way_merge";
-import { ChangeOperation } from "../../../src/lib/diff_merge_patch/patch_operation";
+} from "standard-ts-lib/src/diff_merge_patch/three_way_merge";
+import { ChangeOperation } from "standard-ts-lib/src/diff_merge_patch/patch_operation";
 
 type PartialType<Type> = {
     // For every existing property inside the type of Type

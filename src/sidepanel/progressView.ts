@@ -1,7 +1,7 @@
 import type { App, WorkspaceLeaf } from "obsidian";
 import { ItemView } from "obsidian";
-import { None, Some, type Option } from "../lib/option";
-import { ErrorCode, type StatusError } from "../lib/status_error";
+import { None, Some, type Optional } from "standard-ts-lib/src/optional";
+import { ErrorCode, type StatusError } from "standard-ts-lib/src/status_error";
 // import type { FirebaseHistory } from "../history/firebase_hist";
 // import type FirestoreSyncPlugin from "../main";
 import type { MainAppType } from "../main_app";
@@ -40,7 +40,7 @@ interface CycleProgress {
     /** Last update ms from unix epoch for sorting. */
     lastUpdate: number;
     /** Final publishing entry. */
-    publishedEntry: Option<SyncerPublishedCycle>;
+    publishedEntry: Optional<SyncerPublishedCycle>;
     /** Changes that have been published. */
     changesInCycle: (SyncProgress | SyncerError)[];
     /** File Path to progress of upload. */
@@ -481,7 +481,7 @@ export class SyncProgressView extends ItemView {
     }
 }
 
-let CURRENT_PROGRESS_VIEW: Option<WorkspaceLeaf> = None;
+let CURRENT_PROGRESS_VIEW: Optional<WorkspaceLeaf> = None;
 /**
  * Get or creates the `SyncProgressView`.
  * @param app obsidian app

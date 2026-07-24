@@ -1,12 +1,12 @@
 // import { reduce } from "remeda";
-// import { Ok, type Result } from "../lib/result";
-// import { type StatusError } from "../lib/status_error";
+// import { Ok, type Result } from "standard-ts-lib/src/result";
+// import { type StatusError } from "standard-ts-lib/src/status_error";
 // import type { FirebaseStoredData } from "../sync/firebase_cache";
 // import { CompressStringData, DecompressStringData } from "../sync/firebase_cache";
 // import type { FileDataDbModelV1 } from "../sync/firestore_schema";
 // import { HistoricFileNode } from "./history_file_node";
 // import type { HistoryDbModelV1 } from "./history_schema";
-// import { Some } from "../lib/option";
+// import { Some } from "standard-ts-lib/src/optional";
 // import type { FilePathType } from "../sync/file_node";
 
 // interface HistoryCacheV1 extends Omit<HistoryDbModelV1, "file"> {

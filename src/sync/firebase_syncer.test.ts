@@ -1,20 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/no-confusing-void-expression */
-/* eslint-disable @typescript-eslint/await-thenable */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-empty-function */
-/* eslint-disable @typescript-eslint/member-ordering */
-/* eslint-disable @typescript-eslint/no-useless-constructor */
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/strict-boolean-expressions */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/require-await */
-
-/* eslint-disable @typescript-eslint/naming-convention */
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import type { App, Vault, Stat, TFolder } from "obsidian";
 import type { TFile } from "obsidian";
@@ -30,7 +13,7 @@ import type { FirebaseStoredData, SchemaWithId } from "./firebase_cache";
 import { FirebaseCache } from "./firebase_cache";
 import type { FileSyncer } from "./syncer";
 import { NOTES_SCHEMA_MANAGER } from "../schema/notes/notes.schema";
-import { Ok } from "../lib/result";
+import { Ok } from "standard-ts-lib/src/result";
 
 // Mock dependencies
 jest.mock("../firestore/get_firestore", () => ({

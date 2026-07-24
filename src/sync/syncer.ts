@@ -4,11 +4,15 @@
  */
 
 import type { MainAppType } from "../main_app";
-import { InternalError, UnimplementedError, type StatusError } from "../lib/status_error";
-import type { Option } from "../lib/option";
-import { None, Some } from "../lib/option";
-import type { Result, StatusResult } from "../lib/result";
-import { Err, Ok } from "../lib/result";
+import {
+    InternalError,
+    UnimplementedError,
+    type StatusError
+} from "standard-ts-lib/src/status_error";
+import type { Optional } from "standard-ts-lib/src/optional";
+import { None, Some } from "standard-ts-lib/src/optional";
+import type { Result, StatusResult } from "standard-ts-lib/src/result";
+import { Err, Ok } from "standard-ts-lib/src/result";
 import { FirebaseSyncer } from "./firebase_syncer";
 import type { FirebaseApp } from "firebase/app";
 import { GetOrCreateSyncProgressView, SyncProgressView } from "../sidepanel/progressView";
@@ -23,7 +27,7 @@ import {
 import { Span } from "../logging/tracing/span.decorator";
 import { setAttributeOnActiveSpan } from "../logging/tracing/set-attributes-on-active-span";
 import { SYNCER_ACTIVE_CYCLE_ID_SPAN_ATTR, SYNCER_ID_SPAN_ATTR } from "../constants";
-import { SetSpanStatusFromResult } from "../logging/tracing/set-span-status";
+import { SetSpanStatusFromResult } from "standard-obsidian-lib/src/decorators/set-span-status";
 import { FileAccess } from "../filesystem/file_access";
 import { FileMapUtil, MapOfFileNodes } from "../filesystem/file_map_util";
 import { FilePathType, AllExistingFileNodeTypes } from "../filesystem/file_node";
@@ -37,7 +41,7 @@ import type { Clock } from "../clock";
 import { SyncerUpdateUtil } from "./syncer_update_util";
 import { GetFirestore } from "../firestore/get_firestore";
 import { UserCredential } from "firebase/auth";
-import { InjectMeta } from "../lib/inject_status_msg";
+import { InjectMeta } from "standard-ts-lib/src/status_util/inject_status_msg";
 
 const LOGGER = CreateLogger("drive_syncer");
 
@@ -45,15 +49,15 @@ const LOGGER = CreateLogger("drive_syncer");
 export class FileSyncer {
     public mapOfFileNodes: MapOfFileNodes<AllExistingFileNodeTypes> = new Map();
     /** firebase syncer if one has been created. */
-    private _firebaseSyncer: Option<FirebaseSyncer> = None;
+    private _firebaseSyncer: Optional<FirebaseSyncer> = None;
     /** firebase syncer if one has been created. */
-    // private _firebaseHistory: Option<FirebaseHistory> = None;
+    // private _firebaseHistory: Optional<FirebaseHistory> = None;
     /** Identified file changes to check for changes. */
     private _touchedFilepaths = new Map<FilePathType, MsFromEpoch>();
     /** Function to handle unsubing the watch func. */
-    private _unsubWatchHandler: Option<UnsubFunc> = None;
+    private _unsubWatchHandler: Optional<UnsubFunc> = None;
     /** timeid to kill the tick function. */
-    private _timeoutId: Option<number> = None;
+    private _timeoutId: Optional<number> = None;
     /** Syncer should die. */
     private _isDead = false;
     private _creds: UserCredential;

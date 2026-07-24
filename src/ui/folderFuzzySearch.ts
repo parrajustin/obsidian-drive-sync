@@ -1,9 +1,9 @@
 import type { App, FuzzyMatch, TFolder } from "obsidian";
 import { FuzzySuggestModal } from "obsidian";
-import { SearchString } from "../lib/search_string_parser";
+import { SearchString } from "standard-ts-lib/src/search_string/search_string_parser";
 import { GetQueryString } from "../sync/query_util";
 import { LogError } from "../logging/log";
-import { ConvertToUnknownError } from "../util";
+import { ConvertToUnknownError } from "standard-ts-lib/src/utils";
 import { CreateLogger } from "../logging/logger";
 
 const LOGGER = CreateLogger("view.folder_fuzzy_search");

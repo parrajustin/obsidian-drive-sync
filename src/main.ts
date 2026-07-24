@@ -2,8 +2,8 @@ import type { App, PluginManifest } from "obsidian";
 import { Plugin } from "obsidian";
 import type { FirebaseApp } from "firebase/app";
 import { initializeApp } from "firebase/app";
-import type { Option } from "./lib/option";
-import { None, Some } from "./lib/option";
+import type { Optional } from "standard-ts-lib/src/optional";
+import { None, Some } from "standard-ts-lib/src/optional";
 import { FirebaseSyncSettingTab } from "./settings/settings";
 import type { UserCredential, Auth } from "firebase/auth";
 import {
@@ -13,11 +13,11 @@ import {
     indexedDBLocalPersistence,
     debugErrorMap
 } from "firebase/auth";
-import type { StatusError } from "./lib/status_error";
-import { InternalError, InvalidArgumentError } from "./lib/status_error";
-import type { Result, StatusResult } from "./lib/result";
-import { Err, Ok } from "./lib/result";
-import { WrapPromise } from "./lib/wrap_promise";
+import type { StatusError } from "standard-ts-lib/src/status_error";
+import { InternalError, InvalidArgumentError } from "standard-ts-lib/src/status_error";
+import type { Result, StatusResult } from "standard-ts-lib/src/result";
+import { Err, Ok } from "standard-ts-lib/src/result";
+import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
 import { LogError } from "./logging/log";
 import { CreateExternallyResolvablePromise } from "./lib/external_promise";
 import { FileSyncer } from "./sync/syncer";
@@ -40,9 +40,9 @@ const LOGGER = CreateLogger("main");
 
 /** Plugin to add an image for user profiles. */
 export default class FirestoreSyncPlugin extends Plugin {
-    public firebaseApp: Option<FirebaseApp> = None;
-    public userCreds: Option<UserCredential> = None;
-    public auth: Option<Auth> = None;
+    public firebaseApp: Optional<FirebaseApp> = None;
+    public userCreds: Optional<UserCredential> = None;
+    public auth: Optional<Auth> = None;
     public settings: LatestSettingsConfigVersion;
     public loggedIn: Promise<UserCredential>;
     public loggedInResolve: (user: UserCredential) => void;
@@ -128,7 +128,7 @@ export default class FirestoreSyncPlugin extends Plugin {
         } else {
             this.settings = settingUpdated.safeUnwrap();
         }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
         LOGGER.debug("loaded settings", { dataFromObsidian, parsedSettings: this.settings });
         this.startupSyncers();
     }
@@ -187,7 +187,7 @@ export default class FirestoreSyncPlugin extends Plugin {
 
     /** Attempts to login to the firebase infra. */
     @Span()
-    public async tryLogin(): Promise<Result<Option<UserCredential>, StatusError>> {
+    public async tryLogin(): Promise<Result<Optional<UserCredential>, StatusError>> {
         if (this.settings.email === undefined || this.settings.password === undefined) {
             return Ok(None);
         }

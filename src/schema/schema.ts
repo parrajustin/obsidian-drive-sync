@@ -1,10 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { z } from "zod";
-import { WrapOptional } from "../lib/option";
-import { Err, Ok } from "../lib/result";
-import type { Result } from "../lib/result";
-import { ErrorCode, InvalidArgumentError, NotFoundError, StatusError } from "../lib/status_error";
+import { WrapOptional } from "standard-ts-lib/src/optional";
+import { Err, Ok } from "standard-ts-lib/src/result";
+import type { Result } from "standard-ts-lib/src/result";
+import {
+    ErrorCode,
+    InvalidArgumentError,
+    NotFoundError,
+    StatusError
+} from "standard-ts-lib/src/status_error";
 import { setAttributeOnActiveSpan } from "../logging/tracing/set-attributes-on-active-span";
 import { Span } from "../logging/tracing/span.decorator";
 

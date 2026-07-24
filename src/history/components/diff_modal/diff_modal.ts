@@ -4,9 +4,9 @@
 // import { ReadFileNode } from "../../../sync/file_util";
 // import type { Firestore } from "firebase/firestore";
 // import type { UserCredential } from "firebase/auth";
-// import { DiffMatchPatch } from "../../../lib/diff_merge_patch";
+// import { DiffMatchPatch } from "standard-ts-lib/src/diff_merge_patch";
 // import { LogError } from "../../../logging/log";
-// import { None, Some, type Option } from "../../../lib/option";
+// import { None, Some, type Optional } from "standard-ts-lib/src/optional";
 // import type { HistoricFileNode } from "../../history_file_node";
 
 // export class DiffModal extends Modal {
@@ -14,7 +14,7 @@
 //         app: App,
 //         private _db: Firestore,
 //         private _creds: UserCredential,
-//         private _baseNode: Option<HistoricFileNode>,
+//         private _baseNode: Optional<HistoricFileNode>,
 //         private _aFileNode: LocalNode | HistoricFileNode,
 //         private _bFileNode: LocalNode | HistoricFileNode
 //     ) {
@@ -26,7 +26,7 @@
 //         void (async () => {
 //             const baseFileContent = (
 //                 await this._baseNode
-//                     .andThen<Promise<Option<string>>>((n) => {
+//                     .andThen<Promise<Optional<string>>>((n) => {
 //                         return new Promise((resolve) => {
 //                             void (async () => {
 //                                 const baseReadResult = await ReadFileNode(

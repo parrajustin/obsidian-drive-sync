@@ -1,6 +1,12 @@
 {
     "compilerOptions": {
         "baseUrl": "src",
+        // Resolve the shared libs to their live monorepo sources (via the obsidian/standard-*-lib
+        // symlinks) so tsc/ts-jest/esbuild all agree with jest's moduleNameMapper.
+        "paths": {
+            "standard-ts-lib/*": ["../../standard-ts-lib/*"],
+            "standard-obsidian-lib/*": ["../../standard-obsidian-lib/*"]
+        },
         "inlineSourceMap": true,
         "inlineSources": true,
         "module": "ESNext",

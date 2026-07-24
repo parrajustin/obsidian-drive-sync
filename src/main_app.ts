@@ -1,18 +1,18 @@
 import type { UserCredential } from "firebase/auth";
-import type { Option } from "./lib/option";
-import { None, Some } from "./lib/option";
+import type { Optional } from "standard-ts-lib/src/optional";
+import { None, Some } from "standard-ts-lib/src/optional";
 import type { App, Plugin } from "obsidian";
 import type { FirebaseApp } from "firebase/app";
 import type { LatestSettingsConfigVersion } from "./schema/settings/settings_config.schema";
-import type { Result, StatusResult } from "./lib/result";
-import type { StatusError } from "./lib/status_error";
+import type { Result, StatusResult } from "standard-ts-lib/src/result";
+import type { StatusError } from "standard-ts-lib/src/status_error";
 
 export interface MainAppType extends Plugin {
     app: App;
 
-    userCreds: Option<UserCredential>;
+    userCreds: Optional<UserCredential>;
 
-    firebaseApp: Option<FirebaseApp>;
+    firebaseApp: Optional<FirebaseApp>;
 
     loggedIn: Promise<UserCredential>;
 
@@ -24,12 +24,12 @@ export interface MainAppType extends Plugin {
 
     loginForSettings: () => Promise<StatusResult<StatusError>>;
 
-    tryLogin: () => Promise<Result<Option<UserCredential>, StatusError>>;
+    tryLogin: () => Promise<Result<Optional<UserCredential>, StatusError>>;
 
     killSyncer: (syncerId: string) => void;
 }
 
-export let THIS_APP: Option<MainAppType> = None;
+export let THIS_APP: Optional<MainAppType> = None;
 
 export function SetThisApp(app: MainAppType) {
     THIS_APP = Some(app);

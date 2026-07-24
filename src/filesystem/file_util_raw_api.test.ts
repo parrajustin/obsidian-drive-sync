@@ -1,10 +1,7 @@
-/* eslint-disable @typescript-eslint/unbound-method */
-/* eslint-disable @typescript-eslint/naming-convention */
-/* eslint-disable @typescript-eslint/no-empty-function */
 import { describe, expect, jest, test, beforeEach } from "@jest/globals";
 import type { App, DataWriteOptions } from "obsidian";
 import { FileUtilRaw } from "./file_util_raw_api";
-import type { StatusError } from "../lib/status_error";
+import type { StatusError } from "standard-ts-lib/src/status_error";
 
 const mockAdapter = {
     readBinary: jest.fn<(path: string) => Promise<ArrayBuffer>>(),

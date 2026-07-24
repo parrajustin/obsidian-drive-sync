@@ -2,12 +2,13 @@ import type { Firestore } from "firebase/firestore";
 import { Bytes, doc, setDoc, updateDoc } from "firebase/firestore";
 import { GetFileCollectionPath } from "../firestore/file_db_util";
 import type { UserCredential } from "firebase/auth";
-import { Ok, type Result, type StatusResult } from "../lib/result";
-import { StatusError } from "../lib/status_error";
-import { ResultSpanError } from "../logging/tracing/result_span.decorator";
+import { Ok, type Result, type StatusResult } from "standard-ts-lib/src/result";
+import { StatusError } from "standard-ts-lib/src/status_error";
+import { PromiseResultSpanError } from "standard-obsidian-lib/src/decorators/result_span.decorator";
 import { Span } from "../logging/tracing/span.decorator";
-import { WrapToResult } from "../lib/wrap_to_result";
-import { InjectMeta } from "../lib/inject_status_msg";
+import { WrapToResult } from "standard-ts-lib/src/wrap_to_result";
+import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
+import { InjectMeta } from "standard-ts-lib/src/status_util/inject_status_msg";
 import { FIREBASE_NOTE_ID } from "../constants";
 import { setAttributeOnActiveSpan } from "../logging/tracing/set-attributes-on-active-span";
 import { LatestNotesSchema } from "../schema/notes/notes.schema";
@@ -16,10 +17,45 @@ import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.s
 import { SchemaWithId } from "./firebase_cache";
 
 export class FirestoreUtil {
+    /**
+     * Runs a firestore write against the note doc `fileId`, converting both a
+     * synchronous sdk throw (invalid path) and an async rejection (failed
+     * write) into an error result tagged with the note id.
+     */
+    private static async writeDoc(
+        db: Firestore,
+        user: UserCredential,
+        fileId: string,
+        write: (docRef: ReturnType<typeof doc>) => Promise<void>
+    ): Promise<StatusResult<StatusError>> {
+        const entry = `${GetFileCollectionPath(user)}/${fileId}`;
+        const docRefResult = WrapToResult(
+            () => doc(db, entry),
+            /*textForUnknown=*/ `Failed to create doc reference "${entry}"`
+        );
+        if (docRefResult.err) {
+            FirestoreUtil.tagError(docRefResult.val, fileId);
+            return docRefResult;
+        }
+        const writeResult = await WrapPromise(
+            write(docRefResult.safeUnwrap()),
+            /*textForUnknown=*/ `Failed to execute update transaction`
+        );
+        if (writeResult.err) {
+            FirestoreUtil.tagError(writeResult.val, fileId);
+        }
+        return writeResult;
+    }
+
+    private static tagError(error: StatusError, fileId: string): void {
+        error.with(InjectMeta({ [FIREBASE_NOTE_ID]: fileId }));
+        setAttributeOnActiveSpan(FIREBASE_NOTE_ID, fileId);
+    }
+
     /** Uploads a note with data in cloudstorage. */
     @Span()
-    @ResultSpanError
-    public static uploadCloudNodeToFirestore(
+    @PromiseResultSpanError
+    public static async uploadCloudNodeToFirestore(
         db: Firestore,
         clientId: string,
         syncerConfig: LatestSyncConfigVersion,
@@ -27,8 +63,7 @@ export class FirestoreUtil {
         fileId: string,
         fileNode: LocalOnlyFileNode | LocalCloudFileNode,
         fileStorageRef: string
-    ): Result<SchemaWithId<LatestNotesSchema>, StatusError> {
-        const entry = `${GetFileCollectionPath(user)}/${fileId}`;
+    ): Promise<Result<SchemaWithId<LatestNotesSchema>, StatusError>> {
         const uploadData: LatestNotesSchema = {
             path: fileNode.fileData.fullPath,
             cTime: fileNode.fileData.cTime,
@@ -48,22 +83,20 @@ export class FirestoreUtil {
             fileStorageRef,
             version: 0
         };
-        const updateResult = WrapToResult(
-            () => setDoc(doc(db, entry), uploadData),
-            /*textForUnknown=*/ `Failed to execute update transaction`
+        const updateResult = await FirestoreUtil.writeDoc(db, user, fileId, (docRef) =>
+            setDoc(docRef, uploadData)
         );
         if (updateResult.err) {
-            updateResult.val.with(InjectMeta({ [FIREBASE_NOTE_ID]: fileId }));
-            setAttributeOnActiveSpan(FIREBASE_NOTE_ID, fileId);
+            return updateResult;
         }
 
-        return Ok({ id: entry, data: uploadData });
+        return Ok({ id: fileId, data: uploadData });
     }
 
     /** Update a note where data is embeded. */
     @Span()
-    @ResultSpanError
-    public static uploadDataToFirestore(
+    @PromiseResultSpanError
+    public static async uploadDataToFirestore(
         db: Firestore,
         clientId: string,
         syncerConfig: LatestSyncConfigVersion,
@@ -71,8 +104,7 @@ export class FirestoreUtil {
         fileId: string,
         fileNode: LocalOnlyFileNode | LocalCloudFileNode,
         data: Uint8Array
-    ): Result<SchemaWithId<LatestNotesSchema>, StatusError> {
-        const entry = `${GetFileCollectionPath(user)}/${fileId}`;
+    ): Promise<Result<SchemaWithId<LatestNotesSchema>, StatusError>> {
         const uploadData: LatestNotesSchema = {
             path: fileNode.fileData.fullPath,
             cTime: fileNode.fileData.cTime,
@@ -92,42 +124,29 @@ export class FirestoreUtil {
             fileStorageRef: null,
             version: 0
         };
-        const updateResult = WrapToResult(
-            () => setDoc(doc(db, entry), uploadData),
-            /*textForUnknown=*/ `Failed to execute update transaction`
+        const updateResult = await FirestoreUtil.writeDoc(db, user, fileId, (docRef) =>
+            setDoc(docRef, uploadData)
         );
         if (updateResult.err) {
-            updateResult.val.with(InjectMeta({ [FIREBASE_NOTE_ID]: fileId }));
-            setAttributeOnActiveSpan(FIREBASE_NOTE_ID, fileId);
+            return updateResult;
         }
 
-        return Ok({ id: entry, data: uploadData });
+        return Ok({ id: fileId, data: uploadData });
     }
 
     /** Update firestore to mark a file as deleted. */
     @Span()
-    @ResultSpanError
-    public static markFirestoreAsDeleted(
+    @PromiseResultSpanError
+    public static async markFirestoreAsDeleted(
         db: Firestore,
         user: UserCredential,
         fileId: string,
         newUpdateTime: number
-    ): StatusResult<StatusError> {
-        const entry = `${GetFileCollectionPath(user)}/${fileId}`;
-
+    ): Promise<StatusResult<StatusError>> {
         const updateData: Pick<LatestNotesSchema, "deleted" | "entryTime"> = {
             deleted: true,
             entryTime: newUpdateTime
         };
-        const updateResult = WrapToResult(
-            () => updateDoc(doc(db, entry), updateData),
-            /*textForUnknown=*/ `Failed to execute update transaction`
-        );
-        if (updateResult.err) {
-            updateResult.val.with(InjectMeta({ [FIREBASE_NOTE_ID]: fileId }));
-            setAttributeOnActiveSpan(FIREBASE_NOTE_ID, fileId);
-        }
-
-        return updateResult;
+        return FirestoreUtil.writeDoc(db, user, fileId, (docRef) => updateDoc(docRef, updateData));
     }
 }

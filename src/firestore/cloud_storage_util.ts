@@ -4,15 +4,15 @@
 
 import type { UserCredential } from "firebase/auth";
 import { getBytes, getStorage, ref, uploadBytes } from "firebase/storage";
-import type { Result } from "../lib/result";
-import { Ok } from "../lib/result";
-import type { StatusError } from "../lib/status_error";
-import { WrapPromise } from "../lib/wrap_promise";
+import type { Result } from "standard-ts-lib/src/result";
+import { Ok } from "standard-ts-lib/src/result";
+import type { StatusError } from "standard-ts-lib/src/status_error";
+import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { CreateLogger } from "../logging/logger";
-import { InjectStatusMsg } from "../lib/inject_status_msg";
+import { InjectStatusMsg } from "standard-ts-lib/src/status_util/inject_status_msg";
 import { Span } from "../logging/tracing/span.decorator";
-import { PromiseResultSpanError } from "../logging/tracing/result_span.decorator";
+import { PromiseResultSpanError } from "standard-obsidian-lib/src/decorators/result_span.decorator";
 import type { FilePathType } from "../filesystem/file_node";
 import { CLOUDSTORAGE_FILE_ID, FileConst, SYNCER_ID_SPAN_ATTR } from "../constants";
 
@@ -72,13 +72,13 @@ export class CloudStorageUtil {
         );
         if (byteDataResult.err) {
             byteDataResult.val.with(
-                InjectStatusMsg("Failed to upload to storage.", {
+                InjectStatusMsg("Failed to download from storage.", {
                     [CLOUDSTORAGE_FILE_ID]: fileStorageRef
                 })
             );
             return byteDataResult;
         }
-        LOGGER.debug("Success downloading from stroage.", {
+        LOGGER.debug("Success downloading from storage.", {
             [CLOUDSTORAGE_FILE_ID]: fileStorageRef
         });
 

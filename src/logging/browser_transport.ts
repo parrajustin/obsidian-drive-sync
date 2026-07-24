@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import type { ExtendedTransformableinfo, WritableStreamOptions } from "./winston/transport";
 import { TransportStream } from "./winston/transport";
-import { WrapOptional } from "../lib/option";
+import { WrapOptional } from "standard-ts-lib/src/optional";
 import { LEVEL, MESSAGE } from "triple-beam";
 
 export interface BrowserConsoleOptions extends WritableStreamOptions {

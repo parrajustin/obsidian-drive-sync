@@ -1,18 +1,18 @@
 // import type { DocumentSnapshot, QueryDocumentSnapshot } from "firebase/firestore";
 // import { Bytes } from "firebase/firestore";
 // import type { UserCredential } from "firebase/auth";
-// import type { Option } from "../lib/option";
-// import { None, Some, WrapOptional } from "../lib/option";
+// import type { Optional } from "standard-ts-lib/src/optional";
+// import { None, Some, WrapOptional } from "standard-ts-lib/src/optional";
 // import type FirestoreSyncPlugin from "../main";
-// import { InternalError, NotFoundError, StatusError } from "../lib/status_error";
+// import { InternalError, NotFoundError, StatusError } from "standard-ts-lib/src/status_error";
 // import type { HistoricNodeExtraType } from "./history_file_node";
 // import { HistoricFileNode } from "./history_file_node";
 // import type { FilePathType } from "../sync/file_node";
 // import type { AnyVerionHistorySchema, LatestHistorySchema } from "../schema/history/history.schema";
 // import { HISTORY_SCHEMA_MANAGER } from "../schema/history/history.schema";
 // import { Span } from "../logging/tracing/span.decorator";
-// import { Err, Ok, type Result } from "../lib/result";
-// import { ResultSpanError } from "../logging/tracing/result_span.decorator";
+// import { Err, Ok, type Result } from "standard-ts-lib/src/result";
+// import { ResultSpanError } from "standard-obsidian-lib/src/decorators/result_span.decorator";
 
 // // Firestore history data converter
 // export class HistorySchemaConverter {
@@ -140,7 +140,7 @@
 //     }
 // }
 
-// let FIRESTORE_HISTORY_CONVERTER: Option<HistorySchemaConverter> = None;
+// let FIRESTORE_HISTORY_CONVERTER: Optional<HistorySchemaConverter> = None;
 // export function SetHistorySchemaConverter(plugin: FirestoreSyncPlugin, creds: UserCredential) {
 //     FIRESTORE_HISTORY_CONVERTER = Some(new HistorySchemaConverter(plugin, creds));
 // }

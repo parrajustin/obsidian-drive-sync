@@ -15,7 +15,7 @@ import { FileNodeType } from "../../src/filesystem/file_node";
 import type { LatestSyncConfigVersion } from "../../src/schema/settings/syncer_config.schema";
 import type { MapOfFileNodes } from "../../src/filesystem/file_map_util";
 import type { MsFromEpoch } from "../../src/types";
-import { Ok } from "../../src/lib/result";
+import { Ok } from "standard-ts-lib/src/result";
 import { FileAccess } from "../../src/filesystem/file_access";
 import type { SchemaWithId } from "../../src/sync/firebase_cache";
 import type { LatestNotesSchema } from "../../src/schema/notes/notes.schema";
@@ -510,7 +510,7 @@ describe("ConvergenceUtil.createStateConvergenceActions", () => {
     beforeEach(() => {
         app = createMockApp();
         config = createMockConfig();
-        // eslint-disable-next-line @typescript-eslint/naming-convention, @typescript-eslint/require-await
+
         jest.spyOn(ConvergenceUtil, "updateWithNewNodes").mockImplementation(async (_, __, map) =>
             Ok(map)
         );

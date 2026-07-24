@@ -1,6 +1,6 @@
 // import { LitElement, css, html } from "lit";
 // import { customElement, property } from "lit/decorators.js";
-// import { None, Some } from "../../lib/option";
+// import { None, Some } from "standard-ts-lib/src/optional";
 // import { LocalNode } from "../../sync/file_node";
 // import { CreateIcon, IconName } from "../../ui/icon";
 // import { ViewModal } from "./view_modal";

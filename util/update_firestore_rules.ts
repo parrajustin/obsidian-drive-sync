@@ -4,7 +4,7 @@
 import { promises as fs } from "fs";
 import { NOTES_SCHEMA_MANAGER } from "../src/schema/notes/notes.schema";
 import { ZodObject, ZodUnion } from "zod";
-import { WrapOptional } from "../src/lib/option";
+import { WrapOptional } from "standard-ts-lib/src/optional";
 
 async function UpdateFirestoreRules() {
     try {
@@ -23,7 +23,6 @@ async function UpdateFirestoreRules() {
 
         const keySet = new Set<string>();
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const unionSchema = latestSchema._def.left;
         if (unionSchema instanceof ZodUnion) {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-call

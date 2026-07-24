@@ -108,7 +108,7 @@ export class LokiTransport extends TransportStream {
             Object.entries(lokiLabels).map(([key, value]) => [
                 key,
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-                value !== undefined || value !== null ? (value as any).toString() : value
+                value !== undefined && value !== null ? (value as any).toString() : value
             ])
         );
 

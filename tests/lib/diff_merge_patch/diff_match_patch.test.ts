@@ -1,7 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
-import { DiffMatchPatch } from "../../../src/lib/diff_merge_patch/diff_match_patch";
-import type { DiffPair } from "../../../src/lib/diff_merge_patch/diff_type";
-import { ChangeOperation } from "../../../src/lib/diff_merge_patch/patch_operation";
+import { DiffMatchPatch } from "standard-ts-lib/src/diff_merge_patch/diff_match_patch";
+import type { DiffPair } from "standard-ts-lib/src/diff_merge_patch/diff_type";
+import { ChangeOperation } from "standard-ts-lib/src/diff_merge_patch/patch_operation";
 
 type PartialType<Type> = {
     // For every existing property inside the type of Type

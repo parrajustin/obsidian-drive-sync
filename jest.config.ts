@@ -22,7 +22,28 @@ const config: Config = {
     collectCoverage: true,
 
     // An array of glob patterns indicating a set of files for which coverage information should be collected
-    // collectCoverageFrom: undefined,
+    collectCoverageFrom: [
+        "src/**/*.ts",
+        "!src/**/*.test.ts",
+        // The history feature is currently dead code: it is only referenced from
+        // commented out imports in main.ts / progressView.ts.
+        "!src/history/**",
+        "!src/schema/history/**",
+        // Plugin entry point; pure obsidian wiring exercised by the e2e flows.
+        "!src/main.ts",
+        // Type-only declarations, no runtime code to cover.
+        "!src/types.ts"
+    ],
+
+    // Fail the run if coverage drops below these thresholds.
+    coverageThreshold: {
+        global: {
+            statements: 70,
+            branches: 70,
+            functions: 70,
+            lines: 70
+        }
+    },
 
     // The directory where Jest should output its coverage files
     coverageDirectory: "coverage",
@@ -90,7 +111,14 @@ const config: Config = {
     // ],
 
     // A map from regular expressions to module names or to arrays of module names that allow to stub out resources with a single module
-    // moduleNameMapper: {},
+    // Resolve the shared libs to their live monorepo sources (via the obsidian/standard-*-lib
+    // symlinks) so jest transforms them like regular project files.
+    moduleNameMapper: {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        "^standard-ts-lib/(.*)$": "<rootDir>/../standard-ts-lib/$1",
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        "^standard-obsidian-lib/(.*)$": "<rootDir>/../standard-obsidian-lib/$1"
+    },
 
     // An array of regexp pattern strings, matched against all module paths before considered 'visible' to the module loader
     // modulePathIgnorePatterns: [],
@@ -182,10 +210,8 @@ const config: Config = {
     },
 
     // An array of regexp pattern strings that are matched against all source file paths, matched files will skip transformation
-    // transformIgnorePatterns: [
-    //   "/node_modules/",
-    //   "\\.pnp\\.[^\\/]+$"
-    // ],
+    // The negative lookahead lets jest transform the pnpm-linked standard-*-lib TypeScript sources.
+    transformIgnorePatterns: ["/node_modules/(?!\\.pnpm|standard-ts-lib|standard-obsidian-lib)"],
 
     // An array of regexp pattern strings that are matched against all modules before the module loader will automatically return a mock for them
     // unmockedModulePathPatterns: undefined,

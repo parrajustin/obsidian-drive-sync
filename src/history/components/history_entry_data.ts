@@ -1,4 +1,4 @@
-// import type { Option } from "../../lib/option";
+// import type { Optional } from "standard-ts-lib/src/optional";
 // import type { LocalNode } from "../../sync/file_node";
 // import type { HistoricFileNode } from "../history_file_node";
 
@@ -6,7 +6,7 @@
 //     /** The file path of the given file. */
 //     filePath: string;
 //     /** The local file state if any exists. */
-//     localFile: Option<LocalNode>;
+//     localFile: Optional<LocalNode>;
 //     /** The historical nodes ordered to most recent state to earliest state. */
 //     historyNodes: HistoricFileNode[];
 //     /** The latest modification time (ms from unix epoch). */

@@ -299,7 +299,7 @@ export class FirebaseSyncSettingTab extends PluginSettingTab {
                         cb.setValue(`${elem.maxUpdatePerSyncer}`).onChange((val) => {
                             const parsedVal = Number.parseInt(val);
                             if (!Number.isNaN(parsedVal)) {
-                                elem.maxUpdatePerSyncer = Math.max(1, elem.maxUpdatePerSyncer);
+                                elem.maxUpdatePerSyncer = Math.max(1, parsedVal);
                             }
                         });
                     });

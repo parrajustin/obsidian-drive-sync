@@ -1,18 +1,18 @@
-import { Ok, StatusResult, type Result } from "../lib/result";
-import type { StatusError } from "../lib/status_error";
+import { Ok, StatusResult, type Result } from "standard-ts-lib/src/result";
+import type { StatusError } from "standard-ts-lib/src/status_error";
 import {
     NOTES_SCHEMA_MANAGER,
     type AnyVersionNotesSchema,
     type LatestNotesSchema
 } from "../schema/notes/notes.schema";
-import { PromiseResultSpanError } from "../logging/tracing/result_span.decorator";
+import { PromiseResultSpanError } from "standard-obsidian-lib/src/decorators/result_span.decorator";
 import { Span } from "../logging/tracing/span.decorator";
 import { App } from "obsidian";
 import { FileUtilRaw } from "../filesystem/file_util_raw_api";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { CompressionUtils } from "./compression_utils";
-import { ErrorCode } from "../lib/status_error";
-import { None, Optional, Some } from "../lib/option";
+import { ErrorCode } from "standard-ts-lib/src/status_error";
+import { WrapOptional } from "standard-ts-lib/src/optional";
 
 export interface SchemaWithId<T> {
     id: string;
@@ -27,11 +27,17 @@ export interface FirebaseStoredData<T> {
 }
 
 export class FirebaseCache {
-    private static _lastCacheEntry: Optional<FirebaseStoredData<SchemaWithId<LatestNotesSchema>>> =
-        None;
+    /**
+     * In memory cache of the last read/written data, keyed by the syncer
+     * config's cache path so multiple syncer configs never share entries.
+     */
+    private static _lastCacheEntries = new Map<
+        string,
+        FirebaseStoredData<SchemaWithId<LatestNotesSchema>>
+    >();
 
     public static clearCache(): void {
-        this._lastCacheEntry = None;
+        this._lastCacheEntries.clear();
     }
 
     @Span()
@@ -72,7 +78,7 @@ export class FirebaseCache {
             });
         }
 
-        this._lastCacheEntry = Some(cachedData);
+        this._lastCacheEntries.set(config.firebaseCachePath, cachedData);
         const compressedCache = await CompressionUtils.compressStringData(
             JSON.stringify(cachedData),
             /*reason=*/ "Firebase Cache"
@@ -91,8 +97,9 @@ export class FirebaseCache {
         app: App,
         config: LatestSyncConfigVersion
     ): Promise<Result<FirebaseStoredData<SchemaWithId<LatestNotesSchema>>, StatusError>> {
-        if (this._lastCacheEntry.some) {
-            return Ok(this._lastCacheEntry.safeValue());
+        const lastCacheEntry = WrapOptional(this._lastCacheEntries.get(config.firebaseCachePath));
+        if (lastCacheEntry.some) {
+            return Ok(lastCacheEntry.safeValue());
         }
 
         const fileData = await FileUtilRaw.readRawFile(app, config.firebaseCachePath);
@@ -131,7 +138,7 @@ export class FirebaseCache {
             lastUpdate: parsedJson.safeUnwrap().lastUpdate,
             cache: updatedCache
         };
-        this._lastCacheEntry = Some(cache);
+        this._lastCacheEntries.set(config.firebaseCachePath, cache);
         return Ok(cache);
     }
 }

@@ -2,17 +2,17 @@
 // import type { Unsubscribe, UserCredential } from "firebase/auth";
 // import type { Firestore } from "firebase/firestore";
 // import { query, collection, where, getDocs, onSnapshot, writeBatch, doc } from "firebase/firestore";
-// import type { Option } from "../lib/option";
-// import { Some, WrapOptional } from "../lib/option";
-// import { None } from "../lib/option";
-// import type { Result } from "../lib/result";
-// import { Ok } from "../lib/result";
-// import type { StatusError } from "../lib/status_error";
-// import { WrapPromise } from "../lib/wrap_promise";
+// import type { Optional } from "standard-ts-lib/src/optional";
+// import { Some, WrapOptional } from "standard-ts-lib/src/optional";
+// import { None } from "standard-ts-lib/src/optional";
+// import type { Result } from "standard-ts-lib/src/result";
+// import { Ok } from "standard-ts-lib/src/result";
+// import type { StatusError } from "standard-ts-lib/src/status_error";
+// import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
 // import type FirestoreSyncPlugin from "../main";
 // import type { FilePathType, LocalNode } from "../sync/file_node";
 // import { LogError } from "../logging/log";
-// import { ConvertToUnknownError } from "../util";
+// import { ConvertToUnknownError } from "standard-ts-lib/src/utils";
 // import type { HistoryProgressView } from "./history_view";
 // import { GetOrCreateHistoryProgressView } from "./history_view";
 // import { GetHistorySchemaConverter } from "./history_schema";
@@ -23,8 +23,8 @@
 // import { GetFirestore } from "../firestore/get_firestore";
 // import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 // import { HISTORY_CHANGES_FIREBASE_DB_NAME } from "../constants";
-// import { InjectStatusMsg } from "../lib/inject_status_msg";
-// import { WrapToResult } from "../lib/wrap_to_result";
+// import { InjectStatusMsg } from "standard-ts-lib/src/status_util/inject_status_msg";
+// import { WrapToResult } from "standard-ts-lib/src/wrap_to_result";
 
 // const MAX_NUMBER_OF_HISTORY_ENTRIES_KEPT = 20;
 
@@ -66,9 +66,9 @@
 // }
 
 // export class FirebaseHistory {
-//     public activeHistoryView: Option<HistoryProgressView> = None;
+//     public activeHistoryView: Optional<HistoryProgressView> = None;
 //     /** Unsub function to stop real time updates. */
-//     private _unsubscribe: Option<Unsubscribe> = None;
+//     private _unsubscribe: Optional<Unsubscribe> = None;
 //     /** If this firebase syncer is ready to get updates. */
 //     private _isValid = false;
 //     /** If there is a save setting microtask already running. */
@@ -201,7 +201,7 @@
 //     }
 
 //     /** Get the local nodes file path from a given file path, if there is one. */
-//     public getLocalFileNodeFromFilePath(filePath: FilePathType): Option<LocalNode> {
+//     public getLocalFileNodeFromFilePath(filePath: FilePathType): Optional<LocalNode> {
 //         return WrapOptional(this._mapOfLocalFile.get(filePath));
 //     }
 

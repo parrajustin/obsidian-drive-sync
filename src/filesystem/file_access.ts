@@ -1,14 +1,15 @@
 import { App, normalizePath, TFile } from "obsidian";
 import type { DataWriteOptions } from "obsidian";
-import { Result, StatusResult, Ok, Err } from "../lib/result";
-import { InvalidArgumentError, NotFoundError, StatusError } from "../lib/status_error";
-import { WrapPromise } from "../lib/wrap_promise";
-import { PromiseResultSpanError } from "../logging/tracing/result_span.decorator";
+import { Result, StatusResult, Ok, Err } from "standard-ts-lib/src/result";
+import { InvalidArgumentError, NotFoundError, StatusError } from "standard-ts-lib/src/status_error";
+import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
+import { PromiseResultSpanError } from "standard-obsidian-lib/src/decorators/result_span.decorator";
 import { Span } from "../logging/tracing/span.decorator";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
 import { IsAcceptablePath, IsObsidianFile, IsLocalFileRaw } from "../sync/query_util";
-import { AsyncForEach, CombineResults } from "../util";
-import { None, Optional, Some } from "../lib/option";
+import { AsyncForEach } from "standard-ts-lib/src/async";
+import { CombineResults } from "standard-ts-lib/src/utils";
+import { None, Optional, Some } from "standard-ts-lib/src/optional";
 import GetSha256Hash from "../lib/sha";
 import { FileUtilObsidian } from "./file_util_obsidian_api";
 import { FileUtilRaw } from "./file_util_raw_api";
@@ -22,7 +23,7 @@ import {
 import type { AllExistingFileNodeTypes, FilePathType, LocalCloudFileNode } from "./file_node";
 import { MapOfFileNodes } from "./file_map_util";
 import { MsFromEpoch } from "../types";
-import { InjectMeta } from "../lib/inject_status_msg";
+import { InjectMeta } from "standard-ts-lib/src/status_util/inject_status_msg";
 import { FileConst } from "../constants";
 import { Bytes } from "firebase/firestore";
 

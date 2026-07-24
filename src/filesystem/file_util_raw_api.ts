@@ -3,14 +3,14 @@
  */
 
 import { normalizePath, type App, type DataWriteOptions } from "obsidian";
-import type { Result, StatusResult } from "../lib/result";
-import { Ok } from "../lib/result";
-import { ErrorCode, type StatusError } from "../lib/status_error";
-import { WrapPromise } from "../lib/wrap_promise";
-import { InjectMeta } from "../lib/inject_status_msg";
+import type { Result, StatusResult } from "standard-ts-lib/src/result";
+import { Ok } from "standard-ts-lib/src/result";
+import { ErrorCode, type StatusError } from "standard-ts-lib/src/status_error";
+import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
+import { InjectMeta } from "standard-ts-lib/src/status_util/inject_status_msg";
 import { CreateLogger } from "../logging/logger";
 import { Span } from "../logging/tracing/span.decorator";
-import { PromiseResultSpanError } from "../logging/tracing/result_span.decorator";
+import { PromiseResultSpanError } from "standard-obsidian-lib/src/decorators/result_span.decorator";
 import { FileConst } from "../constants";
 
 const LOGGER = CreateLogger("file_util_raw_api");

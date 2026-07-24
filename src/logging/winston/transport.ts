@@ -4,8 +4,8 @@
 import { LEVEL } from "triple-beam";
 import type { Format, TransformableInfo } from "logform";
 import type { Logger } from "./logger";
-import { WrapOptional } from "../../lib/option";
-import { WrapToResult } from "../../lib/wrap_to_result";
+import { WrapOptional } from "standard-ts-lib/src/optional";
+import { WrapToResult } from "standard-ts-lib/src/wrap_to_result";
 import { Span } from "../tracing/span.decorator";
 import { CreateErrorNotice } from "../log";
 

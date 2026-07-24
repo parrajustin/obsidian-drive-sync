@@ -1,9 +1,9 @@
-import type { Result } from "../lib/result";
-import type { StatusError } from "../lib/status_error";
-import { WrapPromise } from "../lib/wrap_promise";
-import { PromiseResultSpanError } from "../logging/tracing/result_span.decorator";
+import type { Result } from "standard-ts-lib/src/result";
+import type { StatusError } from "standard-ts-lib/src/status_error";
+import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
+import { PromiseResultSpanError } from "standard-obsidian-lib/src/decorators/result_span.decorator";
 import { Span } from "../logging/tracing/span.decorator";
-import { WrapToResult } from "../lib/wrap_to_result";
+import { WrapToResult } from "standard-ts-lib/src/wrap_to_result";
 
 export class CompressionUtils {
     /** Compress string data to base64 gzip data. */

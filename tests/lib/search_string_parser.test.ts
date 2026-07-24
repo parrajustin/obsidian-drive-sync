@@ -1,7 +1,10 @@
 import { describe, expect, test } from "@jest/globals";
-import type { Conditions, TextTransformer } from "../../src/lib/search_string_parser";
-import { SearchString } from "../../src/lib/search_string_parser";
-import { None, Some } from "../../src/lib/option";
+import type {
+    Conditions,
+    TextTransformer
+} from "standard-ts-lib/src/search_string/search_string_parser";
+import { SearchString } from "standard-ts-lib/src/search_string/search_string_parser";
+import { None, Some } from "standard-ts-lib/src/optional";
 
 function GetConditionMap(
     searchString: SearchString

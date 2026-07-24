@@ -12,7 +12,7 @@ const config = tseslint.config({
         ...tseslint.configs.strictTypeChecked,
         ...tseslint.configs.stylisticTypeChecked
     ],
-    ignores: ["dist/*", "coverage/*"],
+    ignores: ["dist/*", "coverage/*", "**/*.test.ts", "tests/**/*.ts"],
     // This is required, see the docs
     languageOptions: {
         parserOptions: {
@@ -148,4 +148,57 @@ const config = tseslint.config({
     }
 });
 
-export default config;
+/**
+ * Test files and test infrastructure (fakes/mocks). These legitimately need
+ * `any`-typed mocks, unbound method references (jest matchers), `require()` in
+ * `jest.mock` factories, and object literals that mirror external API names.
+ * We keep prettier and the core correctness rules but relax the strict
+ * type-checked rules that only make sense for shipped plugin code.
+ */
+const testConfig = tseslint.config({
+    files: ["**/*.test.ts", "tests/**/*.ts"],
+    extends: [
+        eslint.configs.recommended,
+        ...tseslint.configs.recommended,
+        eslintPluginPrettierRecommended
+    ],
+    languageOptions: {
+        parserOptions: {
+            project: true,
+            tsconfigRootDir: import.meta.dirname
+        }
+    },
+    rules: {
+        "prettier/prettier": 2,
+        "no-console": 1,
+        camelcase: "off",
+        "@typescript-eslint/naming-convention": "off",
+        "@typescript-eslint/member-ordering": "off",
+        "@typescript-eslint/explicit-member-accessibility": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-unsafe-any": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "@typescript-eslint/no-unsafe-return": "off",
+        "@typescript-eslint/unbound-method": "off",
+        "@typescript-eslint/require-await": "off",
+        "@typescript-eslint/no-require-imports": "off",
+        "@typescript-eslint/no-empty-function": "off",
+        "@typescript-eslint/consistent-type-imports": "off",
+        "@typescript-eslint/no-unused-vars": [
+            "error",
+            {
+                args: "all",
+                argsIgnorePattern: "^_",
+                caughtErrors: "all",
+                caughtErrorsIgnorePattern: "^_",
+                varsIgnorePattern: "^_",
+                ignoreRestSiblings: true
+            }
+        ]
+    }
+});
+
+export default [...config, ...testConfig];

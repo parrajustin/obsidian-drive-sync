@@ -56,6 +56,12 @@ importers:
       remeda:
         specifier: 2.16.0
         version: 2.16.0
+      standard-obsidian-lib:
+        specifier: file:../standard-obsidian-lib
+        version: file:../standard-obsidian-lib(obsidian@1.8.7(@codemirror/state@6.4.1)(@codemirror/view@6.33.0))
+      standard-ts-lib:
+        specifier: file:../standard-ts-lib
+        version: file:../standard-ts-lib
       triple-beam:
         specifier: 1.4.1
         version: 1.4.1
@@ -4193,6 +4199,14 @@ packages:
   stack-utils@2.0.6:
     resolution: {integrity: sha512-XlkWvfIm6RmsWtNJx+uqtKLS8eqFbxUg0ZzLXqY0caEy9l7hruX8IpiDnjsLavoBgqCCR71TqWO8MaXYheJ3RQ==}
     engines: {node: '>=10'}
+
+  standard-obsidian-lib@file:../standard-obsidian-lib:
+    resolution: {directory: ../standard-obsidian-lib, type: directory}
+    peerDependencies:
+      obsidian: ^1.0.0
+
+  standard-ts-lib@file:../standard-ts-lib:
+    resolution: {directory: ../standard-ts-lib, type: directory}
 
   statuses@1.5.0:
     resolution: {integrity: sha512-OpZ3zP+jT1PI7I8nemJX4AKmAX070ZkYPVWV/AaKTJl+tXCTGyVdC1a4SL8RUQYEwk/f34ZX8UTykN68FwrqAA==}
@@ -9839,6 +9853,16 @@ snapshots:
   stack-utils@2.0.6:
     dependencies:
       escape-string-regexp: 2.0.0
+
+  standard-obsidian-lib@file:../standard-obsidian-lib(obsidian@1.8.7(@codemirror/state@6.4.1)(@codemirror/view@6.33.0)):
+    dependencies:
+      '@opentelemetry/api': 1.9.0
+      obsidian: 1.8.7(@codemirror/state@6.4.1)(@codemirror/view@6.33.0)
+      standard-ts-lib: file:../standard-ts-lib
+      tslib: 2.7.0
+      zod: 3.23.8
+
+  standard-ts-lib@file:../standard-ts-lib: {}
 
   statuses@1.5.0: {}
 

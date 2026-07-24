@@ -1,8 +1,7 @@
 import { THIS_APP } from "./main_app";
 import { CreateLogger } from "./logging/logger";
 import { LogError } from "./logging/log";
-import { NotFoundError } from "./lib/status_error";
-import { Err } from "./lib/result";
+import { NotFoundError } from "standard-ts-lib/src/status_error";
 
 const LOGGER = CreateLogger("clock");
 
@@ -72,15 +71,6 @@ export class FakeClock implements Clock {
 }
 
 export class RealTimeClock implements Clock {
-    private get _app() {
-        if (THIS_APP.none) {
-            const err = NotFoundError("found no app in realtime clock!");
-            LogError(LOGGER, err);
-            throw Err(err);
-        }
-        return THIS_APP.safeValue();
-    }
-
     public now(): number {
         return Date.now();
     }
@@ -91,9 +81,15 @@ export class RealTimeClock implements Clock {
 
     public setTimeout(func: () => void, ms: number): number {
         const timeoutId = window.setTimeout(func, ms);
-        this._app.register(() => {
-            window.clearTimeout(timeoutId);
-        });
+        // Register cleanup with the plugin when available; a missing app only
+        // means the timeout won't be auto cleared on plugin unload.
+        if (THIS_APP.some) {
+            THIS_APP.safeValue().register(() => {
+                window.clearTimeout(timeoutId);
+            });
+        } else {
+            LogError(LOGGER, NotFoundError("found no app in realtime clock!"));
+        }
         return timeoutId;
     }
 

@@ -1,4 +1,4 @@
-// import { InvalidArgumentError } from "../lib/status_error";
+// import { InvalidArgumentError } from "standard-ts-lib/src/status_error";
 // import type { CloudFileMetadata, CloudNode, FileData } from "../sync/file_node";
 // import { CloudNodeFileRef, CloudNodeRaw, BaseMutableFileNode } from "../sync/file_node";
 

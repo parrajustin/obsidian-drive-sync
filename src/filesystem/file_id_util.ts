@@ -5,12 +5,12 @@
 
 import type { App, DataWriteOptions } from "obsidian";
 import { TFile } from "obsidian";
-import type { Option } from "../lib/option";
-import { None, Some } from "../lib/option";
-import type { Result, StatusResult } from "../lib/result";
-import { Ok } from "../lib/result";
-import type { StatusError } from "../lib/status_error";
-import { WrapPromise } from "../lib/wrap_promise";
+import type { Optional } from "standard-ts-lib/src/optional";
+import { None, Some } from "standard-ts-lib/src/optional";
+import type { Result, StatusResult } from "standard-ts-lib/src/result";
+import { Ok } from "standard-ts-lib/src/result";
+import type { StatusError } from "standard-ts-lib/src/status_error";
+import { WrapPromise } from "standard-ts-lib/src/wrap_promise";
 import { uuidv7 } from "../lib/uuid";
 import { ShouldHaveFileId } from "../sync/query_util";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
@@ -21,8 +21,8 @@ export const FILE_ID_FRONTMATTER_KEY = "File Id";
 async function ReadFileIdWithoutCache(
     app: App,
     file: TFile
-): Promise<Result<Option<string>, StatusError>> {
-    let fileId: Option<string> = None;
+): Promise<Result<Optional<string>, StatusError>> {
+    let fileId: Optional<string> = None;
     const processFrontmatter = await WrapPromise(
         app.fileManager.processFrontMatter(file, (frontmatter) => {
             if (frontmatter[FILE_ID_FRONTMATTER_KEY] !== undefined) {
@@ -42,7 +42,7 @@ export async function GetFileUidFromFrontmatter(
     app: App,
     config: LatestSyncConfigVersion,
     file: TFile
-): Promise<Result<Option<string>, StatusError>> {
+): Promise<Result<Optional<string>, StatusError>> {
     if (!ShouldHaveFileId(file.path as FilePathType, config)) {
         return Ok(None);
     }

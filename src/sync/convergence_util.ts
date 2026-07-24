@@ -12,11 +12,11 @@ import {
 import { Span } from "../logging/tracing/span.decorator";
 import { LatestNotesSchema } from "../schema/notes/notes.schema";
 import type { LatestSyncConfigVersion } from "../schema/settings/syncer_config.schema";
-import type { Result } from "../lib/result";
-import { Ok } from "../lib/result";
-import { StatusError } from "../lib/status_error";
-import { PromiseResultSpanError } from "../logging/tracing/result_span.decorator";
-import { None, Optional, Some, WrapOptional } from "../lib/option";
+import type { Result } from "standard-ts-lib/src/result";
+import { Ok } from "standard-ts-lib/src/result";
+import { StatusError } from "standard-ts-lib/src/status_error";
+import { PromiseResultSpanError } from "standard-obsidian-lib/src/decorators/result_span.decorator";
+import { None, Optional, Some, WrapOptional } from "standard-ts-lib/src/optional";
 import { SchemaWithId } from "./firebase_cache";
 import { CreateLogger } from "../logging/logger";
 import { MsFromEpoch } from "../types";
