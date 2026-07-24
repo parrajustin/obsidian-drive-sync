@@ -30,6 +30,29 @@ const USER_ID_FORMAT = format((info, _opts) => {
 });
 
 export function CreateLogger(label: string): Logger {
+    // In a headless Node environment (the CLI binary) we must not ship the
+    // user's logs to the plugin's remote Loki server. Use only the console
+    // transport there. Browser (Obsidian) behavior is unchanged.
+    const isBrowser = typeof window !== "undefined";
+    const consoleFormat = format.combine(
+        USER_ID_FORMAT(),
+        format.label({ label }),
+        format.timestamp(),
+        format.prettyPrint()
+    );
+
+    // Headless Node: console only, no remote Loki telemetry.
+    if (!isBrowser) {
+        const streams: TransportStream[] = IS_TEST_ENV
+            ? []
+            : [new BrowserConsole({ level: "info", format: consoleFormat })];
+        return new Logger({
+            format: consoleFormat,
+            defaultMeta: { env: PLUGIN_ENVIRONMENT, version: PLUGIN_VERSION, runId: RUN_ID },
+            transports: streams
+        });
+    }
+
     let transportStreams: TransportStream[] = [
         new LokiTransport({
             level: "error",
@@ -62,17 +85,7 @@ export function CreateLogger(label: string): Logger {
         })
     ];
     if (PLUGIN_ENVIRONMENT !== "production") {
-        transportStreams.unshift(
-            new BrowserConsole({
-                level: "debug",
-                format: format.combine(
-                    USER_ID_FORMAT(),
-                    format.label({ label }),
-                    format.timestamp(),
-                    format.prettyPrint()
-                )
-            })
-        );
+        transportStreams.unshift(new BrowserConsole({ level: "debug", format: consoleFormat }));
     }
     if (IS_TEST_ENV) {
         transportStreams = [];

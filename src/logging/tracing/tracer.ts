@@ -1,3 +1,5 @@
+import type { Tracer } from "@opentelemetry/api";
+import { trace } from "@opentelemetry/api";
 import type { SpanProcessor } from "@opentelemetry/sdk-trace-base";
 import {
     BatchSpanProcessor,
@@ -33,15 +35,23 @@ const collectorOptions = {
     concurrencyLimit: 10 // an optional limit on pending requests
 };
 
-const exporter = new OTLPTraceExporter(collectorOptions);
-const spanProcessors: SpanProcessor[] = [
-    new BatchSpanProcessor(exporter, {
-        // The maximum queue size. After the size is reached spans are dropped.
-        maxQueueSize: 1000,
-        // The interval between two consecutive exports
-        scheduledDelayMillis: 10000
-    })
-];
+// In a headless Node environment (the CLI binary) there is no browser context
+// and we must NOT ship the user's traces to the plugin's remote collector.
+// Detect Node and skip the network exporter + provider registration entirely,
+// falling back to the OpenTelemetry API's no-op tracer. Browser (Obsidian)
+// behavior is unchanged.
+const isBrowser = typeof window !== "undefined";
+
+const spanProcessors: SpanProcessor[] = isBrowser
+    ? [
+          new BatchSpanProcessor(new OTLPTraceExporter(collectorOptions), {
+              // The maximum queue size. After the size is reached spans are dropped.
+              maxQueueSize: 1000,
+              // The interval between two consecutive exports
+              scheduledDelayMillis: 10000
+          })
+      ]
+    : [];
 // const spanProcessors: SpanProcessor[] = [
 //     new BatchSpanProcessor(
 //         new ZipkinExporter({
@@ -61,24 +71,28 @@ const spanProcessors: SpanProcessor[] = [
 //         }
 //     )
 // ];
-if (PLUGIN_ENVIRONMENT !== "production") {
+if (isBrowser && PLUGIN_ENVIRONMENT !== "production") {
     spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
 }
 
-const provider = new WebTracerProvider({
-    resource: resourceFromAttributes({
-        [ATTR_SERVICE_NAME]: SERVICE_NAME,
-        [ATTR_SERVICE_VERSION]: PLUGIN_VERSION,
-        [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: PLUGIN_ENVIRONMENT,
-        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
-        run_id: RUN_ID
-    }),
-    // Note: For production consider using the "BatchSpanProcessor" to reduce the number of requests
-    // to your exporter. Using the SimpleSpanProcessor here as it sends the spans immediately to the
-    // exporter without delay
-    spanProcessors
-});
+function CreateTracer(): Tracer {
+    if (!isBrowser) {
+        // No provider registered → the API hands back a non-recording no-op
+        // tracer. Spans still satisfy the decorator interface but go nowhere.
+        return trace.getTracer("obsidian-drive-sync-node");
+    }
+    const provider = new WebTracerProvider({
+        resource: resourceFromAttributes({
+            [ATTR_SERVICE_NAME]: SERVICE_NAME,
+            [ATTR_SERVICE_VERSION]: PLUGIN_VERSION,
+            [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: PLUGIN_ENVIRONMENT,
+            // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+            run_id: RUN_ID
+        }),
+        spanProcessors
+    });
+    provider.register();
+    return provider.getTracer("obisidan-frontend");
+}
 
-provider.register();
-
-export const TRACER = provider.getTracer("obisidan-frontend");
+export const TRACER = CreateTracer();

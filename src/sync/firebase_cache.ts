@@ -119,7 +119,7 @@ export class FirebaseCache {
             // Convert to unit8array.
             .map((n) => new Uint8Array(n))
             // Convert to a string.
-            .map((n) => new window.TextDecoder("utf-8").decode(n))
+            .map((n) => new TextDecoder("utf-8").decode(n))
             // Parse the string as json.
             .map((n) => JSON.parse(n) as FirebaseStoredData<SchemaWithId<AnyVersionNotesSchema>>);
         if (parsedJson.err) {

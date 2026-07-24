@@ -12,7 +12,7 @@ const config = tseslint.config({
         ...tseslint.configs.strictTypeChecked,
         ...tseslint.configs.stylisticTypeChecked
     ],
-    ignores: ["dist/*", "coverage/*", "**/*.test.ts", "tests/**/*.ts"],
+    ignores: ["dist/*", "dist-bin/*", "coverage/*", "**/*.test.ts", "tests/**/*.ts"],
     // This is required, see the docs
     languageOptions: {
         parserOptions: {
@@ -201,4 +201,28 @@ const testConfig = tseslint.config({
     }
 });
 
-export default [...config, ...testConfig];
+/**
+ * CLI/tooling glue under cmd/. This is real runtime code (so it keeps the
+ * type-checked correctness rules — floating promises, unsafe access, etc.) but
+ * it bridges to an external API surface (the `obsidian` shim mirrors Obsidian's
+ * exported names, and the shims need inert stub methods), so the purely
+ * stylistic Google-style rules are relaxed here.
+ */
+const cmdConfig = tseslint.config({
+    files: ["cmd/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+        "@typescript-eslint/naming-convention": "off",
+        "@typescript-eslint/member-ordering": "off",
+        "@typescript-eslint/no-empty-function": "off",
+        "@typescript-eslint/no-useless-constructor": "off"
+    }
+});
+
+export default [
+    // Global ignores (bundled/generated output).
+    { ignores: ["dist/**", "dist-bin/**", "coverage/**"] },
+    ...config,
+    ...cmdConfig,
+    ...testConfig
+];
