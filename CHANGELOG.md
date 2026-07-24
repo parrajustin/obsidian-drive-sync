@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.3.0](https://github.com/parrajustin/obsidian-drive-sync/compare/v3.2.1...v3.3.0) (2026-07-24)
+
+
+### Features
+
+* Add cli for syncing ([dc716db](https://github.com/parrajustin/obsidian-drive-sync/commit/dc716db408068ae58bf900f86a38658b54e02008))
+* Update plugin make tested ([0069e82](https://github.com/parrajustin/obsidian-drive-sync/commit/0069e8292470302507e702518cb1194998561db2))
+
 ## [3.2.1](https://github.com/parrajustin/obsidian-drive-sync/compare/v3.2.0...v3.2.1) (2025-09-22)
 
 
