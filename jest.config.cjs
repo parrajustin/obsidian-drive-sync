@@ -3,9 +3,12 @@
  * https://jestjs.io/docs/configuration
  */
 
-import type { Config } from "jest";
+// Converted from jest.config.ts so the config is loadable both by plain
+// `npx jest` and by Bazel's jest_test (which requires a .js/.cjs/.mjs/.json
+// config).
+/** @type {import('jest').Config} */
 
-const config: Config = {
+const config = {
     // All imported modules in your tests should be mocked automatically
     // automock: false,
 
@@ -111,13 +114,11 @@ const config: Config = {
     // ],
 
     // A map from regular expressions to module names or to arrays of module names that allow to stub out resources with a single module
-    // Resolve the shared libs to their live monorepo sources (via the obsidian/standard-*-lib
-    // symlinks) so jest transforms them like regular project files.
+    // Resolve the shared libs to their live monorepo sources (common/standard-*-lib)
+    // so jest transforms them like regular project files.
     moduleNameMapper: {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        "^standard-ts-lib/(.*)$": "<rootDir>/../standard-ts-lib/$1",
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        "^standard-obsidian-lib/(.*)$": "<rootDir>/../standard-obsidian-lib/$1"
+        "^standard-ts-lib/(.*)$": "<rootDir>/../../common/standard-ts-lib/$1",
+        "^standard-obsidian-lib/(.*)$": "<rootDir>/../../common/standard-obsidian-lib/$1"
     },
 
     // An array of regexp pattern strings, matched against all module paths before considered 'visible' to the module loader
@@ -205,7 +206,6 @@ const config: Config = {
 
     // A map from regular expressions to paths to transformers
     transform: {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         "^.+.tsx?$": ["ts-jest", {}]
     },
 
@@ -226,4 +226,4 @@ const config: Config = {
     // watchman: true,
 };
 
-export default config;
+module.exports = config;

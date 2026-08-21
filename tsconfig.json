@@ -1,11 +1,11 @@
 {
     "compilerOptions": {
         "baseUrl": "src",
-        // Resolve the shared libs to their live monorepo sources (via the obsidian/standard-*-lib
-        // symlinks) so tsc/ts-jest/esbuild all agree with jest's moduleNameMapper.
+        // Resolve the shared libs to their live monorepo sources (common/standard-*-lib)
+        // so tsc/ts-jest/esbuild all agree with jest's moduleNameMapper.
         "paths": {
-            "standard-ts-lib/*": ["../../standard-ts-lib/*"],
-            "standard-obsidian-lib/*": ["../../standard-obsidian-lib/*"]
+            "standard-ts-lib/*": ["../../../common/standard-ts-lib/*"],
+            "standard-obsidian-lib/*": ["../../../common/standard-obsidian-lib/*"]
         },
         "inlineSourceMap": true,
         "inlineSources": true,
@@ -39,7 +39,6 @@
         "tests/**/*.ts",
         "cmd/**/*.ts",
         "docs/**/*",
-        "jest.config.ts",
         "util/update_firestore_rules.ts"
     ]
 }

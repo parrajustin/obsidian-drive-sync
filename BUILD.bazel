@@ -1,0 +1,275 @@
+# obsidian-drive-sync — Google Drive / Firebase sync plugin + headless CLI.
+#
+# npm-script parity:
+#   build                  -> :build         (esbuild bundle -> dist/)
+#   build:binary           -> :build_binary  (headless CLI -> dist-bin/drive-sync.cjs)
+#   test                   -> :test          (jest, ts-jest transform)
+#   type-check             -> :type_check    (tsc --noEmit)
+#   lint                   -> :lint          (eslint flat config, type-aware)
+#   dev                    -> bazel run :dev           (watch mode, source tree)
+#   dev:binary             -> bazel run :dev_binary
+#   deploy                 -> bazel run :deploy        (firebase deploy)
+#   version                -> bazel run :version
+#   githubaction           -> bazel run :githubaction
+#   update-firestore-rules -> bazel run :update_firestore_rules
+#   devObsidianDeploy      -> bazel run :dev_obsidian_deploy
+#
+# The shared libs (standard-ts-lib / standard-obsidian-lib) are pnpm `file:`
+# deps resolved through :node_modules; jest and tsc additionally resolve them
+# to the live monorepo sources (//common/...:srcs) via moduleNameMapper /
+# tsconfig paths.
+
+load("@aspect_rules_jest//jest:defs.bzl", "jest_test")
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
+load("@npm_obsidian_drive_sync//:defs.bzl", "npm_link_all_packages")
+load("@npm_obsidian_drive_sync//obsidian/obsidian-drive-sync:eslint/package_json.bzl", eslint_bin = "bin")
+load("@npm_obsidian_drive_sync//obsidian/obsidian-drive-sync:typescript/package_json.bzl", typescript_bin = "bin")
+
+exports_files([
+    "package.json",
+    "pnpm-lock.yaml",
+])
+
+# Links every npm dependency from the pnpm lockfile as :node_modules/<pkg>.
+npm_link_all_packages(name = "node_modules")
+
+# Runtime deps the plugin bundle resolves at esbuild time.
+BUNDLE_DEPS = [
+    ":node_modules/@lit-labs/signals",
+    ":node_modules/@lit/context",
+    ":node_modules/@opentelemetry/api",
+    ":node_modules/@opentelemetry/exporter-trace-otlp-http",
+    ":node_modules/@opentelemetry/resources",
+    ":node_modules/@opentelemetry/sdk-trace-base",
+    ":node_modules/@opentelemetry/sdk-trace-web",
+    ":node_modules/@opentelemetry/semantic-conventions",
+    ":node_modules/disposablestack",
+    ":node_modules/firebase",
+    ":node_modules/lit",
+    ":node_modules/logform",
+    ":node_modules/remeda",
+    ":node_modules/standard-obsidian-lib",
+    ":node_modules/standard-ts-lib",
+    ":node_modules/triple-beam",
+    ":node_modules/tslib",
+    ":node_modules/winston-transport",
+    ":node_modules/yaml",
+    ":node_modules/zod",
+]
+
+# The package's own esbuild driver script (esbuild.config.mjs). It imports
+# esbuild + builtin-modules + dotenv and the local build/ esbuild plugins.
+js_binary(
+    name = "esbuild_config",
+    data = glob(["build/*.js"]) + [
+        ":node_modules/builtin-modules",
+        ":node_modules/dotenv",
+        ":node_modules/esbuild",
+    ],
+    entry_point = "esbuild.config.mjs",
+)
+
+# `npm run build` — bundles src/main.ts into dist/ (main.js, meta.json,
+# manifest.json).
+js_run_binary(
+    name = "build",
+    srcs = glob([
+        "build/*.js",
+        "src/**",
+    ]) + BUNDLE_DEPS + [
+        "manifest.json",
+        "package.json",
+        "styles.css",
+        "tsconfig.json",
+    ],
+    args = ["production"],
+    chdir = package_name(),
+    out_dirs = ["dist"],
+    tool = ":esbuild_config",
+    visibility = ["//visibility:public"],
+)
+
+# Driver for the headless CLI bundle (esbuild.binary.mjs).
+js_binary(
+    name = "esbuild_binary_config",
+    data = [":node_modules/esbuild"],
+    entry_point = "esbuild.binary.mjs",
+)
+
+# `npm run build:binary` — bundles cmd/binary.ts (obsidian aliased to the Node
+# shim) into dist-bin/drive-sync.cjs.
+js_run_binary(
+    name = "build_binary",
+    srcs = glob([
+        "cmd/**",
+        "src/**",
+    ]) + BUNDLE_DEPS + [
+        "package.json",
+        "tsconfig.json",
+    ],
+    args = ["production"],
+    chdir = package_name(),
+    out_dirs = ["dist-bin"],
+    tool = ":esbuild_binary_config",
+    visibility = ["//visibility:public"],
+)
+
+# `npm test` — jest with the ts-jest transform in the custom obsidian DOM
+# environment. moduleNameMapper resolves the shared libs to ../../common
+# sources, so those must be present in the sandbox.
+jest_test(
+    name = "test",
+    size = "large",
+    config = "jest.config.cjs",
+    data = glob([
+        "cmd/**",
+        "src/**",
+        "tests/**",
+    ]) + [
+        "package.json",
+        "tsconfig.json",
+        ":node_modules",
+        # set-span-status.ts (resolved to the live ../../common sources)
+        # imports @opentelemetry/api, which resolves from the lib's own
+        # node_modules on the host — mirror that here.
+        "//common/standard-obsidian-lib:node_modules/@opentelemetry/api",
+        "//common/standard-obsidian-lib:srcs",
+        "//common/standard-ts-lib:srcs",
+    ],
+    node_modules = ":node_modules",
+)
+
+# `npm run type-check` — tsc --noEmit; tsconfig paths point at ../../common.
+typescript_bin.tsc_test(
+    name = "type_check",
+    args = [
+        "--noEmit",
+        "-p",
+        "tsconfig.json",
+    ],
+    chdir = package_name(),
+    data = glob([
+        "cmd/**",
+        "src/**",
+        "tests/**",
+    ]) + [
+        "package.json",
+        "tsconfig.json",
+        "util/update_firestore_rules.ts",
+        ":node_modules",
+        "//common/standard-obsidian-lib:node_modules/@opentelemetry/api",
+        "//common/standard-obsidian-lib:srcs",
+        "//common/standard-ts-lib:srcs",
+    ],
+)
+
+# `npm run lint` — eslint flat config (type-aware, keyed off ./tsconfig.json,
+# which resolves the shared libs to ../../common sources).
+eslint_bin.eslint_test(
+    name = "lint",
+    args = [
+        ".",
+        "--ignore-pattern",
+        "**/*.js",
+    ],
+    chdir = package_name(),
+    data = glob([
+        "cmd/**",
+        "src/**",
+        "tests/**",
+    ]) + [
+        ".editorconfig",
+        ".prettierignore",
+        ".prettierrc.json",
+        "eslint.config.js",
+        "jest.config.cjs",
+        "package.json",
+        "tsconfig.json",
+        "util/update_firestore_rules.ts",
+        ":node_modules",
+        "//common/standard-obsidian-lib:srcs",
+        "//common/standard-ts-lib:srcs",
+    ],
+)
+
+# Host-coupled scripts: run from the real source tree via `bazel run`
+# (require a local `pnpm install`).
+sh_binary(
+    name = "dev",
+    srcs = ["//:run_in_package.sh"],
+    args = [
+        package_name(),
+        "node",
+        "esbuild.config.mjs",
+        "development",
+        "false",
+    ],
+    tags = ["manual"],
+)
+
+sh_binary(
+    name = "dev_binary",
+    srcs = ["//:run_in_package.sh"],
+    args = [
+        package_name(),
+        "node",
+        "esbuild.binary.mjs",
+    ],
+    tags = ["manual"],
+)
+
+sh_binary(
+    name = "deploy",
+    srcs = ["//:run_in_package.sh"],
+    args = [
+        package_name(),
+        "npx",
+        "firebase",
+        "deploy",
+    ],
+    tags = ["manual"],
+)
+
+sh_binary(
+    name = "version",
+    srcs = ["//:run_in_package.sh"],
+    args = [
+        package_name(),
+        "node",
+        "version-bump.mjs",
+    ],
+    tags = ["manual"],
+)
+
+sh_binary(
+    name = "githubaction",
+    srcs = ["//:run_in_package.sh"],
+    args = [
+        package_name(),
+        "node",
+        "version-github-action.mjs",
+    ],
+    tags = ["manual"],
+)
+
+sh_binary(
+    name = "update_firestore_rules",
+    srcs = ["//:run_in_package.sh"],
+    args = [
+        package_name(),
+        "./util/update_firestore_rules",
+    ],
+    tags = ["manual"],
+)
+
+sh_binary(
+    name = "dev_obsidian_deploy",
+    srcs = ["//:run_in_package.sh"],
+    args = [
+        package_name(),
+        "./dev_update",
+        "-o",
+        "/mnt/PersonalVault/.obsidian/plugins/obsidian-firebase-sync/",
+    ],
+    tags = ["manual"],
+)
